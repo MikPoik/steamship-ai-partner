@@ -126,7 +126,7 @@ class MyAssistant(AgentService):
 
         self._agent = ReACTAgent(tools=[SearchTool(),VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool(),VoiceTool()],
             llm=OpenAI(self.client,model_name="gpt-4"),
-            conversation_memory=MessageWindowMessageSelector(k=10),
+            conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
 
