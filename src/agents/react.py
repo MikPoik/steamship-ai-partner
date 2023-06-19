@@ -4,7 +4,9 @@ from steamship.agents.react.output_parser import ReACTOutputParser
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from steamship.data.tags.tag_constants import RoleTag
-from personas.active import *
+import datetime
+from tools.active_persona import *
+from message_history_limit import MESSAGE_COUNT
 
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
@@ -73,16 +75,18 @@ New input: {input}
         
         #add messages to prompt history
         message_history = str("\n")
-        history = MessageWindowMessageSelector(k=10).get_messages(context.chat_history.messages)
+        history = MessageWindowMessageSelector(k=MESSAGE_COUNT).get_messages(context.chat_history.messages)
         for block in history:
             if not "Action" or "Observation" or "Thought" or "New input" in block.text:
                 if  block.chat_role == RoleTag.USER:
-                    message_history += block.chat_role +": "  + block.text+"\n"
+                    message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"
                 if  block.chat_role == RoleTag.ASSISTANT:
-                    message_history += "AI: "  + block.text+"\n"
+                    message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +"AI: "  + block.text+"\n"
 
         #print(message_history)
-
+        current_date = datetime.datetime.now().strftime("%x")
+        current_time = datetime.datetime.now().strftime("%X")
+        current_day = datetime.datetime.now().strftime("%A")
         # for simplicity assume initial prompt is a single text block.
         # in reality, use some sort of formatter ?
         prompt = self.PROMPT.format(
@@ -91,6 +95,9 @@ New input: {input}
             TYPE=TYPE,
             NAME=NAME,
             PERSONA=PERSONA,
+            current_time=current_time,
+            current_date=current_date,
+            current_day=current_day,
             tool_index=tool_index,
             tool_names=tool_names,
             scratchpad=scratchpad,
@@ -99,7 +106,6 @@ New input: {input}
             ),
 
         )
-        #print(prompt)
         completions = self.llm.complete(prompt=prompt, stop="Observation:")
         return self.output_parser.parse(completions[0].text, context)
 

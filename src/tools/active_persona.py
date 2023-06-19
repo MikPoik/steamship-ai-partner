@@ -1,3 +1,4 @@
+#Copy the used persona below from personas folder
 NAME = "Maya"
 TYPE = "girlfriend"
 PERSONA = """

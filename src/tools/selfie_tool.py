@@ -6,8 +6,7 @@ from steamship.agents.schema import AgentContext
 from steamship.agents.tools.base_tools import ImageGeneratorTool
 from steamship.agents.tools.image_generation.stable_diffusion import StableDiffusionTool
 from steamship.utils.repl import ToolREPL
-#how to import if tool is in tools-folder?
-from personas.active import *
+from tools.active_persona import SELFIE_TEMPLATE
 
 
 class SelfieTool(ImageGeneratorTool):
@@ -24,7 +23,8 @@ class SelfieTool(ImageGeneratorTool):
         "Input: the scene setup of the image "
         "Output: the selfie-style image"
     )
-    generator_plugin_handle: str = "stable-diffusion"
+    generator_plugin_handle: str = "stable-diffusion",
+    generator_plugin_config: dict = {"n": 1}
 
     prompt_template = (
         "{SELFIE_TEMPLATE}, {subject}"

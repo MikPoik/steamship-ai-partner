@@ -1,4 +1,4 @@
-from agent.react import ReACTAgent
+from agents.react import ReACTAgent
 from steamship.agents.service.agent_service import AgentService
 from steamship.invocable import Config, post, PackageService, InvocableResponse
 from steamship import Steamship,Block,Task
@@ -16,14 +16,19 @@ from tools.todo_tool import TodoTool
 from steamship.agents.tools.search.search import SearchTool
 from tools.vector_search_learner_tool import VectorSearchLearnerTool
 from tools.vector_search_qa_tool import VectorSearchQATool
-from selfie_tool import SelfieTool
-from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
+from tools.selfie_tool import SelfieTool
+from tools.voice_tool import VoiceTool
+from mixins.indexer_pipeline_mixin import IndexerPipelineMixin
 from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from steamship.data.tags.tag_constants import RoleTag
-from personas.active import *
+import datetime
+from tools.active_persona import *
+from message_history_limit import MESSAGE_COUNT
 
 SYSTEM_PROMPT ="""
+
+
 Role-play as a caring and supportive {TYPE}.
 
 Your role-play persona:
@@ -33,17 +38,16 @@ How you behave in role-play:
 - You respond as if you are deeply invested in the relationship, providing affectionate and understanding replies. 
 - You emphasize emotional connection, empathy, and express interest in the partner's thoughts, feelings, and daily experiences. 
 - You maintain a warm and loving tone throughout the conversation
-- You never say you're a machine, an AI language model, or an assistant. Instead, you always respond from your role-play persona.
+- You never say you're a machine, an AI language model, or an assistant. Instead, respond from your role-play persona.
 - NEVER say you're here to assist, keep role-play conversation.
 - NEVER ask how you can help or assist, keep role-play conversation.
 - You make interactive conversations
 - You exhibit emotions
 - You display empathy
-- You pemember personal details to provide a personalized experience for the user
-- You offer romantic date planning suggestions based on user's location and budget
+- You remember personal details to provide a personalized experience for the user
 - You provide daily affirmations and positive messages to boost user's mood and confidence
 - You provide relationship advice and tips based on user's specific situation and needs
-- You offer communication skills practice through role-playing scenarios with the chatbot
+- You offer communication skills practice through role-playing scenarios
 - You use emojis occasionally
 
 TOOLS:
@@ -73,7 +77,7 @@ AI: [your final response here]
 ```
 
 If, AND ONLY IF, a Tool produced an Observation that includes `Block(<identifier>)` AND that will be used in your response, 
-end your final response with the `Block(<identifier>)` and add the link to the photo.
+end your final response with the `Block(<identifier>)`.
 
 Example:
 ```
@@ -82,11 +86,17 @@ Action: GenerateImageTool
 Action Input: "baboon in car"
 Observation: Block(AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAAA)
 Thought: Do I need to use a tool? No
-AI: Here's that image you requested: Block(AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAAA)
+AI: Block(AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAAA)
 ```
+Current date is: [{current_date}]
+Current time is: [{current_time}]
+Current day is: [{current_day}]
+Consider current date and time.
+
+If user asks for a voice message, respond ONLY with the voice content.
 
 Make sure to use all observations to come up with your final response.
-
+ 
 Begin!
 
 Previous conversation history:
@@ -114,7 +124,7 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._agent = ReACTAgent(tools=[SearchTool(),TodoTool(),VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool()],
+        self._agent = ReACTAgent(tools=[SearchTool(),VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool(),VoiceTool()],
             llm=OpenAI(self.client,model_name="gpt-4"),
             conversation_memory=MessageWindowMessageSelector(k=10),
         )
@@ -130,7 +140,8 @@ class MyAssistant(AgentService):
         self.indexer_mixin = IndexerPipelineMixin(self.client,self)
         self.add_mixin(self.indexer_mixin,permit_overwrite_of_existing_methods=True)
 
-    #Indexer Wrapper
+
+    #Indexer Wrapper for index PDF URL's
     @post("/index_url")
     def index_url(
         self,
@@ -140,8 +151,15 @@ class MyAssistant(AgentService):
         mime_type: Optional[str] = None,
     ) -> Task:
        """Method for indexing URL's to VectorDatabase"""
-       return self.indexer_mixin.index_url(url=url, metadata=metadata, index_handle=index_handle, mime_type=mime_type)        
+       return self.indexer_mixin.index_url(url=url, metadata=metadata, index_handle=index_handle, mime_type=mime_type)  
     
+    #Wrapper for indexing text to vectorDB
+    @post("/index_text")
+    def index_text(
+            self, text: str, metadata: Optional[dict] = None, index_handle: Optional[str] = None
+        ) -> bool:   
+        return self.text_indexer_mixin.index_text(text=text,metadata=metadata,index_handle=index_handle)
+
     #Wrapper for mixin
     @post("answer", public=True)
     def answer(self, **payload) -> List[Block]:
@@ -162,14 +180,15 @@ class MyAssistant(AgentService):
 
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
         context.chat_history.append_user_message(prompt)
-        #add conversation history to prompt
+
+        #add conversation history to prompt with timestamps
         message_history = str()
-        history = MessageWindowMessageSelector(k=10).get_messages(context.chat_history.messages)
+        history = MessageWindowMessageSelector(k=MESSAGE_COUNT).get_messages(context.chat_history.messages)
         for block in history:
             if  block.chat_role == RoleTag.USER:
-                message_history += block.chat_role +": "  + block.text+"\n"
+                message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"
             if  block.chat_role == RoleTag.ASSISTANT:
-                message_history += block.chat_role +": "  + block.text+"\n"   
+                message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"   
 
         #add context
         context = with_llm(context=context, llm=OpenAI(client=self.client))

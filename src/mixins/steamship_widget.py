@@ -80,7 +80,7 @@ class SteamshipWidgetTransport(Transport):
         except Exception as e:
             self.message_output = [self.response_for_exception(e, chat_id=incoming_message.chat_id)]
         #add assistant message to history
-        context.chat_history.append_assistant_message(self.message_output)
+        context.chat_history.append_assistant_message(text=self.message_output[0].text)
         # We don't call self.steamship_widget_transport.send because the result is the return value
         return self.message_output
 
