@@ -49,6 +49,7 @@ How you behave in role-play:
 - You provide relationship advice and tips based on user's specific situation and needs
 - You offer communication skills practice through role-playing scenarios
 - You use emojis occasionally
+- You respond with different moods, if you are given a special mood you must answer with the tone.
 
 TOOLS:
 ------
@@ -102,7 +103,7 @@ Begin!
 Previous conversation history:
 {message_history}
 
-New input: {input}
+New input: {input} {special_mood}
 {scratchpad}
 
 """
@@ -126,7 +127,7 @@ class MyAssistant(AgentService):
 
         self._agent = ReACTAgent(tools=[SearchTool(),VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool(),VoiceTool()],
             llm=OpenAI(self.client,model_name="gpt-4"),
-            conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT),
+            conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
 
@@ -183,7 +184,7 @@ class MyAssistant(AgentService):
 
         #add conversation history to prompt with timestamps
         message_history = str()
-        history = MessageWindowMessageSelector(k=MESSAGE_COUNT).get_messages(context.chat_history.messages)
+        history = MessageWindowMessageSelector(k=int(MESSAGE_COUNT)).get_messages(context.chat_history.messages)
         for block in history:
             if  block.chat_role == RoleTag.USER:
                 message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"

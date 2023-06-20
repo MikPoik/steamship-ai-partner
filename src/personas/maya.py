@@ -13,3 +13,22 @@ PERSONA = """
 
 SELFIE_TEMPLATE = "photo of a gorgeous young woman with blonde hair in the style of stefan kostic, realistic, sharp focus, 8k high definition, insanely detailed, intricate, elegant, art by stanley lau and artgerm,flirty, golden hour"
 VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+
+MOOD_KEYWORDS = '''
+{
+  "mood_keywords": [
+    {
+      "keyword": "jogging",
+      "value": 1
+    },
+    {
+      "keyword": "coffee",
+      "value": 1
+    },
+    {
+      "keyword": "tea",
+      "value": -1
+    }
+  ]
+}
+'''

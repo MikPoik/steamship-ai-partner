@@ -13,3 +13,22 @@ PERSONA = """
 
 SELFIE_TEMPLATE = "clear portrait of a gigachad! attractive men, cottagecore!!, background hyper detailed, character concept, full body, dynamic pose, glowing lights!! intricate, elegant, highly detailed, digital painting, artstation, concept art, smooth, sharp focus, illustration, art by artgerm and greg rutkowski and alphonse mucha"
 VOICE_ID = "TxGEqnHWrfWFTfGW9XjX"
+
+MOOD_KEYWORDS = '''
+{
+  "mood_keywords": [
+    {
+      "keyword": "jogging",
+      "value": 1
+    },
+    {
+      "keyword": "coffee",
+      "value": 1
+    },
+    {
+      "keyword": "tea",
+      "value": -1
+    }
+  ]
+}
+'''
