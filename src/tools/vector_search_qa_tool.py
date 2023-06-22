@@ -10,7 +10,7 @@ from steamship.utils.repl import ToolREPL
 
 DEFAULT_QUESTION_ANSWERING_PROMPT = (
     "Use the following pieces of memory to answer the question at the end. "
-    """If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    """If you don't know the answer, respond politely that you dont remember.
 
 {source_text}
 
@@ -29,9 +29,9 @@ class VectorSearchQATool(VectorSearchTool):
     name: str = "VectorSearchQATool"
     human_description: str = "Answers questions with help from a Vector Database."
     agent_description: str = (
-        "Used to answer questions or events and remembering personal details of user. ",
+        "Used to answer questions or events and remembering personal details of user. "
         "The input should be a plain text question. "
-        "The output is a plain text answer.",
+        "The output is a plain text answer."
     )
     question_answering_prompt: Optional[str] = DEFAULT_QUESTION_ANSWERING_PROMPT
     source_document_prompt: Optional[str] = DEFAULT_SOURCE_DOCUMENT_PROMPT

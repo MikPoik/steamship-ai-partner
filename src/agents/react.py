@@ -69,20 +69,27 @@ New input: {input} {special_mood}
 
     def next_action(self, context: AgentContext) -> Action:
         scratchpad = self._construct_scratchpad(context)
+        print(scratchpad)
         tool_names = [t.name for t in self.tools]
 
         tool_index_parts = [f"- {t.name}: {t.agent_description}" for t in self.tools]
         tool_index = "\n".join(tool_index_parts)
         
+
         #add messages to prompt history
-        message_history = str("\n")
+        message_history = str()
         history = MessageWindowMessageSelector(k=int(MESSAGE_COUNT)).get_messages(context.chat_history.messages)
         for block in history:
             if not "Action" or "Observation" or "Thought" or "New input" in block.text:
                 if  block.chat_role == RoleTag.USER:
                     message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"
                 if  block.chat_role == RoleTag.ASSISTANT:
-                    message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +"AI: "  + block.text+"\n"
+                    if "https://steamship" in block.text:
+                        message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": [URL link to Block()]\n"   
+                    else:
+                        message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"   
+
+
 
         #print(message_history)
         current_date = datetime.datetime.now().strftime("%x")
@@ -93,6 +100,7 @@ New input: {input} {special_mood}
         mood = MoodTool()
         special_mood = mood.run([context.chat_history.last_user_message],context)
         special_mood = special_mood[0].text
+        #print("special mood " +special_mood)
 
         # for simplicity assume initial prompt is a single text block.
         # in reality, use some sort of formatter ?
@@ -114,14 +122,14 @@ New input: {input} {special_mood}
             ),
 
         )
-        #print(prompt)
+        
         completions = self.llm.complete(prompt=prompt, stop="Observation:")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
         steps = []
         for action in context.completed_steps:
-            steps.append(
+            steps.append(                
                 "Thought: Do I need to use a tool? Yes\n"
                 f"Action: {action.tool.name}\n"
                 f'Action Input: {" ".join([b.as_llm_input() for b in action.input])}\n'

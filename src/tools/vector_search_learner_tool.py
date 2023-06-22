@@ -15,9 +15,9 @@ class VectorSearchLearnerTool(VectorSearchTool):
     name: str = "VectorSearchLearnerTool"
     human_description: str = "Learns a new fact, event date or personal detail of the user and puts it in the Vector Database."
     agent_description: str = (
-        "Used to remember a fact, event or personal detail of user",
-        "The input is a fact, event or  personal detail of user. ",
-        "The output is a response to the fact, personality or event that has been learned.",
+        "Used to remember a fact, event or personal detail of user. "
+        "The input is a fact, event or  personal detail of user. "
+        "The output is a response to the fact, personality or event."
     )
 
     def learn_sentence(self, sentence: str, context: AgentContext, metadata: Optional[dict] = None):

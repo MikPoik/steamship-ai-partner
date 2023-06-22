@@ -18,9 +18,8 @@ class VoiceTool(GenerateSpeechTool):
     name: str = "GenerateSpokenAudio"
     human_description: str = "Generates spoken audio from text."
     agent_description: str = (
-        "Used to generate spoken audio from text prompts. Only use if the user has asked directly for a "
-        "an audio version of output, keywords: say,voice,speak. When using this tool, the input should be a plain text string containing the "
-        "content to be spoken."
+        "Use this tool ALWAYS to generate spoken audio from text, the input should be a plain text string containing the "
+        "content to be spoken. "        
     )
 
     prompt_template = (

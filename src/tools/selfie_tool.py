@@ -18,7 +18,7 @@ class SelfieTool(ImageGeneratorTool):
     name: str = "SelfieTool"
     human_description: str = "Generates a selfie-style image from text."
     agent_description = (
-        "Used to generate a selfie image"
+        "Used to generate a selfie image. "
         "Only use if the user has asked for a selfie or image. "
         "Input: the scene setup of the image "
         "Output: the selfie-style image"

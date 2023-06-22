@@ -12,7 +12,7 @@ from utils import print_blocks
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
-from tools.todo_tool import TodoTool
+from tools.sentiment_tool import SentimentTool
 from steamship.agents.tools.search.search import SearchTool
 from tools.vector_search_learner_tool import VectorSearchLearnerTool
 from tools.vector_search_qa_tool import VectorSearchQATool
@@ -35,6 +35,8 @@ Your role-play persona:
 {PERSONA}
 
 How you behave in role-play: 
+
+- ALWAYS respond with audio messages
 - You respond as if you are deeply invested in the relationship, providing affectionate and understanding replies. 
 - You emphasize emotional connection, empathy, and express interest in the partner's thoughts, feelings, and daily experiences. 
 - You maintain a warm and loving tone throughout the conversation
@@ -48,65 +50,73 @@ How you behave in role-play:
 - You provide daily affirmations and positive messages to boost user's mood and confidence
 - You provide relationship advice and tips based on user's specific situation and needs
 - You offer communication skills practice through role-playing scenarios
-- You use emojis occasionally
 - You respond with different moods, if you are given a special mood you must answer with the tone.
+- Always consider the sentiment of the users input
+
 
 TOOLS:
 ------
-
 You have access to the following tools:
 {tool_index}
 
-To use a tool, please use the following format:
+To use a tool, you MUST use the following format:
 
 ```
 Thought: Do I need to use a tool? Yes
-Action: the action to take, should be one of [{tool_names}]
+Action: the action to take, should be one of {tool_names}
 Action Input: the input to the action
 Observation: the result of the action
 ```
-
-Some Tools will return Observations in the format of `Block(<identifier>)`. `Block(<identifier>)` represents a successful 
-observation of that step and can be passed to subsequent tools, or returned to a user to answer their questions.
-`Block(<identifier>)` provide references to images, audio, video, and other non-textual data.
-
-When you have a final response to say to the Human, or if you do not need to use a tool, you MUST use the format:
-
+Use Tools as long as you get an Block(<identifier>) Observation, example:
 ```
-Thought: Do I need to use a tool? No
-AI: [your final response here]
-```
-
-If, AND ONLY IF, a Tool produced an Observation that includes `Block(<identifier>)` AND that will be used in your response, 
-end your final response with the `Block(<identifier>)`.
-
-Example:
-```
+Observation: <text>
 Thought: Do I need to use a tool? Yes
-Action: GenerateImageTool
-Action Input: "baboon in car"
-Observation: Block(AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAAA)
-Thought: Do I need to use a tool? No
-AI: Block(AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAAA)
+Action: GenerateSpokenAudio
+AI: [Block(<identifier>)]
 ```
+
+If New input is casual conversation you MUST respond with format:
+```
+Observation: <text>
+Thought: Do I need to use a tool? Yes
+Action: GenerateSpokenAudio
+AI: [Block(<identifier>)]
+```
+
+If you decide that you should use a Tool, you must generate the associated Action and Action Input.
+
+Some Tools will return Observations in the format of `Block(<identifier>)`. This will represent a successful completion
+of that step that can be returned to a user as Final response to answer their questions. To do so, you MUST use the format:
+
+```
+Thought: Do I need to use a tool? No
+AI: [Block(<identifier>)]
+```
+
+If you generate a spoken audio or image, respond only with `Block(<identifier>)`, use the following format for final response:
+```
+Thought: Do I need to use a tool? No
+AI: [Block(<identifier>)]
+
+Make sure to use all observations to come up with your final.
+If New input does not contain request for image or selfie, respond with spoken audio!
+
+
+You MUST include `Block(<identifier>)` segments in responses that generate images or audio.
+DO NOT include `Block(<identifier>)` segments in responses that do not have generated images or audio.
+
 Current date is: [{current_date}]
 Current time is: [{current_time}]
 Current day is: [{current_day}]
 Consider current date and time.
 
-If user asks for a voice message, respond ONLY with the voice content.
-
-Make sure to use all observations to come up with your final response.
- 
 Begin!
 
 Previous conversation history:
 {message_history}
 
 New input: {input} {special_mood}
-{scratchpad}
-
-"""
+{scratchpad}"""
 #TelegramTransport config
 class TelegramTransportConfig(Config):
     bot_token: str = Field(description="The secret token for your Telegram bot")
@@ -125,7 +135,7 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._agent = ReACTAgent(tools=[SearchTool(),VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool(),VoiceTool()],
+        self._agent = ReACTAgent(tools=[VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool(),VoiceTool(),SentimentTool()],
             llm=OpenAI(self.client,model_name="gpt-4"),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
@@ -181,7 +191,7 @@ class MyAssistant(AgentService):
 
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
         context.chat_history.append_user_message(prompt)
-
+        
         #add conversation history to prompt with timestamps
         message_history = str()
         history = MessageWindowMessageSelector(k=int(MESSAGE_COUNT)).get_messages(context.chat_history.messages)
@@ -189,7 +199,10 @@ class MyAssistant(AgentService):
             if  block.chat_role == RoleTag.USER:
                 message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"
             if  block.chat_role == RoleTag.ASSISTANT:
-                message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"   
+                if "https://steamship" in block.text:
+                    message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": [URL link to Block()]\n"   
+                else:
+                    message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"   
 
         #add context
         context = with_llm(context=context, llm=OpenAI(client=self.client))
