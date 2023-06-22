@@ -69,7 +69,6 @@ New input: {input} {special_mood}
 
     def next_action(self, context: AgentContext) -> Action:
         scratchpad = self._construct_scratchpad(context)
-        print(scratchpad)
         tool_names = [t.name for t in self.tools]
 
         tool_index_parts = [f"- {t.name}: {t.agent_description}" for t in self.tools]
@@ -85,7 +84,7 @@ New input: {input} {special_mood}
                     message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"
                 if  block.chat_role == RoleTag.ASSISTANT:
                     if "https://steamship" in block.text:
-                        message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": [URL link to Block()]\n"   
+                        message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": [URL link]\n"   
                     else:
                         message_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"   
 
@@ -122,7 +121,7 @@ New input: {input} {special_mood}
             ),
 
         )
-        
+        #print(prompt)
         completions = self.llm.complete(prompt=prompt, stop="Observation:")
         return self.output_parser.parse(completions[0].text, context)
 

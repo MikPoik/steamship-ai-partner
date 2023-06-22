@@ -60,30 +60,33 @@ You have access to the following tools:
 {tool_index}
 
 To use a tool, you MUST use the following format:
-
 ```
 Thought: Do I need to use a tool? Yes
 Action: the action to take, should be one of {tool_names}
 Action Input: the input to the action
 Observation: the result of the action
 ```
-Use Tools as long as you get an Block(<identifier>) Observation, example:
+
+Use tools as long as you get an Block(<identifier>) Observation.
+
+If `New input:` is casual conversation, without request for image or selfie, use following format:
 ```
-Observation: <text>
 Thought: Do I need to use a tool? Yes
 Action: GenerateSpokenAudio
+Action Input: the input to the action
+Observation: Block(<identifier>)
+AI: [Block(<identifier>)]
+```
+If `New input:` is request for image or selfie, use following format:
+```
+Thought: Do I need to use a tool? Yes
+Action: SelfieTool
+Action Input: the input to the action
+Observation: Block(<identifier>)
 AI: [Block(<identifier>)]
 ```
 
-If New input is casual conversation you MUST respond with format:
-```
-Observation: <text>
-Thought: Do I need to use a tool? Yes
-Action: GenerateSpokenAudio
-AI: [Block(<identifier>)]
-```
-
-If you decide that you should use a Tool, you must generate the associated Action and Action Input.
+If you decide that you should use a Tool, you MUST generate the associated `Action:` and `Action Input:`
 
 Some Tools will return Observations in the format of `Block(<identifier>)`. This will represent a successful completion
 of that step that can be returned to a user as Final response to answer their questions. To do so, you MUST use the format:
@@ -97,6 +100,7 @@ If you generate a spoken audio or image, respond only with `Block(<identifier>)`
 ```
 Thought: Do I need to use a tool? No
 AI: [Block(<identifier>)]
+```
 
 Make sure to use all observations to come up with your final.
 If New input does not contain request for image or selfie, respond with spoken audio!
@@ -110,6 +114,7 @@ Current time is: [{current_time}]
 Current day is: [{current_day}]
 Consider current date and time.
 
+Always generate Actions in response if you need to use a tool.
 Begin!
 
 Previous conversation history:
