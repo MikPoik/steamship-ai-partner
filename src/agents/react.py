@@ -7,7 +7,11 @@ from steamship.data.tags.tag_constants import RoleTag
 import datetime
 from tools.active_persona import *
 from tools.mood_tool import MoodTool
-from message_history_limit import MESSAGE_COUNT
+from tools.option_tool import OptionTool
+from message_history_limit import *
+from default_prompt_template import DEFAULT_TEXT_PROMPT
+from voice_prompt_template import DEFAULT_VOICE_PROMPT
+from video_prompt_template import DEFAULT_VIDEO_PROMPT
 
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
@@ -59,6 +63,7 @@ Begin!
 Previous conversation history:
 {message_history}
 
+
 New input: {input} {special_mood}
 {scratchpad}"""
 
@@ -68,14 +73,39 @@ New input: {input} {special_mood}
         )
 
     def next_action(self, context: AgentContext) -> Action:
+        #get reply prompt template
+        option = OptionTool()
+        reply_mode = option.get_mode(context=context)
+        if reply_mode == "voice":
+            #respond video as default
+            self.PROMPT = DEFAULT_VOICE_PROMPT
+        if reply_mode == "text":
+            #respond text as default
+            self.PROMPT = DEFAULT_TEXT_PROMPT
+        if reply_mode == "video":
+            #video tool not working yet, fallback to text
+            self.PROMPT = DEFAULT_TEXT_PROMPT
+
+        substrings = ["default voice", "default text", "default video"]
+        if any(substring in context.chat_history.last_user_message.text.lower() for substring in substrings):
+            reply_mode = option.run([context.chat_history.last_user_message],context)
+            if "voice" in reply_mode[0].text:
+                return self.output_parser.parse(reply_mode[0].text, context)
+            if "text" in reply_mode[0].text:
+                return self.output_parser.parse(reply_mode[0].text, context)
+            if "video" in reply_mode[0].text:
+                return self.output_parser.parse(reply_mode[0].text, context)
+    
         scratchpad = self._construct_scratchpad(context)
         tool_names = [t.name for t in self.tools]
 
         tool_index_parts = [f"- {t.name}: {t.agent_description}" for t in self.tools]
         tool_index = "\n".join(tool_index_parts)
+
+
         
 
-        #add messages to prompt history
+        #add messages to prompt history, is vector history enough?
         message_history = str()
         history = MessageWindowMessageSelector(k=int(MESSAGE_COUNT)).get_messages(context.chat_history.messages)
         for block in history:
@@ -101,6 +131,19 @@ New input: {input} {special_mood}
         special_mood = special_mood[0].text
         #print("special mood " +special_mood)
 
+        #get relevant history to last input, beyond MESSAGE_COUNT
+        relevant_history = str()
+        if len(context.chat_history.messages) > MESSAGE_COUNT:
+            relevant_history_blocks = context.chat_history.search(context.chat_history.last_user_message.text, k=int(RELEVANT_MESSAGES)).wait().to_ranked_blocks()
+            for block in relevant_history_blocks:
+                if  block.chat_role == RoleTag.USER:
+                    relevant_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"
+                if  block.chat_role == RoleTag.ASSISTANT:
+                    if "https://steamship" in block.text:
+                        relevant_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": [URL link]\n"   
+                    else:
+                        relevant_history += "["+datetime.datetime.now().strftime("%x %X")+ "] " +block.chat_role +": "  + block.text+"\n"   
+
         # for simplicity assume initial prompt is a single text block.
         # in reality, use some sort of formatter ?
         prompt = self.PROMPT.format(
@@ -119,6 +162,7 @@ New input: {input} {special_mood}
             chat_history=self.messages_to_prompt_history(
                 messages=context.chat_history.select_messages(self.message_selector)
             ),
+            relevant_history=relevant_history
 
         )
         #print(prompt)

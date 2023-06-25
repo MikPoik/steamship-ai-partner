@@ -27,6 +27,9 @@ class VoiceTool(GenerateSpeechTool):
     )
     def run(self, tool_input: List[Block], context: AgentContext) -> Union[List[Block], Task[Any]]:
 
+        for block in tool_input:
+            context.chat_history.append_assistant_message(block.text)
+            
         modified_inputs = [
             Block(text=self.prompt_template.format(subject=block.text))
             for block in tool_input

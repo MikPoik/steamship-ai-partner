@@ -7,17 +7,17 @@ from steamship.agents.schema import AgentContext
 from steamship.agents.tools.question_answering.vector_search_tool import VectorSearchTool
 from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
-
+from tools.active_persona import NAME
 
 class VectorSearchLearnerTool(VectorSearchTool):
     """Tool to answer questions with the assistance of a vector search plugin."""
 
     name: str = "VectorSearchLearnerTool"
-    human_description: str = "Learns a new fact, event date or personal detail of the user and puts it in the Vector Database."
+    human_description: str = "Learns a new fact, event date or personal detail or preference of the user or {NAME} and puts it in the Vector Database."
     agent_description: str = (
-        "Used to remember a fact, event or personal detail of user. "
-        "The input is a fact, event or  personal detail of user. "
-        "The output is a response to the fact, personality or event."
+        "Used to remember a fact, event or personal detail or preference of user or role-play character {NAME} "
+        "The input is a fact, event, preference or personal detail of user or role-play character. "
+        "The output is a response to the fact, personality,detail,preference or event."
     )
 
     def learn_sentence(self, sentence: str, context: AgentContext, metadata: Optional[dict] = None):
