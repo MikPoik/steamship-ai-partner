@@ -7,11 +7,10 @@ from steamship.agents.schema import AgentContext
 from steamship.agents.tools.question_answering.vector_search_tool import VectorSearchTool
 from steamship.agents.utils import get_llm, with_llm
 from steamship.utils.repl import ToolREPL
-from tools.active_persona import NAME
 
 DEFAULT_QUESTION_ANSWERING_PROMPT = (
     "Use the following pieces of memory to answer the question at the end. "
-    """If you don't know the answer, respond politely that you dont remember, do no try to make up answer. 
+    """If you don't know the answer, respond politely that you don't remember, do no try to make up answer. 
 
 {source_text}
 
@@ -30,7 +29,7 @@ class VectorSearchQATool(VectorSearchTool):
     name: str = "VectorSearchQATool"
     human_description: str = "Answers questions with help from a Vector Database."
     agent_description: str = (
-        "Used to answer questions of User or role-play character {NAME} "
+        "Used to answer questions about User or assistant's role-play character from VectorDatabase "
         "The input should be a plain text question. "
         "The output is a plain text answer."
     )
@@ -53,7 +52,6 @@ class VectorSearchQATool(VectorSearchTool):
         final_prompt = self.question_answering_prompt.format(
             **{"source_text": "\n".join(source_texts), "question": question}
         )
-
         return get_llm(context).complete(prompt=final_prompt)
 
     def run(self, tool_input: List[Block], context: AgentContext) -> Union[List[Block], Task[Any]]:

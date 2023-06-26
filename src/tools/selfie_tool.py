@@ -23,7 +23,7 @@ class SelfieTool(ImageGeneratorTool):
         "Input: the scene setup of the image "
         "Output: the selfie-style image"
     )
-    generator_plugin_handle: str = "stable-diffusion",
+    generator_plugin_handle: str = "stable-diffusion"
     generator_plugin_config: dict = {"n": 1}
 
     prompt_template = (
