@@ -7,7 +7,6 @@ from steamship.data.tags.tag_constants import RoleTag
 import datetime
 from tools.active_persona import *
 from tools.mood_tool import MoodTool
-from tools.voice_tool import VoiceTool
 from message_history_limit import *
 
 
@@ -70,7 +69,7 @@ New input: {input} {special_mood}
             output_parser=ReACTOutputParser(tools=tools), llm=llm, tools=tools, **kwargs
         )
 
-    def next_action(self, context: AgentContext) -> Action:    
+    def next_action(self, context: AgentContext,hint: str = "") -> Action:    
         scratchpad = self._construct_scratchpad(context)
         tool_names = [t.name for t in self.tools]
 
@@ -115,6 +114,7 @@ New input: {input} {special_mood}
             NAME=NAME,
             PERSONA=PERSONA,
             BEHAVIOUR=BEHAVIOUR,
+            response_hint=hint, #response hint from vectorDB for role-play character
             current_time=current_time,
             current_date=current_date,
             current_day=current_day,

@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-test-bot",
-	"version": "1.1.1",
+	"version": "1.2.2",
 	"description": "",
 	"author": "",
 	"entrypoint": "Unused",
@@ -16,8 +16,18 @@
 	"configTemplate": {
 		"bot_token": {
 			"type": "string",
-			"description": "The secret token for your Telegram bot",
+			"description": "Telegram bot token, obtained via @BotFather",
 			"default": null
+		},
+		"payment_provider_token": {
+			"type": "string",
+			"description": "Payment provider token, obtained via @BotFather",
+			"default": "xxx"
+		},
+		"n_free_messages": {
+			"type": "number",
+			"description": "Number of free messages assigned to new users.",
+			"default": 20
 		},
 		"api_base": {
 			"type": "string",

@@ -12,11 +12,11 @@ from steamship.utils.repl import ToolREPL
 class VectorSearchLearnerTool(VectorSearchTool):
     """Tool to answer questions with the assistance of a vector search plugin."""
     name: str = "VectorSearchLearnerTool"
-    human_description: str = "Learns a new fact, event, personal detail or preference of the User or role-play character and puts it in the Vector Database."
+    human_description: str = "Learns a new fact, event, personal detail or preference of the User and puts it in the Vector Database."
     agent_description: str = (
-        "Used to remember a fact, event, personal detail or preference of User or assistant's role-play character "
-        "The input is a fact, event, preference or personal detail of User or role-play character. "
-        "The output is a response to the fact, personality,detail,preference or event."
+        "Used to remember a fact, event, personal detail or preference of User."
+        "The input is a fact, event, preference or personal detail of User."
+        "The output is a confirmation that the fact has been learned."
     )
 
     def learn_sentence(self, sentence: str, context: AgentContext, metadata: Optional[dict] = None):

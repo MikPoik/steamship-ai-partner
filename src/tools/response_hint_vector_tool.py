@@ -7,29 +7,33 @@ from steamship.agents.schema import AgentContext
 from steamship.agents.tools.question_answering.vector_search_tool import VectorSearchTool
 from steamship.agents.utils import get_llm, with_llm
 from steamship.utils.repl import ToolREPL
+from tools.active_persona import NAME
 
 DEFAULT_QUESTION_ANSWERING_PROMPT = (
-    "Use the following pieces of memory to answer the question at the end. "
-    """If you don't know the answer, respond politely that you don't remember, do no try to make up answer. 
+"Use the following pieces of memory to answer a question about {NAME} at the end. "
+"""
+If you don't know the answer, don't try to make up answer, respond ONLY with: `no hints` 
+Answer with keywords in format: `<keyword> - ... - <keyword>`, give at most five keywords.
 
+memory:
 {source_text}
 
-Question: {question}
+question for {NAME}: {question}
 
-Helpful Answer:"""
+helpful answer:"""
 )
 
 
 DEFAULT_SOURCE_DOCUMENT_PROMPT = "Source Document: {text}"
 
 
-class VectorSearchQATool(VectorSearchTool):
+class ResponseHintTool(VectorSearchTool):
     """Tool to answer questions with the assistance of a vector search plugin."""
 
-    name: str = "VectorSearchQATool"
+    name: str = "ResponseHintTool"
     human_description: str = "Answers questions with help from a Vector Database."
     agent_description: str = (
-        "Used to answer questions about User or assistant's role-play character. "
+        "Used to answer questions about User or assistant's role-play character from VectorDatabase "
         "The input should be a plain text question. "
         "The output is a plain text answer."
     )
@@ -50,8 +54,9 @@ class VectorSearchQATool(VectorSearchTool):
                 source_texts.append(self.source_document_prompt.format(**item_data))
 
         final_prompt = self.question_answering_prompt.format(
-            **{"source_text": "\n".join(source_texts), "question": question}
+            **{"source_text": "\n".join(source_texts), "question": question,"NAME": NAME}
         )
+        #print(final_prompt)
         return get_llm(context).complete(prompt=final_prompt)
 
     def run(self, tool_input: List[Block], context: AgentContext) -> Union[List[Block], Task[Any]]:
@@ -80,12 +85,11 @@ class VectorSearchQATool(VectorSearchTool):
 
 
 if __name__ == "__main__":
-    tool = VectorSearchQATool()
+    tool = ResponseHintTool()
     repl = ToolREPL(tool)
-
     with repl.temporary_workspace() as client:
         index = tool.get_embedding_index(client)
-        index.insert([Tag(text="Ted loves apple pie."), Tag(text="The secret passcode is 1234.")])
+        index.insert([Tag(text="Maya loves apple pie."), Tag(text="Mayas last travel was to Spain"),Tag(text="Mayas favourite music is reggaeton")])
         repl.run_with_client(
             client, context=with_llm(context=AgentContext(), llm=OpenAI(client=client))
         )

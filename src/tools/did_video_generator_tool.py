@@ -11,7 +11,7 @@ from steamship.agents.tools import VideoGeneratorTool
 from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
 
-DEFAULT_SOURCE_URL = "https://www.steamship.com/images/agents/man-in-suit-midjourney.png"
+DEFAULT_SOURCE_URL = "https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png"
 
 
 class DIDVideoGeneratorTool(VideoGeneratorTool):
@@ -37,6 +37,8 @@ class DIDVideoGeneratorTool(VideoGeneratorTool):
     )
     generator_plugin_handle: str = "did-video-generator"
     generator_plugin_config: dict = {}
+    generator_plugin_version: str = "0.1.7" #newest version 0.1.8-rc doesnt work
+
 
     source_url: Optional[str] = DEFAULT_SOURCE_URL
     """The URL of the source image to be animated."""
@@ -46,7 +48,7 @@ class DIDVideoGeneratorTool(VideoGeneratorTool):
     voice_provider: Optional[str] = "microsoft"
     """The voice provider. Must be either `microsoft` or `amazon`."""
 
-    voice_id: Optional[str] = "en-US-GuyNeural"
+    voice_id: Optional[str] = "en-US-AshleyNeural"
     """The voice ID. E.g. `en-US-AshleyNeural` for Microsoft or `Amy` for Amazon."""
 
     voice_style: Optional[str] = "Default"
@@ -67,6 +69,7 @@ class DIDVideoGeneratorTool(VideoGeneratorTool):
             plugin_handle=self.generator_plugin_handle,
             instance_handle=self.generator_plugin_instance_handle,
             config=self.generator_plugin_config,
+            version=self.generator_plugin_version
         )
 
         tasks = []
@@ -98,6 +101,7 @@ class DIDVideoGeneratorTool(VideoGeneratorTool):
                     "transition_frames": self.transition_frames,
                 },
             )
+            
             tasks.append(task)
 
         # TODO / REMOVE Synchronous execution is a temporary simplification while we merge code.

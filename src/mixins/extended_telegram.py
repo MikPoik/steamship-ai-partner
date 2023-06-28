@@ -1,44 +1,81 @@
 import logging
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 import requests
-from pydantic import Field
-
 from steamship import Block, Steamship, SteamshipError
-from steamship.agents.llms import OpenAI
+from steamship.agents.mixins.transports.telegram import TelegramTransportConfig
 from steamship.agents.mixins.transports.transport import Transport
 from steamship.agents.schema import Agent, AgentContext, EmitFunc, Metadata
 from steamship.agents.service.agent_service import AgentService
-from steamship.agents.utils import with_llm
 from steamship.invocable import Config, InvocableResponse, InvocationContext, post
 
 
-class TelegramTransportConfig(Config):
-    bot_token: str = Field(description="The secret token for your Telegram bot")
-    api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
-
-
-class TelegramTransport(Transport):
-    """Experimental base class to encapsulate a Telegram communication channel."""
-
+class ExtendedTelegramTransport(Transport):
     api_root: str
     bot_token: str
     agent: Agent
     agent_service: AgentService
+    set_payment_plan: Callable
+
+    @post("telegram_respond", public=True)
+    def telegram_respond(self, **kwargs) -> InvocableResponse[str]:
+        """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
+
+        if "pre_checkout_query" in kwargs:
+            pre_checkout_query = kwargs["pre_checkout_query"]
+            self.set_payment_plan(pre_checkout_query)
+            requests.post(
+                f"{self.api_root}/answerPreCheckoutQuery",
+                json={
+                    "pre_checkout_query_id": pre_checkout_query["id"],
+                    "ok": True,
+                },
+            )
+            return InvocableResponse(string="OK")
+
+        message = kwargs.get("message", {})
+        chat_id = message.get("chat", {}).get("id")
+        try:
+            incoming_message = self.parse_inbound(message)
+            if incoming_message is not None:
+                context = AgentContext.get_or_create(self.client, context_keys={"chat_id": chat_id})
+                context.chat_history.append_user_message(
+                    text=incoming_message.text, tags=incoming_message.tags
+                )
+                context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
+
+                response = self.agent_service.run_agent(self.agent, context)
+                if response is not None:
+                    self.send(response)
+                else:
+                    # Do nothing here; this could be a message we intentionally don't want to respond to (ex. an image or file upload)
+                    pass
+            else:
+                # Do nothing here; this could be a message we intentionally don't want to respond to (ex. an image or file upload)
+                pass
+        except Exception as e:
+            response = self.response_for_exception(e, chat_id=chat_id)
+
+            if chat_id is not None:
+                self.send([response])
+        # Even if we do nothing, make sure we return ok
+        return InvocableResponse(string="OK")
 
     def __init__(
-        self,
-        client: Steamship,
-        config: TelegramTransportConfig,
-        agent_service: AgentService,
-        agent: Agent,
+            self,
+            client: Steamship,
+            config: TelegramTransportConfig,
+            agent_service: AgentService,
+            agent: Agent,
+            set_payment_plan: Callable
     ):
         super().__init__(client=client)
         self.api_root = f"{config.api_base}{config.bot_token}"
         self.bot_token = config.bot_token
         self.agent = agent
         self.agent_service = agent_service
+        self.set_payment_plan = set_payment_plan
 
     def instance_init(self, config: Config, invocation_context: InvocationContext):
         webhook_url = invocation_context.invocable_url + "telegram_respond"
@@ -175,45 +212,3 @@ class TelegramTransport(Transport):
             return self.send(blocks, metadata)
 
         return new_emit_func
-
-    @post("telegram_respond", public=True)
-    def telegram_respond(self, **kwargs) -> InvocableResponse[str]:
-        """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
-
-        # TODO: must reject things not from the package
-        message = kwargs.get("message", {})
-        chat_id = message.get("chat", {}).get("id")
-        try:
-            incoming_message = self.parse_inbound(message)
-            if incoming_message is not None:
-                context = AgentContext.get_or_create(self.client, context_keys={"chat_id": chat_id})
-                context.chat_history.append_user_message(text=incoming_message.text)
-                context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
-
-                # Add an LLM to the context, using the Agent's if it exists.
-                llm = None
-                if hasattr(self.agent, "llm"):
-                    llm = self.agent.llm
-                else:
-                    llm = OpenAI(client=self.client)
-
-                context = with_llm(context=context, llm=llm)
-
-                response = self.agent_service.run_agent(self.agent, context)
-                if response is not None:
-                    #add assistan message to history
-                    context.chat_history.append_assistant_message(response)
-                    self.send(response)
-                else:
-                    # Do nothing here; this could be a message we intentionally don't want to respond to (ex. an image or file upload)
-                    pass
-            else:
-                # Do nothing here; this could be a message we intentionally don't want to respond to (ex. an image or file upload)
-                pass
-        except Exception as e:
-            response = self.response_for_exception(e, chat_id=chat_id)
-
-            if chat_id is not None:
-                self.send([response])
-        # Even if we do nothing, make sure we return ok
-        return InvocableResponse(string="OK")

@@ -8,6 +8,8 @@ from steamship.agents.tools.image_generation.stable_diffusion import StableDiffu
 from steamship.utils.repl import ToolREPL
 from tools.active_persona import SELFIE_TEMPLATE
 
+#testing..
+#SELFIE_TEMPLATE ="(real life photo of a beautiful woman),(hyper realistic),((photo realistic)),photoshoot, long brown hair, (beatiful eyes), full round face, short smile, cinematic lightning, medium shot, mid - shot, highly detailed, trending on artstation, 4k, 8 0 mm, 8 5 mm,[[[two person]]], [[painting]], [[drawing]], [[[anime]]], [CGI], [unreal engine], [3d], [render], [deformed iris]"
 
 class SelfieTool(ImageGeneratorTool):
     """Tool to generate a selfie image.

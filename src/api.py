@@ -2,27 +2,34 @@ from agents.react import ReACTAgent
 from steamship.agents.logging import AgentLogging
 from steamship.agents.service.agent_service import AgentService
 from steamship.invocable import Config, post, InvocableResponse
-from steamship import Block,Task
+from steamship import Block,Task,MimeTypes
 from steamship.agents.llms.openai import OpenAI
 from steamship.utils.repl import AgentREPL
-from mixins.steamship_widget import SteamshipWidgetTransport
-from mixins.telegram import TelegramTransport
+from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
+from mixins.extended_telegram import ExtendedTelegramTransport
+from usage_tracking import UsageTracker
 import uuid
 import logging
+import re
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
+import requests
 from tools.vector_search_learner_tool import VectorSearchLearnerTool
 from tools.vector_search_qa_tool import VectorSearchQATool
+from tools.response_hint_vector_tool import ResponseHintTool
 from tools.selfie_tool import SelfieTool
 from tools.voice_tool import VoiceTool
 from mixins.indexer_pipeline_mixin import IndexerPipelineMixin
+from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
 from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
 from message_history_limit import MESSAGE_COUNT
+from steamship import File
+
 
 SYSTEM_PROMPT = """
 Role-play as a {TYPE}.
@@ -38,14 +45,13 @@ How you behave in role-play:
 - You make interactive conversations.
 - You respond with different moods, if you are given a special mood you must answer with the tone.
 - Always consider the sentiment of the users input.
-- You remember personal details and preferences to provide a personalized experience for the User
+- You remember User's personal details and preferences to provide a personalized experience for the User
 
 
 TOOLS:
 ------
 You have access to the following tools:
 {tool_index}
-
 To use a tool, you MUST use the following format:
 ```
 Thought: Do I need to use a tool? Yes
@@ -66,15 +72,6 @@ Thought: Do I need to use a tool? No
 AI: [Your final response here]
 ```
 
-If a question is about role-play character or User, Always remember to use VectorSearchQATool BEFORE answering. Use following format:
-```
-Thought: Do I need to use a tool? Yes
-Action: VectorSearchQATool
-Action Input: the input to the action
-Observation: the result of the action
-AI: [your final response here]
-```
-
 If a Tool generated an Observation that includes `Block(<identifier>)` and you wish to return it to the user, ALWAYS
 end your response with the `Block(<identifier>)` observation. To do so, you MUST use the format:
 
@@ -84,6 +81,7 @@ AI: [your response with a suffix of: "Block(<identifier>)"]
 ```
 
 Make sure to use all observations to come up with your final answer.
+
 You MUST include `Block(<identifier>)` segments in responses that generate images or audio.
 DO NOT include `Block(<identifier>)` segments in responses that do not have generated images or audio.
 
@@ -103,12 +101,16 @@ Recent conversation history:
 Other relevant previous conversation:
 {relevant_history}
 
+
 New input: {input} {special_mood}
+{response_hint}
 {scratchpad}"""
 
 #TelegramTransport config
 class TelegramTransportConfig(Config):
-    bot_token: str = Field(description="The secret token for your Telegram bot")
+    bot_token: str = Field(description="Telegram bot token, obtained via @BotFather")
+    payment_provider_token: str = Field("xxx",description="Payment provider token, obtained via @BotFather")
+    n_free_messages: int = Field(20, description="Number of free messages assigned to new users.")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
 
 
@@ -120,7 +122,52 @@ class MyAssistant(AgentService):
     def config_cls(cls) -> Type[Config]:
         """Return the Configuration class."""
         return TelegramTransportConfig
-           
+    
+    def set_payment_plan(self, pre_checkout_query):
+        chat_id = str(pre_checkout_query["from"]["id"])
+        payload = int(pre_checkout_query["invoice_payload"])
+        self.usage.increase_message_limit(chat_id, payload)
+
+    def append_response(self, context: AgentContext, action:FinishAction):
+        for func in context.emit_funcs:
+            logging.info(f"Emitting via function: {func.__name__}")
+            func(action.output, context.metadata)
+
+    def send_invoice(self, chat_id):
+        response = requests.post(
+            f"{self.config.api_base}{self.config.bot_token}/sendInvoice",
+            json={
+                "chat_id": chat_id,
+                "payload": "5",
+                "currency": "USD",
+                "title": "🍏 50 messages",
+                "description": "Tap the button below and pay",
+                "prices": [{
+                    "label": "🍏 50 messages",
+                    "amount": 5,
+                }],
+                "provider_token": self.config.payment_provider_token
+            },
+        )
+        logging.info(response)      
+
+    def check_usage(self, chat_id: str, context: AgentContext) -> bool:
+        usage_entry = self.usage.get_usage(context.metadata.get("chat_id"))
+        if not self.usage.exists(chat_id):
+            self.usage.add_user(chat_id)
+        if self.usage.usage_exceeded(chat_id):
+            action = FinishAction()
+            action.output.append(Block(text=f"You have {usage_entry.message_limit - usage_entry.message_count} messages left. "
+            ))
+            self.append_response(context=context,action=action)
+
+            self.send_invoice(chat_id)
+            return False          
+
+        return True
+
+
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -134,11 +181,12 @@ class MyAssistant(AgentService):
         self.widget_mixin = SteamshipWidgetTransport(self.client,self,self._agent)
         self.add_mixin(self.widget_mixin,permit_overwrite_of_existing_methods=True)
         #add Telegram chat mixin 
-        self.telegram_mixin = TelegramTransport(self.client,self.config,self,self._agent)
-        self.add_mixin(self.telegram_mixin,permit_overwrite_of_existing_methods=True)
+        self.telegram_mixin = ExtendedTelegramTransport(self.client,self.config,self,self._agent,set_payment_plan=self.set_payment_plan)
+        self.add_mixin(self.telegram_mixin,permit_overwrite_of_existing_methods=True)        
         #IndexerMixin
         self.indexer_mixin = IndexerPipelineMixin(self.client,self)
         self.add_mixin(self.indexer_mixin,permit_overwrite_of_existing_methods=True)
+        self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages)
 
 
     #Indexer Wrapper for index PDF URL's
@@ -172,10 +220,56 @@ class MyAssistant(AgentService):
         """Wrapper function for Telegram chat"""
         return self.telegram_respond(self,**kwargs)
     
-    #Customized run_agent, append audio to response
+    #Customized run_agent
     def run_agent(self, agent: Agent, context: AgentContext):
+        
+        #check balance
+        if context.chat_history.last_user_message.text.lower() == "/balance":
+            usage_entry = self.usage.get_usage(context.metadata.get("chat_id"))
+            action = FinishAction()
+            action.output.append(Block(text=f"You have {usage_entry.message_limit - usage_entry.message_count} messages left. "
+            ))
+            self.append_response(context=context,action=action)
 
-        action = agent.next_action(context=context)
+            return
+        #if not balance, send message and invoice (invoice not tested yet..)
+        if not self.check_usage(context=context,chat_id=context.metadata.get("chat_id")):
+            return        
+                
+        #respond to telegram /start command
+        if "/start" in context.chat_history.last_user_message.text.lower():
+            action = FinishAction()
+            action.output.append(Block(text=f"Hi there!"))
+
+            #send picture in first message, how to send external image from url?
+
+            selfie_tool = SelfieTool()
+            selfie_response = selfie_tool.run([Block(text=f"welcoming")],context=context)
+            action.output.append(selfie_response[0])
+
+            self.append_response(context=context,action=action)
+
+            return
+
+        #Searh response hints for role-play character from vectorDB, if any related text is indexed
+        #run only if text contains word 'you' and ends with '?', assume its a question for bot
+        #should it run every time?
+        hint = ""
+        pattern = r"you.*\?$"
+        matches = re.findall(pattern, context.chat_history.last_user_message.text.lower())
+        if matches:
+            hint_tool = ResponseHintTool()
+            hint = hint_tool.run([context.chat_history.last_user_message],context=context)[0].text
+            if hint != "no hints":
+                #found related results
+                hint = "Response hint for "+NAME+": "+hint
+                print(hint)
+            else:
+                #print("no hints")
+                hint = ""
+
+
+        action = agent.next_action(context=context,hint=hint)
         while not isinstance(action, FinishAction):
             # TODO: Arrive at a solid design for the details of this structured log object
             inputs = ",".join([f"{b.as_llm_input()}" for b in action.input])
@@ -201,22 +295,35 @@ class MyAssistant(AgentService):
                 },
             )
 
+        #If something went wrong, retry run
+        if "Do I need to use a tool?" in action.output[0].text:
+            print("something went wrong, trying again..")
+            self.run_agent(self._agent, context)
+            return
+
         context.completed_steps.append(action)
+        #add message to history
+        context.chat_history.append_assistant_message(text=action.output[0].text)
+
         output_text_length = 0
         if action.output is not None:
             output_text_length = sum([len(block.text or "") for block in action.output])
         logging.info(
             f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
         )
+        self.usage.increase_message_count(context.metadata.get("chat_id"))
+        print(self.usage.get_usage(context.metadata.get("chat_id")))
+
+
         #Custom: Add voice to response
         voice_tool = VoiceTool()
         voice_response = voice_tool.run(action.output,context=context)
         action.output.append(voice_response[0])
 
-        for func in context.emit_funcs:            
-            logging.info(f"Emitting via function: {func.__name__}")
-            func(action.output, context.metadata)   
-        context.emit_funcs.append 
+        self.append_response(context=context,action=action)
+
+        
+
 
     
     @post("prompt")
@@ -243,7 +350,7 @@ class MyAssistant(AgentService):
 
         context.emit_funcs.append(sync_emit)
         self.run_agent(self._agent, context)
-        context.chat_history.append_assistant_message(output)
+
        
         return output
 
