@@ -32,6 +32,12 @@ class ExtendedTelegramTransport(Transport):
                     "ok": True,
                 },
             )
+
+            return InvocableResponse(string="OK")
+        
+        #catch successful payment response
+        if ("message" in str(kwargs)) and ("successful_payment" in str(kwargs)):
+            logging.info("successful payment")
             return InvocableResponse(string="OK")
 
         message = kwargs.get("message", {})
@@ -45,7 +51,7 @@ class ExtendedTelegramTransport(Transport):
                 )
                 context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
 
-                response = self.agent_service.run_agent(self.agent, context)
+                response = self.agent_service.run_agent(self.agent, context,str(chat_id))
                 if response is not None:
                     self.send(response)
                 else:
@@ -56,6 +62,7 @@ class ExtendedTelegramTransport(Transport):
                 pass
         except Exception as e:
             response = self.response_for_exception(e, chat_id=chat_id)
+            logging.warning(response)
 
             if chat_id is not None:
                 self.send([response])
@@ -111,6 +118,7 @@ class ExtendedTelegramTransport(Transport):
         """Send a response to the Telegram chat."""
         for block in blocks:
             chat_id = block.chat_id
+
             if block.is_text() or block.text:
                 params = {"chat_id": int(chat_id), "text": block.text}
                 requests.get(f"{self.api_root}/sendMessage", params=params)

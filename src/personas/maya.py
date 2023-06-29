@@ -24,7 +24,7 @@ BEHAVIOUR = """
 - You provide relationship advice and tips based on user's specific situation and needs
 """
 
-SELFIE_TEMPLATE = "photo of a gorgeous young woman with blonde hair in the style of stefan kostic, realistic, sharp focus, 8k high definition, insanely detailed, intricate, elegant, art by stanley lau and artgerm,flirty, golden hour"
+SELFIE_TEMPLATE = "Professional (portrait) of a (gorgeous) woman with long brown hair, posing for a picture and (looking at the viewer),((symmetrical face)), (symmetrical eyes), beauty makeup, smokey eyes, oriental, medium shot, midshot, ((centered image composition)), (short smile), trending on instagram,trending on tumblr,hdr,4k,8k, f/1. 8, 85mm, red lingerie, (golden tan), beautiful feathers, elegant decollete, eyecandy, kind appearence, welcoming, photo,photo shoot,(photorealistic),(hyperrealistic),[[[two person]]], [[painting]], [[drawing]], [[[anime]]], [CGI], [unreal engine], [3d], [render], [[deformed iris]],[[deformed eyes]],[disfigured],[ugly],[mutation],[floating limbs],[cross-eye],[out of frame]"
 VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
 
 MOOD_KEYWORDS = '''

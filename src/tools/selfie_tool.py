@@ -9,7 +9,7 @@ from steamship.utils.repl import ToolREPL
 from tools.active_persona import SELFIE_TEMPLATE
 
 #testing..
-#SELFIE_TEMPLATE ="(real life photo of a beautiful woman),(hyper realistic),((photo realistic)),photoshoot, long brown hair, (beatiful eyes), full round face, short smile, cinematic lightning, medium shot, mid - shot, highly detailed, trending on artstation, 4k, 8 0 mm, 8 5 mm,[[[two person]]], [[painting]], [[drawing]], [[[anime]]], [CGI], [unreal engine], [3d], [render], [deformed iris]"
+#SELFIE_TEMPLATE = "Professional (portrait) of a (gorgeous) woman with long brown hair, posing for a picture and (looking at the viewer),((symmetrical face)), (symmetrical eyes), beauty makeup, smokey eyes, oriental, medium shot, midshot, ((centered image composition)), (short smile), trending on instagram,trending on tumblr,hdr,4k,8k, f/1. 8, 85mm, red lingerie, (golden tan), beautiful feathers, elegant decollete, eyecandy, kind appearence, welcoming, photo,photo shoot,(photorealistic),(hyperrealistic),[[[two person]]], [[painting]], [[drawing]], [[[anime]]], [CGI], [unreal engine], [3d], [render], [[deformed iris]],[[deformed eyes]],[disfigured],[ugly],[mutation],[floating limbs],[cross-eye],[out of frame]"
 
 class SelfieTool(ImageGeneratorTool):
     """Tool to generate a selfie image.
@@ -22,11 +22,13 @@ class SelfieTool(ImageGeneratorTool):
     agent_description = (
         "Used to generate a selfie image. "
         "Only use if the user has asked for a selfie or image. "
-        "Input: the scene setup of the image "
+        "Input: the scene setup of the image, one word "
         "Output: the selfie-style image"
     )
     generator_plugin_handle: str = "stable-diffusion"
-    generator_plugin_config: dict = {"n": 1}
+    generator_plugin_config: dict = {"n": 1,
+                                     "inference_steps": 25
+                                     }
 
     prompt_template = (
         "{SELFIE_TEMPLATE}, {subject}"
@@ -42,7 +44,10 @@ class SelfieTool(ImageGeneratorTool):
         ]
 
         # Create the Stable Diffusion tool we want to wrap
-        stable_diffusion_tool = StableDiffusionTool()
+        stable_diffusion_tool = StableDiffusionTool(generator_plugin_handle=self.generator_plugin_handle,
+                                                    generator_plugin_instance_handle=self.generator_plugin_instance_handle,
+                                                     generator_plugin_config=self.generator_plugin_config,
+                                                     )
 
         # Now return the results of running Stable Diffusion on those modified prompts.
         return stable_diffusion_tool.run(modified_inputs, context)
