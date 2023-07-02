@@ -184,7 +184,7 @@ class MyAssistant(AgentService):
       
 
     def check_usage(self, chat_id: str, context: AgentContext) -> bool:
-        #usage_entry = self.usage.get_usage(chat_id)
+        usage_entry = self.usage.get_usage(chat_id)
         if not self.usage.exists(chat_id):
             self.usage.add_user(chat_id)
         if self.usage.usage_exceeded(chat_id):
@@ -212,7 +212,7 @@ class MyAssistant(AgentService):
         super().__init__(**kwargs)
 
         self._agent = ReACTAgent(tools=[VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool()],
-            llm=OpenAI(self.client,model_name=GPT3),
+            llm=OpenAI(self.client,model_name=GPT4),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
@@ -417,9 +417,9 @@ class MyAssistant(AgentService):
 
         #OPTION 3: Add voice to response
 
-        voice_tool = VoiceTool()
-        voice_response = voice_tool.run(action.output,context=context)
-        action.output.append(voice_response[0])
+        #voice_tool = VoiceTool()
+        #voice_response = voice_tool.run(action.output,context=context)
+        #action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
 
