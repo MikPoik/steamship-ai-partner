@@ -19,8 +19,11 @@ class ExtendedTelegramTransport(Transport):
     set_payment_plan: Callable
 
     @post("telegram_respond", public=True)
-    def telegram_respond(self, **kwargs) -> InvocableResponse[str]:
+    def telegram_respond(self, **kwargs) -> InvocableResponse[str]:        
         """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
+
+        logging.info("request kwargs: "+str(kwargs))
+
 
         if "pre_checkout_query" in kwargs:
             pre_checkout_query = kwargs["pre_checkout_query"]
@@ -35,23 +38,46 @@ class ExtendedTelegramTransport(Transport):
 
             return InvocableResponse(string="OK")
         
-        #catch successful payment response
+        #catch successful payment response, should we send message to user?
         if ("message" in str(kwargs)) and ("successful_payment" in str(kwargs)):
             logging.info("successful payment")
             return InvocableResponse(string="OK")
 
+
         message = kwargs.get("message", {})
-        chat_id = message.get("chat", {}).get("id")
+
+
         try:
+            callback_args = {}
+            if "callback_query" in kwargs:
+                callback_query = kwargs["callback_query"]
+                #send answer to callback
+                requests.post(
+                    f"{self.api_root}/answerCallbackQuery",
+                    json={
+                        "callback_query_id": callback_query["id"],
+                    },
+                )
+                #set callback message
+                message = kwargs.get("callback_query",{}).get("message",{})
+                #callback arg string
+                callback_args = kwargs.get("callback_query",{}).get("data",{})
+                logging.info("callback msg "+str(message )+"args "+str(callback_args ))
+                logging.info("callback args "+str(callback_args ))
+ 
+            chat_id = message.get("chat", {}).get("id")
+
             incoming_message = self.parse_inbound(message)
-            if incoming_message is not None:
+
+            if incoming_message is not None and incoming_message.text is not None:
+                
                 context = AgentContext.get_or_create(self.client, context_keys={"chat_id": chat_id})
                 context.chat_history.append_user_message(
                     text=incoming_message.text, tags=incoming_message.tags
                 )
                 context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
 
-                response = self.agent_service.run_agent(self.agent, context,str(chat_id))
+                response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args)
                 if response is not None:
                     self.send(response)
                 else:
@@ -166,7 +192,7 @@ class ExtendedTelegramTransport(Transport):
 
         return result.content
 
-    def _parse_inbound(self, payload: dict, context: Optional[dict] = None) -> Optional[Block]:
+    def _parse_inbound(self, payload: dict, context: Optional[dict] = None, callback_args: dict = None) -> Optional[Block]:
         """Parses an inbound Telegram message."""
 
         chat = payload.get("chat")
@@ -205,13 +231,11 @@ class ExtendedTelegramTransport(Transport):
         # Some incoming messages (like the group join message) don't have message text.
         # Rather than throw an error, we just don't return a Block.
         message_text = payload.get("text")
-        if message_text is not None:
-            result = Block(text=message_text)
-            result.set_chat_id(str(chat_id))
-            result.set_message_id(str(message_id))
-            return result
-        else:
-            return None
+
+        result = Block(text=message_text)
+        result.set_chat_id(str(chat_id))
+        result.set_message_id(str(message_id))
+        return result
 
     def build_emit_func(self, chat_id: str) -> EmitFunc:
         def new_emit_func(blocks: List[Block], metadata: Metadata):

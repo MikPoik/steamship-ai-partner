@@ -24,7 +24,7 @@ BEHAVIOUR = """
 - You provide relationship advice and tips based on user's specific situation and needs
 """
 
-SELFIE_TEMPLATE = "Professional (portrait) of a (gorgeous) woman with long brown hair, posing for a picture and (looking at the viewer),((symmetrical face)), (symmetrical eyes), beauty makeup, smokey eyes, oriental, medium shot, midshot, ((centered image composition)), (short smile), trending on instagram,trending on tumblr,hdr,4k,8k, f/1. 8, 85mm, red lingerie, (golden tan), beautiful feathers, elegant decollete, eyecandy, kind appearence, welcoming, photo,photo shoot,(photorealistic),(hyperrealistic),[[[two person]]], [[painting]], [[drawing]], [[[anime]]], [CGI], [unreal engine], [3d], [render], [[deformed iris]],[[deformed eyes]],[disfigured],[ugly],[mutation],[floating limbs],[cross-eye],[out of frame]"
+SELFIE_TEMPLATE = "a woman with brown hair looking at the viewer and posing for a picture, hyper realistic,portait of haifa wehbe,portrait of sofia vergara,curly middle part haircut, mixture turkish and russian, cover girl, beautiful oriental woman, eyecandy, kind appearence ,desi, [airbrush],hdr,4k,8k,trending on tumblr,trending on instagram,centered image composition"
 VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
 
 MOOD_KEYWORDS = '''

@@ -8,8 +8,8 @@ from steamship.agents.tools.image_generation.stable_diffusion import StableDiffu
 from steamship.utils.repl import ToolREPL
 from tools.active_persona import SELFIE_TEMPLATE
 
-#testing..
-#SELFIE_TEMPLATE = "Professional (portrait) of a (gorgeous) woman with long brown hair, posing for a picture and (looking at the viewer),((symmetrical face)), (symmetrical eyes), beauty makeup, smokey eyes, oriental, medium shot, midshot, ((centered image composition)), (short smile), trending on instagram,trending on tumblr,hdr,4k,8k, f/1. 8, 85mm, red lingerie, (golden tan), beautiful feathers, elegant decollete, eyecandy, kind appearence, welcoming, photo,photo shoot,(photorealistic),(hyperrealistic),[[[two person]]], [[painting]], [[drawing]], [[[anime]]], [CGI], [unreal engine], [3d], [render], [[deformed iris]],[[deformed eyes]],[disfigured],[ugly],[mutation],[floating limbs],[cross-eye],[out of frame]"
+
+
 
 class SelfieTool(ImageGeneratorTool):
     """Tool to generate a selfie image.
@@ -29,6 +29,7 @@ class SelfieTool(ImageGeneratorTool):
     generator_plugin_config: dict = {"n": 1,
                                      "inference_steps": 25
                                      }
+                                     
 
     prompt_template = (
         "{SELFIE_TEMPLATE}, {subject}"

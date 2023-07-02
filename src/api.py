@@ -11,6 +11,8 @@ from usage_tracking import UsageTracker
 import uuid
 import logging
 import re
+from steamship import File,Tag,DocTag
+from steamship.utils.context_length import token_length
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
 from typing import List, Optional
 from pydantic import Field
@@ -104,13 +106,18 @@ New input: {input} {special_mood}
 {response_hint}
 {scratchpad}"""
 
+
 #TelegramTransport config
 class TelegramTransportConfig(Config):
     bot_token: str = Field(description="Telegram bot token, obtained via @BotFather")
-    payment_provider_token: Optional[str] = Field("0:TEST:0",description="Payment provider token, obtained via @BotFather")
-    n_free_messages: Optional[int] = Field(5, description="Number of free messages assigned to new users.")
+    payment_provider_token: Optional[str] = Field("TEST",description="Payment provider token, obtained via @BotFather")
+    n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
+    usd_balance:Optional[float] = Field(0.1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
+    #model_name: str(Field("gpt-model"))
 
+GPT3 = "gpt-3.5-turbo-0613"
+GPT4 = "gpt-4-0613"
 
 class MyAssistant(AgentService):
     
@@ -124,26 +131,52 @@ class MyAssistant(AgentService):
     def set_payment_plan(self, pre_checkout_query):
         chat_id = str(pre_checkout_query["from"]["id"])
         payload = int(pre_checkout_query["invoice_payload"])
-        self.usage.increase_message_limit(chat_id, payload)
+        self.usage.increase_usd_balance(chat_id, payload)
 
 
     def append_response(self, context: AgentContext, action:FinishAction):
         for func in context.emit_funcs:
-            logging.info(f"Emitting via function: {func.__name__}")
+            #logging.info(f"Emitting via function: {func.__name__}")
             func(action.output, context.metadata)
 
-    def send_invoice(self, chat_id):
+    def send_buy_options(self,chat_id):
+        requests.post(
+            f"{self.config.api_base}{self.config.bot_token}/sendMessage",
+            #text: button text
+            #callback_data: /buy_option_xxx-yyy  xxx=deposit amount, yyy=price 
+            json={
+                "chat_id": chat_id,
+                "text": "Choose deposit amount below:",
+                "reply_markup": {
+                    "inline_keyboard": [
+                    [
+                        {
+                        "text": "deposit 5$",
+                        "callback_data": "/buy_option_50-50"
+                        }
+                    ],
+                    [
+                            {
+                        "text": "Deposit 10$",
+                        "callback_data": "/buy_option_100-100"
+                        }
+                    ]
+                    ]
+                }
+                },
+        )        
+    def send_invoice(self, chat_id,amount,price):
         requests.post(
             f"{self.config.api_base}{self.config.bot_token}/sendInvoice",
             json={
                 "chat_id": chat_id,
-                "payload": "50",
+                "payload": amount,
                 "currency": "USD",
-                "title": "🍏 50 messages",
+                "title": "🍏 "+amount+"$ deposit",
                 "description": "Tap the button below and pay",
                 "prices": [{
-                    "label": "🍏 50 messages",
-                    "amount": 599,
+                    "label": "🍏 "+amount+"$ deposit to balance",
+                    "amount": price,
                 }],
                 "provider_token": self.config.payment_provider_token
             },
@@ -151,22 +184,24 @@ class MyAssistant(AgentService):
       
 
     def check_usage(self, chat_id: str, context: AgentContext) -> bool:
-        usage_entry = self.usage.get_usage(chat_id)
+        #usage_entry = self.usage.get_usage(chat_id)
         if not self.usage.exists(chat_id):
             self.usage.add_user(chat_id)
         if self.usage.usage_exceeded(chat_id):
             action = FinishAction()
-            action.output.append(Block(text=f"I'm sorry, You have {usage_entry.message_limit - usage_entry.message_count} messages left. "
+            action.output.append(Block(text=f"I'm sorry, You have used all of your $ balance. "
             ))
+            #check if chat is in telegram
             if chat_id.isdigit():
-                action.output.append(Block(text=f"Please buy more messages to continue chatting with me, tap the button below."))
+                action.output.append(Block(text=f"Please deposit more $ to continue chatting with me."))
             else:
+                #we are not in telegram chat
                 action.output.append(Block(text=f"Payments are not supported for this bot"))
             self.append_response(context=context,action=action)
             
             #check if its a telegram chat id and send invoice
             if chat_id.isdigit():
-                self.send_invoice(chat_id)
+                self.send_buy_options(chat_id=chat_id)
             return False          
 
         return True
@@ -177,7 +212,7 @@ class MyAssistant(AgentService):
         super().__init__(**kwargs)
 
         self._agent = ReACTAgent(tools=[VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool()],
-            llm=OpenAI(self.client,model_name="gpt-4"),
+            llm=OpenAI(self.client,model_name=GPT3),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
@@ -191,7 +226,7 @@ class MyAssistant(AgentService):
         #IndexerMixin
         self.indexer_mixin = IndexerPipelineMixin(self.client,self)
         self.add_mixin(self.indexer_mixin,permit_overwrite_of_existing_methods=True)
-        self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages)
+        self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
 
     #Indexer Wrapper for index PDF URL's
@@ -226,57 +261,92 @@ class MyAssistant(AgentService):
         return self.telegram_respond(self,**kwargs)
     
     #Customized run_agent
-    def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = ""):
-
+    def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None):
+        
         chat_id=""
         if msg_chat_id != "":
             chat_id = msg_chat_id #Telegram chat
         else:
             chat_id = context.id #repl or webchat
-  
+
+        last_message = context.chat_history.last_user_message.text.lower()
+        logging.info("last message "+last_message)
+        if callback_args:
+            logging.info("callback args "+str(callback_args))
+        #parse buy callback message
+        if callback_args:
+            if "/buy_option_" in callback_args:
+                #parse data
+                params = callback_args.replace("/buy_option_","").split("-")        
+                logging.info("invoice params" +str(params))
+                self.send_invoice(chat_id=chat_id,amount=params[0],price=params[1])
+                return   
+        
+        #buy messages
+        if last_message == "/deposit":
+            self.send_buy_options(chat_id=chat_id)
+            return
+
         #check balance
-        if context.chat_history.last_user_message.text.lower() == "/balance":
-            usage_entry = self.usage.get_usage(chat_id)
+        if last_message == "/balance":
+            usage_entry = self.usage.get_balance(chat_id=chat_id)
             action = FinishAction()
-            action.output.append(Block(text=f"You have {usage_entry.message_limit - usage_entry.message_count} messages left. "
+            action.output.append(Block(text=f"You have {usage_entry} $ balance left. "
             ))
             self.append_response(context=context,action=action)
 
             return
+        
         #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
         if not self.check_usage(chat_id=chat_id,context=context):
             return        
                 
         #respond to telegram /start command
-        if "/start" in context.chat_history.last_user_message.text.lower():
+        if "/start" in last_message:
 
             action = FinishAction()
             action.output.append(Block(text=f"Hi there!"))
 
-            #OPTION 1: send picture from url
+            #OPTION 1: send picture from local assets-folder
             
-            #png_file = self.indexer_mixin.importer_mixin.import_url("https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
-            #png_file.set_public_data(True)
-            
-            #could be also just plain url as text but the url link would also be displayed in message            
-            #block = Block(bytes=png_file.raw(),content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
+            #image file in assets folder
+            filename = "avatar.png"
+            #handle, use letters and underscore
+            file_handle ="avatar_png"
+            try:
+                png_file = File.get(client=context.client,handle=file_handle)
+                block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
+                action.output.append(block)
+                self.append_response(context=context,action=action)
+                self.usage.increase_token_count(action.output,chat_id=chat_id)
+ 
+            except Exception as e:
+                #print(e)
+                logging.info("avatar not found creating..")
+                with open("assets/avatar.png","rb") as f:             
 
-            #action.output.append(block)
+                    bytes = f.read()
+                    title_tag = Tag(kind=DocTag.TITLE, name=filename) 
+                    source_tag = Tag(kind=DocTag.SOURCE, name=filename)
+                    tags = [source_tag, title_tag]
+                    png_file = File.create(context.client,content=bytes,mime_type=MimeTypes.PNG,tags=tags,handle=file_handle)                    
+                    block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)            
+                    png_file.set_public_data(True)
+                    action.output.append(block)
+                    self.append_response(context=context,action=action)
 
             #OPTION 2: send picture with selfie tool in first message
 
-            selfie_tool = SelfieTool()
-            selfie_response = selfie_tool.run([Block(text=f"welcoming")],context=context)
-            action.output.append(selfie_response[0])
-
-
-            self.append_response(context=context,action=action)
+            #selfie_tool = SelfieTool()
+            #selfie_response = selfie_tool.run([Block(text=f"welcoming")],context=context)
+            #action.output.append(selfie_response[0])
+            #self.append_response(context=context,action=action)
 
             return
 
         #Searh response hints for role-play character from vectorDB, if any related text is indexed
         #run only if text contains word 'you' and ends with '?', assume its a question for bot
-        #should it run every time?
+        
         hint = ""
         pattern = r"you.*\?$"
         matches = re.findall(pattern, context.chat_history.last_user_message.text.lower())
@@ -322,7 +392,8 @@ class MyAssistant(AgentService):
         if "Do I need to use a tool?" in action.output[0].text:
             logging.warning("something went wrong")
             action = FinishAction()
-            action.output.append(Block(text=f"I'm sorry I didn't understand, can you repeat"))
+            action.output.append(Block(text=f"I'm sorry I got a bit distracted, can you please repeat"))
+            self.append_response(context=context,action=action)
 
             return
 
@@ -338,7 +409,10 @@ class MyAssistant(AgentService):
         )
 
         #Increase message count
-        self.usage.increase_message_count(chat_id)
+        if self.config.n_free_messages > 0:
+            self.usage.increase_message_count(chat_id)
+        #increase used tokens and reduce balance
+        self.usage.increase_token_count(action.output,chat_id=chat_id)
 
 
         #OPTION 3: Add voice to response
@@ -372,6 +446,7 @@ class MyAssistant(AgentService):
                 if not block.is_text():
                     block.set_public_data(True)
                     output += f"({block.mime_type}: {block.raw_data_url})\n"
+                    print("Image url for console:" +block.content_url)
                 else:
                     output += f"{block.text}\n"
 
