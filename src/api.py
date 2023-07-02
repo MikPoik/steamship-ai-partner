@@ -417,9 +417,9 @@ class MyAssistant(AgentService):
 
         #OPTION 3: Add voice to response
 
-        #voice_tool = VoiceTool()
-        #voice_response = voice_tool.run(action.output,context=context)
-        #action.output.append(voice_response[0])
+        voice_tool = VoiceTool()
+        voice_response = voice_tool.run(action.output,context=context)
+        action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
 

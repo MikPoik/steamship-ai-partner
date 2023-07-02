@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-test-bot",
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"description": "",
 	"author": "",
 	"entrypoint": "Unused",
@@ -22,7 +22,7 @@
 		"payment_provider_token": {
 			"type": "string",
 			"description": "Payment provider token, obtained via @BotFather",
-			"default": "TEST"
+			"default": "284685063:TEST:MWMyYjU3ZDhiNWMy"
 		},
 		"n_free_messages": {
 			"type": "number",
