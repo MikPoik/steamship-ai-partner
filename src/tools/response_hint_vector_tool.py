@@ -57,7 +57,8 @@ class ResponseHintTool(VectorSearchTool):
             **{"source_text": "\n".join(source_texts), "question": question,"NAME": NAME}
         )
         #print(final_prompt)
-        return get_llm(context).complete(prompt=final_prompt)
+        llm = get_llm(context, default=OpenAI(client=context.client))
+        return llm.complete(prompt=final_prompt)
 
     def run(self, tool_input: List[Block], context: AgentContext) -> Union[List[Block], Task[Any]]:
         """Answers questions with the assistance of an Embedding Index plugin.
@@ -74,6 +75,8 @@ class ResponseHintTool(VectorSearchTool):
         output: List[Blocks]
             A lit of blocks containing the answers.
         """
+
+        llm = get_llm(context, default=OpenAI(client=context.client))
 
         output = []
         for input_block in tool_input:

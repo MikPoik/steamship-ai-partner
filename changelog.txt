@@ -1,0 +1,6 @@
+3.7.2023
+- fixed response_hint tool default llm error
+- added more invoice categories
+- option to send first image from "assets" folder preloaded image
+- usage tracking tweaking
+- added /help command

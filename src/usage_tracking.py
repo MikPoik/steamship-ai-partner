@@ -27,35 +27,33 @@ class UsageTracker:
 
     def increase_token_count(self, blocks: [Block], chat_id: str ):
         usage_entry = self.get_usage(chat_id)
-        chars_used = 0 
-        tokens_used = 0       
-        for token_block in blocks:
-            if token_block is not None and token_block.text:
-                num_tokens = token_length(token_block,tiktoken_encoder="cl100k_base") #gpt3/4 tokenizer
-                tokens_used += num_tokens
-                chars_used += len(token_block.text)                
-                #logging.info("tokens in prompt: "+ str(tokens_used) )
-        
-        usage_entry.usd_balance -= self.calculate_cost(num_tokens=tokens_used,num_chars=chars_used)
-        self._set_usage(chat_id, usage_entry)
-        return tokens_used
+        #if free message limit reached
+        if usage_entry.message_count >= usage_entry.message_limit:
+            chars_used = 0 
+            tokens_used = 0       
+            for token_block in blocks:
+                if token_block is not None and token_block.text:
+                    num_tokens = token_length(token_block,tiktoken_encoder="cl100k_base") #gpt3/4 tokenizer
+                    tokens_used += num_tokens
+                    chars_used += len(token_block.text)                                    
+                    #logging.info("tokens in prompt: "+ str(tokens_used) )
+            
+            usage_entry.usd_balance -= self.calculate_cost(num_tokens=tokens_used,num_chars=chars_used)
+            self._set_usage(chat_id, usage_entry)
+            return tokens_used
     
     def calculate_cost(self, num_tokens:int,num_chars:int):
         #calculate tokens and voice cost in USD
         cost_per_token = self.gpt_price_per_thousand_tokens / 1000
         token_cost = num_tokens * cost_per_token
-        print("token cost: "+str(token_cost))
         voice_price = (num_chars / 1000) * self.elevenlabs_price_per_thousand_chars
-        print("voice cost: "+str(voice_price))
-        #logging.info("used balance in USD: "+str(token_cost))
-        print("total cost :"+str(token_cost+voice_price))
+        #logging.info("used balance in USD: "+str(token_cost+voice_price))
         return token_cost+voice_price   
             
     def get_balance(self,chat_id):
         #get rounded balance
         usage_entry = self.get_usage(chat_id)      
         #logging.info(str(usage_entry.usd_balance))
-        print("balance :" +str(usage_entry.usd_balance))
         return round(usage_entry.usd_balance,2)
 
     def get_usage(self, chat_id) -> UsageEntry:
@@ -69,10 +67,8 @@ class UsageTracker:
     def usage_exceeded(self, chat_id: str):
         usage_entry = self.kv_store.get(chat_id)
         if usage_entry["message_count"] >= usage_entry["message_limit"] and self.get_balance(chat_id=chat_id) <= 0:
-            print("usage exceeded")
             return True
         else:
-            print("usage not exeeded")
             return False
 
 

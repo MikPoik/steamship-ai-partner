@@ -21,9 +21,7 @@ class ExtendedTelegramTransport(Transport):
     @post("telegram_respond", public=True)
     def telegram_respond(self, **kwargs) -> InvocableResponse[str]:        
         """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
-
-        logging.info("request kwargs: "+str(kwargs))
-
+        #logging.info("request kwargs: "+str(kwargs))
 
         if "pre_checkout_query" in kwargs:
             pre_checkout_query = kwargs["pre_checkout_query"]
@@ -35,17 +33,14 @@ class ExtendedTelegramTransport(Transport):
                     "ok": True,
                 },
             )
-
             return InvocableResponse(string="OK")
         
         #catch successful payment response, should we send message to user?
         if ("message" in str(kwargs)) and ("successful_payment" in str(kwargs)):
             logging.info("successful payment")
             return InvocableResponse(string="OK")
-
-
+        
         message = kwargs.get("message", {})
-
 
         try:
             callback_args = {}
@@ -62,8 +57,7 @@ class ExtendedTelegramTransport(Transport):
                 message = kwargs.get("callback_query",{}).get("message",{})
                 #callback arg string
                 callback_args = kwargs.get("callback_query",{}).get("data",{})
-                logging.info("callback msg "+str(message )+"args "+str(callback_args ))
-                logging.info("callback args "+str(callback_args ))
+                #logging.info("callback msg "+str(message )+"\nargs "+str(callback_args ))
  
             chat_id = message.get("chat", {}).get("id")
 

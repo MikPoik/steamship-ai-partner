@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-test-bot",
-	"version": "1.5.1",
+	"version": "1.5.6",
 	"description": "",
 	"author": "",
 	"entrypoint": "Unused",
@@ -32,7 +32,7 @@
 		"usd_balance": {
 			"type": "number",
 			"description": "USD balance for new users",
-			"default": 0.1
+			"default": 0.5
 		},
 		"api_base": {
 			"type": "string",

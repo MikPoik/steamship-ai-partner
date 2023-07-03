@@ -11,7 +11,6 @@ from usage_tracking import UsageTracker
 import uuid
 import logging
 import re
-import os
 from steamship import File,Tag,DocTag
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
 from typing import List, Optional
@@ -54,6 +53,7 @@ TOOLS:
 ------
 You have access to the following tools:
 {tool_index}
+
 To use a tool, you MUST use the following format:
 ```
 Thought: Do I need to use a tool? Yes
@@ -113,9 +113,8 @@ class TelegramTransportConfig(Config):
     bot_token: str = Field(description="Telegram bot token, obtained via @BotFather")
     payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
-    usd_balance:Optional[float] = Field(0.1,description="USD balance for new users")
+    usd_balance:Optional[float] = Field(0.50,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
-    #model_name: str(Field("gpt-model"))
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
@@ -144,24 +143,48 @@ class MyAssistant(AgentService):
         requests.post(
             f"{self.config.api_base}{self.config.bot_token}/sendMessage",
             #text: button text
-            #callback_data: /buy_option_xxx-yyy  xxx=deposit amount, yyy=price 
+            #callback_data: /buy_option_xxx-yyy  xxx=deposit amount, yyy=price
             json={
                 "chat_id": chat_id,
                 "text": "Choose deposit amount below:",
                 "reply_markup": {
                     "inline_keyboard": [
-                    [
+                    [{
+                        "text": "Deposit 5$",
+                        "callback_data": "/buy_option_5-500"
+                        },
                         {
-                        "text": "deposit 5$",
-                        "callback_data": "/buy_option_50-50"
+                        "text": "Deposit 10$",
+                        "callback_data": "/buy_option_10-1000"
                         }
                     ],
-                    [
-                            {
-                        "text": "Deposit 10$",
-                        "callback_data": "/buy_option_100-100"
-                        }
-                    ]
+                    [ {
+                        "text": "Deposit 25$",
+                        "callback_data": "/buy_option_25-2500"
+                        },
+                        {
+                        "text": "Deposit 50$",
+                        "callback_data": "/buy_option_50-5000"
+                        },                        
+                    ],
+                    [ {
+                        "text": "Deposit 100$",
+                        "callback_data": "/buy_option_100-10000"
+                        },
+                        {
+                        "text": "Deposit 250$",
+                        "callback_data": "/buy_option_250-25000"
+                        },                        
+                    ],     
+                    [ {
+                        "text": "Deposit 500$",
+                        "callback_data": "/buy_option_500-50000"
+                        },
+                        {
+                        "text": "Deposit 1000$",
+                        "callback_data": "/buy_option_1000-100000"
+                        },                        
+                    ]                                          
                     ]
                 }
                 },
@@ -185,7 +208,7 @@ class MyAssistant(AgentService):
       
 
     def check_usage(self, chat_id: str, context: AgentContext) -> bool:
-        usage_entry = self.usage.get_usage(chat_id)
+        
         if not self.usage.exists(chat_id):
             self.usage.add_user(chat_id)
         if self.usage.usage_exceeded(chat_id):
@@ -212,7 +235,7 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._agent = ReACTAgent(tools=[VectorSearchLearnerTool(),VectorSearchQATool(),SelfieTool()],
+        self._agent = ReACTAgent(tools=[VectorSearchLearnerTool(),VectorSearchQATool()],
             llm=OpenAI(self.client,model_name=GPT4),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
@@ -229,7 +252,7 @@ class MyAssistant(AgentService):
         self.add_mixin(self.indexer_mixin,permit_overwrite_of_existing_methods=True)
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
-
+        
     #Indexer Wrapper for index PDF URL's
     @post("/index_url")
     def index_url(
@@ -271,15 +294,14 @@ class MyAssistant(AgentService):
             chat_id = context.id #repl or webchat
 
         last_message = context.chat_history.last_user_message.text.lower()
-        logging.info("last message "+last_message)
-        if callback_args:
-            logging.info("callback args "+str(callback_args))
+
         #parse buy callback message
         if callback_args:
+            #logging.info("callback args "+str(callback_args))
             if "/buy_option_" in callback_args:
                 #parse data
                 params = callback_args.replace("/buy_option_","").split("-")        
-                logging.info("invoice params" +str(params))
+                #logging.info("invoice params" +str(params))
                 self.send_invoice(chat_id=chat_id,amount=params[0],price=params[1])
                 return   
         
@@ -295,30 +317,37 @@ class MyAssistant(AgentService):
             action.output.append(Block(text=f"You have {usage_entry} $ balance left. "
             ))
             self.append_response(context=context,action=action)
-
             return
         
         #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
         if not self.check_usage(chat_id=chat_id,context=context):
             return        
-                
+
+        if "/help" in last_message:
+            action = FinishAction()
+            action.output.append(Block(text=f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance"))
+            self.append_response(context=context,action=action)
+            return
+                   
         #respond to telegram /start command
         if "/start" in last_message:
 
             action = FinishAction()
-            action.output.append(Block(text=f"Hi there!"))
+            action.output.append(Block(text=f"Hi there! Welcome to chat with "+NAME+".\n You can see the available commands with:\n /help -command"))
 
             #OPTION 1: send picture from local assets-folder
 
-            #send from url
+            ##send from url
             #png_file = self.indexer_mixin.importer_mixin.import_url("https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
             #png_file.set_public_data(True)            
             #block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
+            #action.output.append(block)
 
-            #send from local assets folder
-            block = send_file_from_local(filename="avatar.png",context=context)             
+
+            ##send from local assets folder           
+            block = send_file_from_local(filename="avatar.png",folder="src/assets/",context=context)             
             action.output.append(block)
-            self.append_response(context=context,action=action)
+
                 
             #OPTION 2: send picture with selfie tool in first message
 
@@ -327,6 +356,9 @@ class MyAssistant(AgentService):
             #action.output.append(selfie_response[0])
             #self.append_response(context=context,action=action)
 
+
+
+            self.append_response(context=context,action=action)
             return
 
         #Searh response hints for role-play character from vectorDB, if any related text is indexed
@@ -341,8 +373,9 @@ class MyAssistant(AgentService):
             if hint != "no hints":
                 #found related results
                 hint = "Response hint for "+NAME+": "+hint
-                logging.info(hint)
+                #logging.info(hint)
             else:
+                print("no hints")
                 hint = ""
 
 
@@ -379,7 +412,6 @@ class MyAssistant(AgentService):
             action = FinishAction()
             action.output.append(Block(text=f"I'm sorry I got a bit distracted, can you please repeat"))
             self.append_response(context=context,action=action)
-
             return
 
         context.completed_steps.append(action)
@@ -408,8 +440,6 @@ class MyAssistant(AgentService):
 
         self.append_response(context=context,action=action)
 
-        
-
 
     
     @post("prompt")
@@ -431,7 +461,8 @@ class MyAssistant(AgentService):
                 if not block.is_text():
                     block.set_public_data(True)
                     output += f"({block.mime_type}: {block.raw_data_url})\n"
-                    print("Image url for console:" +block.content_url)
+                    if block.mime_type == MimeTypes.PNG:
+                        print("Image url for console:" +str(block.content_url))
                 else:
                     output += f"{block.text}\n"
 

@@ -22,7 +22,7 @@ class SelfieTool(ImageGeneratorTool):
     agent_description = (
         "Used to generate a selfie image. "
         "Only use if the user has asked for a selfie or image. "
-        "Input: the scene setup of the image, one word "
+        "Input: describe the image background, short comma separated list of words "
         "Output: the selfie-style image"
     )
     generator_plugin_handle: str = "stable-diffusion"
