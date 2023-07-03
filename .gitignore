@@ -1,2 +1,3 @@
 venv38/
 build/
+**/__pycache__/

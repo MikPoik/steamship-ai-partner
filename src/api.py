@@ -11,8 +11,8 @@ from usage_tracking import UsageTracker
 import uuid
 import logging
 import re
+import os
 from steamship import File,Tag,DocTag
-from steamship.utils.context_length import token_length
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
 from typing import List, Optional
 from pydantic import Field
@@ -28,6 +28,7 @@ from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
+from utils import send_file_from_local
 from message_history_limit import MESSAGE_COUNT
 
 
@@ -110,7 +111,7 @@ New input: {input} {special_mood}
 #TelegramTransport config
 class TelegramTransportConfig(Config):
     bot_token: str = Field(description="Telegram bot token, obtained via @BotFather")
-    payment_provider_token: Optional[str] = Field("TEST",description="Payment provider token, obtained via @BotFather")
+    payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(0.1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
@@ -308,33 +309,17 @@ class MyAssistant(AgentService):
             action.output.append(Block(text=f"Hi there!"))
 
             #OPTION 1: send picture from local assets-folder
-            
-            #image file in assets folder
-            filename = "avatar.png"
-            #handle, use letters and underscore
-            file_handle ="avatar_png"
-            try:
-                png_file = File.get(client=context.client,handle=file_handle)
-                block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
-                action.output.append(block)
-                self.append_response(context=context,action=action)
-                self.usage.increase_token_count(action.output,chat_id=chat_id)
- 
-            except Exception as e:
-                #print(e)
-                logging.info("avatar not found creating..")
-                with open("assets/avatar.png","rb") as f:             
 
-                    bytes = f.read()
-                    title_tag = Tag(kind=DocTag.TITLE, name=filename) 
-                    source_tag = Tag(kind=DocTag.SOURCE, name=filename)
-                    tags = [source_tag, title_tag]
-                    png_file = File.create(context.client,content=bytes,mime_type=MimeTypes.PNG,tags=tags,handle=file_handle)                    
-                    block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)            
-                    png_file.set_public_data(True)
-                    action.output.append(block)
-                    self.append_response(context=context,action=action)
+            #send from url
+            #png_file = self.indexer_mixin.importer_mixin.import_url("https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
+            #png_file.set_public_data(True)            
+            #block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
 
+            #send from local assets folder
+            block = send_file_from_local(filename="avatar.png",context=context)             
+            action.output.append(block)
+            self.append_response(context=context,action=action)
+                
             #OPTION 2: send picture with selfie tool in first message
 
             #selfie_tool = SelfieTool()

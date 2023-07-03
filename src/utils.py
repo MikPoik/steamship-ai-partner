@@ -2,8 +2,8 @@ import logging
 import re
 import uuid
 from typing import List
-
-from steamship import Block, Steamship
+from steamship.agents.schema import AgentContext,F
+from steamship import Block, Steamship, MimeTypes, File, Tag,DocTag
 from steamship.data.workspace import SignedUrl
 from steamship.utils.signed_urls import upload_to_signed_url
 from termcolor import colored
@@ -11,6 +11,29 @@ from termcolor import colored
 UUID_PATTERN = re.compile(
     r"([0-9A-Za-z]{8}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{12})"
 )
+
+
+def send_file_from_local(filename: str,context: AgentContext) -> Block:
+    filename = filename
+    #handle, use letters and underscore
+    file_handle = filename.replace(".","_")
+
+    try:
+        png_file = File.get(client=context.client,handle=file_handle)
+        block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
+        return block
+
+    except Exception as e:
+        logging.info("avatar not found creating..")
+        with open("assets/"+filename,"rb") as f:             
+
+            bytes = f.read()
+            title_tag = Tag(kind=DocTag.TITLE, name=filename) 
+            source_tag = Tag(kind=DocTag.SOURCE, name=filename)
+            tags = [source_tag, title_tag]
+            png_file = File.create(context.client,content=bytes,mime_type=MimeTypes.PNG,tags=tags,handle=file_handle)                    
+            block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)            
+            png_file.set_public_data(True)
 
 
 def is_valid_uuid(uuid_to_test: str, version=4) -> bool:
