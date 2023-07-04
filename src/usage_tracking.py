@@ -16,9 +16,9 @@ class UsageEntry(BaseModel):
 
 class UsageTracker:
     kv_store: KeyValueStore
-    price_margin = 0.0 #add margin to price?
-    gpt_price_per_thousand_tokens = 0.18 + price_margin
-    elevenlabs_price_per_thousand_chars = 0.30 + price_margin
+    gpt_price_per_thousand_tokens = 0.18           #0.18c/1000 tokens
+    elevenlabs_price_per_thousand_chars = 1        #Calculate price based on generated voice, default price 0.30c/100 chars
+    chars_per_minute = 1010
 
     def __init__(self, client: Steamship, n_free_messages: Optional[int] = 0,usd_balance: Optional[float] = 0):
         self.kv_store = KeyValueStore(client, store_identifier="usage_tracking")
@@ -36,7 +36,6 @@ class UsageTracker:
                     num_tokens = token_length(token_block,tiktoken_encoder="cl100k_base") #gpt3/4 tokenizer
                     tokens_used += num_tokens
                     chars_used += len(token_block.text)                                    
-                    #logging.info("tokens in prompt: "+ str(tokens_used) )
             
             usage_entry.usd_balance -= self.calculate_cost(num_tokens=tokens_used,num_chars=chars_used)
             self._set_usage(chat_id, usage_entry)
@@ -46,13 +45,24 @@ class UsageTracker:
         #calculate tokens and voice cost in USD
         cost_per_token = self.gpt_price_per_thousand_tokens / 1000
         token_cost = num_tokens * cost_per_token
-        voice_price = (num_chars / 1000) * self.elevenlabs_price_per_thousand_chars
+        voice_price = (num_chars / self.chars_per_minute) * self.elevenlabs_price_per_thousand_chars
         #logging.info("used balance in USD: "+str(token_cost+voice_price))
-        return token_cost+voice_price   
+        return voice_price   #return voice_price+token_cost for both
+    
+    def get_available_words(self,chat_id):
+        #get available word from balance
+        usage_entry = self.get_usage(chat_id)
+        cost_per_char = self.elevenlabs_price_per_thousand_chars / self.chars_per_minute
+        chars_left = int(usage_entry.usd_balance / cost_per_char)
+        tokens = chars_left / 4
+        words = tokens * 0.75
+        return int(words)
             
     def get_balance(self,chat_id):
         #get rounded balance
         usage_entry = self.get_usage(chat_id)      
+        if usage_entry.usd_balance < 0:
+            usage_entry.usd_balance = 0
         #logging.info(str(usage_entry.usd_balance))
         return round(usage_entry.usd_balance,2)
 

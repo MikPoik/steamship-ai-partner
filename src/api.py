@@ -105,6 +105,7 @@ Recent conversation history:
 
 New input: {input} {special_mood}
 {response_hint}
+{answer_word_cap}
 {scratchpad}"""
 
 
@@ -113,7 +114,7 @@ class TelegramTransportConfig(Config):
     bot_token: str = Field(description="Telegram bot token, obtained via @BotFather")
     payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
-    usd_balance:Optional[float] = Field(0.50,description="USD balance for new users")
+    usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
 
 GPT3 = "gpt-3.5-turbo-0613"
@@ -175,16 +176,7 @@ class MyAssistant(AgentService):
                         "text": "Deposit 250$",
                         "callback_data": "/buy_option_250-25000"
                         },                        
-                    ],     
-                    [ {
-                        "text": "Deposit 500$",
-                        "callback_data": "/buy_option_500-50000"
-                        },
-                        {
-                        "text": "Deposit 1000$",
-                        "callback_data": "/buy_option_1000-100000"
-                        },                        
-                    ]                                          
+                    ]                                      
                     ]
                 }
                 },
@@ -348,16 +340,6 @@ class MyAssistant(AgentService):
             block = send_file_from_local(filename="avatar.png",folder="src/assets/",context=context)             
             action.output.append(block)
 
-                
-            #OPTION 2: send picture with selfie tool in first message
-
-            #selfie_tool = SelfieTool()
-            #selfie_response = selfie_tool.run([Block(text=f"welcoming")],context=context)
-            #action.output.append(selfie_response[0])
-            #self.append_response(context=context,action=action)
-
-
-
             self.append_response(context=context,action=action)
             return
 
@@ -375,11 +357,12 @@ class MyAssistant(AgentService):
                 hint = "Response hint for "+NAME+": "+hint
                 #logging.info(hint)
             else:
-                print("no hints")
+                #print("no hints")
                 hint = ""
-
-
-        action = agent.next_action(context=context,hint=hint)
+        
+        #If balance low, guide answer length
+        words_left = self.usage.get_available_words(chat_id=chat_id)
+        action = agent.next_action(context=context,hint=hint,words_left=words_left)
   
         while not isinstance(action, FinishAction):
             # TODO: Arrive at a solid design for the details of this structured log object
@@ -394,7 +377,7 @@ class MyAssistant(AgentService):
                 },
             )
             self.run_action(action=action, context=context)
-            action = agent.next_action(context=context)
+            action = agent.next_action(context=context,hint=hint,words_left=words_left)
             # TODO: Arrive at a solid design for the details of this structured log object
             logging.info(
                 f"Next Tool: {action.tool.name}",

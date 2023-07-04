@@ -1,3 +1,7 @@
+4.7.2023
+- usage tracking now calculates cost on generated voice
+- limit llm output when balance running low
+
 3.7.2023
 - fixed response_hint tool default llm error
 - added more invoice categories

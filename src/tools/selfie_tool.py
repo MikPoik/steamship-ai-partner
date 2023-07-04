@@ -9,8 +9,6 @@ from steamship.utils.repl import ToolREPL
 from tools.active_persona import SELFIE_TEMPLATE
 
 
-
-
 class SelfieTool(ImageGeneratorTool):
     """Tool to generate a selfie image.
 
