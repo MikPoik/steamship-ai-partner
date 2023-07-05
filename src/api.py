@@ -2,7 +2,7 @@ from agents.react import ReACTAgent
 from steamship.agents.logging import AgentLogging
 from steamship.agents.service.agent_service import AgentService
 from steamship.invocable import Config, post, InvocableResponse
-from steamship import Block,Task,MimeTypes
+from steamship import Block,Task,MimeTypes, Steamship
 from steamship.agents.llms.openai import OpenAI
 from steamship.utils.repl import AgentREPL
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
@@ -116,6 +116,8 @@ class TelegramTransportConfig(Config):
     n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
+    transloadit_api_key:str = Field(description="Transloadit api key for OGG encoding")
+    transloadit_api_secret:str = Field(description="Transloadit api secret")    
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
@@ -344,21 +346,18 @@ class MyAssistant(AgentService):
             return
 
         #Searh response hints for role-play character from vectorDB, if any related text is indexed
-        #run only if text contains word 'you' and ends with '?', assume its a question for bot
         
         hint = ""
-        pattern = r"you.*\?$"
-        matches = re.findall(pattern, context.chat_history.last_user_message.text.lower())
-        if matches:
-            hint_tool = ResponseHintTool()
-            hint = hint_tool.run([context.chat_history.last_user_message],context=context)[0].text
-            if hint != "no hints":
-                #found related results
-                hint = "Response hint for "+NAME+": "+hint
-                #logging.info(hint)
-            else:
-                #print("no hints")
-                hint = ""
+        hint_tool = ResponseHintTool()
+        hint = hint_tool.run([context.chat_history.last_user_message],context=context)[0].text
+        if not "no hints" in hint:
+            #found related results
+            hint = "Response hint about "+NAME+": "+hint
+            print(hint)
+            logging.info(hint)
+        else:
+            #print("no hints")
+            hint = ""
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=chat_id)
@@ -418,7 +417,7 @@ class MyAssistant(AgentService):
         #OPTION 3: Add voice to response
 
         voice_tool = VoiceTool()
-        voice_response = voice_tool.run(action.output,context=context)
+        voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
         action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
@@ -446,6 +445,8 @@ class MyAssistant(AgentService):
                     output += f"({block.mime_type}: {block.raw_data_url})\n"
                     if block.mime_type == MimeTypes.PNG:
                         print("Image url for console:" +str(block.content_url))
+                    if block.mime_type == MimeTypes.OGG_AUDIO:
+                        print("audio url for console: " +str(block.content_url))                        
                 else:
                     output += f"{block.text}\n"
 

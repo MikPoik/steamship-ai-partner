@@ -1,5 +1,5 @@
 """Tool for generating images."""
-from steamship import Steamship
+from steamship import Steamship,Block, Steamship, MimeTypes, File, Tag,DocTag
 from steamship.agents.llms import OpenAI
 from steamship.agents.tools.speech_generation import GenerateSpeechTool
 from steamship.agents.utils import with_llm
@@ -7,6 +7,8 @@ from steamship.utils.repl import ToolREPL
 from typing import Any, List, Union
 from steamship import Block, Task
 from steamship.agents.schema import AgentContext
+from transloadit import client as tlclient
+import logging
 from tools.active_persona import VOICE_ID
 
 
@@ -25,8 +27,14 @@ class VoiceTool(GenerateSpeechTool):
     prompt_template = (
         "{subject}"
     )
-    def run(self, tool_input: List[Block], context: AgentContext) -> Union[List[Block], Task[Any]]:
-
+    def run(self, tool_input: List[Block], context: AgentContext,transloadit_api_key:str = "",transloadit_api_secret = "") -> Union[List[Block], Task[Any]]:
+        if transloadit_api_key == "":
+            print("API_KEY not set")
+            logging.warning("Transloadit api key not set")
+            block = Block(text="Transloadit api key not set")
+            return [block]
+            
+        
         modified_inputs = [
             Block(text=self.prompt_template.format(subject=block.text))
             for block in tool_input
@@ -35,7 +43,32 @@ class VoiceTool(GenerateSpeechTool):
         speech.generator_plugin_config = {
             "voice_id": VOICE_ID 
         }
-        return speech.run(modified_inputs,context)
+        voice_result = speech.run(modified_inputs,context)
+        voice_result[0].set_public_data(True)
+
+        tl = tlclient.Transloadit(transloadit_api_key, transloadit_api_secret)
+        assembly = tl.new_assembly()
+        assembly.add_step("imported_postroll", "/http/import", {
+        'url': voice_result[0].raw_data_url
+        })
+
+        assembly.add_step("ogg_encoded", "/audio/encode", {
+        'use': 'imported_postroll',
+        'result': True,
+        'ffmpeg_stack': 'v4.3.1',
+        'ffmpeg': {
+            'q:a': -1,
+            'b:a': 128000,
+            'ar': 48000
+        },
+        'preset': 'opus'
+        })
+
+        assembly_response = assembly.create(retries=5, wait=True)
+        #logging.info(assembly_response.data.get('assembly_ssl_url'))
+        ogg_url = assembly_response.data['results']['ogg_encoded'][0]['ssl_url']
+        block = Block(content_url=ogg_url,mime_type=MimeTypes.OGG_AUDIO,url=ogg_url)
+        return [block]
 
 if __name__ == "__main__":
     tool = VoiceTool()

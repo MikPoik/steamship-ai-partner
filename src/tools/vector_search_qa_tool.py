@@ -52,7 +52,8 @@ class VectorSearchQATool(VectorSearchTool):
         final_prompt = self.question_answering_prompt.format(
             **{"source_text": "\n".join(source_texts), "question": question}
         )
-        return get_llm(context).complete(prompt=final_prompt)
+        llm = get_llm(context, default=OpenAI(client=context.client))
+        return llm.complete(prompt=final_prompt)
 
     def run(self, tool_input: List[Block], context: AgentContext) -> Union[List[Block], Task[Any]]:
         """Answers questions with the assistance of an Embedding Index plugin.

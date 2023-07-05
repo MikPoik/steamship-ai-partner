@@ -1,7 +1,7 @@
 import logging
 import tempfile
 from typing import Any, Dict, List, Optional, Callable
-import json
+
 import requests
 from steamship import Block, Steamship, SteamshipError
 from steamship.agents.mixins.transports.telegram import TelegramTransportConfig
@@ -142,25 +142,12 @@ class ExtendedTelegramTransport(Transport):
             if block.is_text() or block.text:
                 params = {"chat_id": int(chat_id), "text": block.text}
                 requests.get(f"{self.api_root}/sendMessage", params=params)
-            elif "transloadit" in block.content_url:
-                    block_url = block.content_url
-                    suffix = "sendVoice"
-                    uri = f"{self.api_root}/{suffix}?chat_id={chat_id}"
-                    body = {
-                    "voice": block_url
-                    }           
-                    headers = {
-                        "Content-Type": "application/json"
-                    }         
-                    resp = requests.post(uri, headers=headers, data=json.dumps(body))              
-                    #logging.info("response: "+str(resp.json()))
-               
             elif block.is_image() or block.is_audio() or block.is_video():
                 if block.is_image():
                     suffix = "sendPhoto"
                     key = "photo"
                 elif block.is_audio():
-                    suffix = "sendVoice"
+                    suffix = "sendAudio"
                     key = "audio"
                 elif block.is_video():
                     suffix = "sendVideo"

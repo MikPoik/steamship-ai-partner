@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-test-bot",
-	"version": "1.6.5",
+	"version": "1.7.8",
 	"description": "",
 	"author": "",
 	"entrypoint": "Unused",
@@ -38,6 +38,16 @@
 			"type": "string",
 			"description": "The root API for Telegram",
 			"default": "https://api.telegram.org/bot"
+		},
+		"transloadit_api_key": {
+			"type": "string",
+			"description": "Transloadit api key for OGG encoding",
+			"default": ""
+		},
+		"transloadit_api_secret": {
+			"type": "string",
+			"description": "Transloadit api secret",
+			"default": ""
 		}
 	},
 	"steamshipRegistry": {
