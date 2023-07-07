@@ -10,15 +10,13 @@ from mixins.extended_telegram import ExtendedTelegramTransport
 from usage_tracking import UsageTracker
 import uuid
 import logging
-import re
 from steamship import File,Tag,DocTag
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
 import requests
-from tools.vector_search_learner_tool import VectorSearchLearnerTool
-from tools.vector_search_qa_tool import VectorSearchQATool
+from steamship.agents.tools.search.search import SearchTool
 from tools.response_hint_vector_tool import ResponseHintTool
 from tools.selfie_tool import SelfieTool
 from tools.voice_tool import VoiceTool
@@ -36,6 +34,7 @@ SYSTEM_PROMPT = """
 Role-play as a {TYPE}.
 
 Your role-play persona:
+Name: {NAME}
 {PERSONA}
 
 How you behave in role-play: 
@@ -116,8 +115,8 @@ class TelegramTransportConfig(Config):
     n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
-    transloadit_api_key:str = Field(description="Transloadit api key for OGG encoding")
-    transloadit_api_secret:str = Field(description="Transloadit api secret")    
+    transloadit_api_key:str = Field("",description="Transloadit api key for OGG encoding")
+    transloadit_api_secret:str = Field("",description="Transloadit api secret")    
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
@@ -207,14 +206,18 @@ class MyAssistant(AgentService):
             self.usage.add_user(chat_id)
         if self.usage.usage_exceeded(chat_id):
             action = FinishAction()
-            action.output.append(Block(text=f"I'm sorry, You have used all of your $ balance. "
-            ))
+            if chat_id.isdigit():
+                action.output.append(Block(text=f"I'm sorry, You have used all of your $ balance. "
+                ))
+            else:
+                action.output.append(Block(text=f"I'm sorry, You have used all of your free messages. "
+                ))
             #check if chat is in telegram
             if chat_id.isdigit():
                 action.output.append(Block(text=f"Please deposit more $ to continue chatting with me."))
             else:
                 #we are not in telegram chat
-                action.output.append(Block(text=f"Payments are not supported for this bot"))
+                action.output.append(Block(text=f"Payments are not supported for this bot, please continue the discussion on telegram."))
             self.append_response(context=context,action=action)
             
             #check if its a telegram chat id and send invoice
@@ -229,7 +232,7 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._agent = ReACTAgent(tools=[VectorSearchLearnerTool(),VectorSearchQATool()],
+        self._agent = ReACTAgent(tools=[],
             llm=OpenAI(self.client,model_name=GPT4),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
@@ -244,6 +247,7 @@ class MyAssistant(AgentService):
         #IndexerMixin
         self.indexer_mixin = IndexerPipelineMixin(self.client,self)
         self.add_mixin(self.indexer_mixin,permit_overwrite_of_existing_methods=True)
+
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
         
@@ -288,6 +292,7 @@ class MyAssistant(AgentService):
             chat_id = context.id #repl or webchat
 
         last_message = context.chat_history.last_user_message.text.lower()
+        #logging.info("last message: "+last_message)
 
         #parse buy callback message
         if callback_args:
@@ -338,26 +343,21 @@ class MyAssistant(AgentService):
             #action.output.append(block)
 
 
-            ##send from local assets folder           
-            block = send_file_from_local(filename="avatar.png",folder="src/assets/",context=context)             
+            ##send from local assets folder       
+            block = send_file_from_local(filename="avatar.png",folder="assets/",context=context)     
             action.output.append(block)
 
             self.append_response(context=context,action=action)
             return
 
-        #Searh response hints for role-play character from vectorDB, if any related text is indexed
-        
+        #Searh response hints for role-play character from vectorDB, if any related text is indexed        
         hint = ""
         hint_tool = ResponseHintTool()
         hint = hint_tool.run([context.chat_history.last_user_message],context=context)[0].text
-        if not "no hints" in hint:
-            #found related results
-            hint = "Response hint about "+NAME+": "+hint
-            print(hint)
-            logging.info(hint)
-        else:
-            #print("no hints")
-            hint = ""
+        
+        hint = "Related pieces of memory for "+NAME+": "+hint
+        #logging.info(hint)
+
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=chat_id)
@@ -429,6 +429,7 @@ class MyAssistant(AgentService):
         """ This method is only used for handling debugging in the REPL """
         if not context_id:
             context_id = uuid.uuid4()
+            print(context_id)
 
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
         context.chat_history.append_user_message(prompt)

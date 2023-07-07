@@ -38,6 +38,8 @@ class UsageTracker:
                     chars_used += len(token_block.text)                                    
             
             usage_entry.usd_balance -= self.calculate_cost(num_tokens=tokens_used,num_chars=chars_used)
+            if usage_entry.usd_balance < 0:
+                usage_entry.usd_balance = 0
             self._set_usage(chat_id, usage_entry)
             return tokens_used
     

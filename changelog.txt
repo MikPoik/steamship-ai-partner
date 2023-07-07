@@ -1,3 +1,9 @@
+7.7.2023
+- Refactored response_hint_tool to return similarity search results from indexed docs.
+- removed VectorSearchLearnerTool and VectorSearchQATool from used tools, now obsolete with chat_history and response_hint_tool vector memory.
+- Added safety checks to voice_tool
+- fixed usage tracking negative balance issue.
+
 5.7.2023
 - OGG generation for telegram voice messages
 - fix default llm in VectorSearchQATool

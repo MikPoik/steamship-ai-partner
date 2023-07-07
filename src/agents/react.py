@@ -111,6 +111,12 @@ New input: {input} {special_mood}
         if words_left < 50 and words_left > 0:
             respond_with_words = "Answer with a word limit of "+str(words_left)+"!"
 
+        vector_history = self.messages_to_prompt_history(
+                context.chat_history.search(context.chat_history.last_user_message.text, k=int(RELEVANT_MESSAGES))
+                .wait()
+                .to_ranked_blocks()
+        )
+        #print("Vector_history:\n" + vector_history)
         # for simplicity assume initial prompt is a single text block.
         # in reality, use some sort of formatter ?
         prompt = self.PROMPT.format(
@@ -132,11 +138,7 @@ New input: {input} {special_mood}
             chat_history=self.messages_to_prompt_history(
                 messages=context.chat_history.select_messages(self.message_selector)
             ),
-            relevant_history=self.messages_to_prompt_history(
-                context.chat_history.search(context.chat_history.last_user_message.text, k=int(RELEVANT_MESSAGES))
-                .wait()
-                .to_ranked_blocks()
-            ),
+            relevant_history=vector_history,
 
         )
         #print(prompt)

@@ -1,7 +1,7 @@
 {
 	"type": "package",
-	"handle": "partner-ai-test-bot",
-	"version": "1.7.8",
+	"handle": "partner-ai-template-bot",
+	"version": "1.0.0",
 	"description": "",
 	"author": "",
 	"entrypoint": "Unused",

@@ -9,7 +9,7 @@ from steamship.agents.utils import get_llm, with_llm
 from steamship.utils.repl import ToolREPL
 
 DEFAULT_QUESTION_ANSWERING_PROMPT = (
-    "Use the following pieces of memory to answer the question at the end. "
+    "Use the following pieces of memory to answer the question about User at the end."
     """If you don't know the answer, respond politely that you don't remember, do no try to make up answer. 
 
 {source_text}

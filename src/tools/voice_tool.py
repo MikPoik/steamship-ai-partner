@@ -66,9 +66,13 @@ class VoiceTool(GenerateSpeechTool):
 
         assembly_response = assembly.create(retries=5, wait=True)
         #logging.info(assembly_response.data.get('assembly_ssl_url'))
-        ogg_url = assembly_response.data['results']['ogg_encoded'][0]['ssl_url']
-        block = Block(content_url=ogg_url,mime_type=MimeTypes.OGG_AUDIO,url=ogg_url)
-        return [block]
+        result = assembly_response.data['http_code']
+        if result == 200:
+            ogg_url = assembly_response.data['results']['ogg_encoded'][0]['ssl_url']
+            block = Block(content_url=ogg_url,mime_type=MimeTypes.OGG_AUDIO,url=ogg_url)
+            return [block]
+        else:
+            return[Block()]
 
 if __name__ == "__main__":
     tool = VoiceTool()

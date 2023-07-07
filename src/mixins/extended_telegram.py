@@ -153,7 +153,12 @@ class ExtendedTelegramTransport(Transport):
                         "Content-Type": "application/json"
                     }         
                     resp = requests.post(uri, headers=headers, data=json.dumps(body))              
-                    #logging.info("response: "+str(resp.json()))
+                    logging.info("response: "+str(resp.json()))
+                    if resp.status_code != 200:
+                        logging.error(f"Error sending message: {resp.text} [{resp.status_code}]")
+                        raise SteamshipError(
+                            f"Message not sent to chat {chat_id} successfully: {resp.text}"
+                        )                    
                
             elif block.is_image() or block.is_audio() or block.is_video():
                 if block.is_image():

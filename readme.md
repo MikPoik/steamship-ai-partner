@@ -2,7 +2,7 @@
 
 Partner AI with vector database memory for learning, customizable personality.
 
-- Preconfigured with two personalities, woman and male companion.
+- Preconfigured with two personalities.
 - VectorDB learning configured, data can be added with api.
 - Uses indexed data to create personal responses.
 - Remembers details about user to provide personal experience
@@ -14,7 +14,7 @@ Partner AI with vector database memory for learning, customizable personality.
 - Cost tracking by generated voice or tokens
 - Telegram invoicing with Stripe
 - User balance tracking
-- 
+-
 
 
 
