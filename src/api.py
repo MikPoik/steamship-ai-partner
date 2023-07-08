@@ -464,14 +464,14 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
 
-    client = Steamship(workspace="partner-ai-dev2-ws")
+
     context_id=uuid.uuid4()
     
     print("chat id "+str(context_id))
     AgentREPL(MyAssistant,
            method="prompt",
            agent_package_config={'botToken': 'not-a-real-token-for-local-testing'       
-        }).run_with_client(client=client,context_id=context_id) 
+        }).run(context_id=context_id) 
     
 
     
