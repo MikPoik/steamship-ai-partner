@@ -153,7 +153,7 @@ class ExtendedTelegramTransport(Transport):
                         "Content-Type": "application/json"
                     }         
                     resp = requests.post(uri, headers=headers, data=json.dumps(body))              
-                    logging.info("response: "+str(resp.json()))
+                    #logging.info("response: "+str(resp.json()))
                     if resp.status_code != 200:
                         logging.error(f"Error sending message: {resp.text} [{resp.status_code}]")
                         raise SteamshipError(

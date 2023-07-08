@@ -8,7 +8,7 @@ from steamship.agents.tools.question_answering.vector_search_tool import VectorS
 from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
 
-class ResponseHintTool(VectorSearchTool):
+class VectorSearchResponseTool(VectorSearchTool):
     """Tool to answer questions with the assistance of a vector search plugin."""
 
     name: str = "ResponseHintTool"
@@ -60,7 +60,7 @@ class ResponseHintTool(VectorSearchTool):
 
 
 if __name__ == "__main__":
-    tool = ResponseHintTool()
+    tool = VectorSearchResponseTool()
     repl = ToolREPL(tool)
     with repl.temporary_workspace() as client:
         index = tool.get_embedding_index(client)
@@ -69,10 +69,8 @@ if __name__ == "__main__":
                         [Tag(text="Mayas last travel was to Spain"),Tag(text="Maya plays the guitar")]
 
                     )
-        index.insert(
-                        
-                        [Tag(text="Maya likes concerts"),Tag(text="Mayas advocates mental health awarness")]
-                        
+        index.insert(                        
+                        [Tag(text="Maya likes concerts"),Tag(text="Mayas advocates mental health awarness")]                        
                     )        
         repl.run_with_client(
             client, context=with_llm(context=AgentContext(), llm=OpenAI(client=client))

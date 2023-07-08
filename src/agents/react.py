@@ -69,7 +69,7 @@ New input: {input} {special_mood}
             output_parser=ReACTOutputParser(tools=tools), llm=llm, tools=tools, **kwargs
         )
 
-    def next_action(self, context: AgentContext,hint: str = "",words_left = 0) -> Action:    
+    def next_action(self, context: AgentContext,vector_response: str = "",words_left = 0) -> Action:    
         scratchpad = self._construct_scratchpad(context)
         tool_names = [t.name for t in self.tools]
 
@@ -107,7 +107,7 @@ New input: {input} {special_mood}
 
 
         #get available balance and guide output length
-        respond_with_words = str()
+        respond_with_words = "Answer with a word limit of 200!"
         if words_left < 50 and words_left > 0:
             respond_with_words = "Answer with a word limit of "+str(words_left)+"!"
 
@@ -126,7 +126,7 @@ New input: {input} {special_mood}
             NAME=NAME,
             PERSONA=PERSONA,
             BEHAVIOUR=BEHAVIOUR,
-            response_hint=hint, #response hint from vectorDB for role-play character
+            vector_response=vector_response, #response text pieces from vectorDB for role-play character
             answer_word_cap=respond_with_words,
             current_time=current_time,
             current_date=current_date,

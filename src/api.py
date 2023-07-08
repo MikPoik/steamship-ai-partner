@@ -17,7 +17,7 @@ from pydantic import Field
 from typing import Type
 import requests
 from steamship.agents.tools.search.search import SearchTool
-from tools.response_hint_vector_tool import ResponseHintTool
+from tools.vector_search_response_tool import VectorSearchResponseTool
 from tools.selfie_tool import SelfieTool
 from tools.voice_tool import VoiceTool
 from mixins.indexer_pipeline_mixin import IndexerPipelineMixin
@@ -103,7 +103,7 @@ Recent conversation history:
 {message_history}
 
 New input: {input} {special_mood}
-{response_hint}
+{vector_response}
 {answer_word_cap}
 {scratchpad}"""
 
@@ -327,6 +327,10 @@ class MyAssistant(AgentService):
             action.output.append(Block(text=f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance"))
             self.append_response(context=context,action=action)
             return
+        
+        if "/reset" in last_message:
+            #TODO clear chat history
+            return
                    
         #respond to telegram /start command
         if "/start" in last_message:
@@ -351,17 +355,18 @@ class MyAssistant(AgentService):
             return
 
         #Searh response hints for role-play character from vectorDB, if any related text is indexed        
-        hint = ""
-        hint_tool = ResponseHintTool()
-        hint = hint_tool.run([context.chat_history.last_user_message],context=context)[0].text
+        vector_response = ""
+        vector_response_tool = VectorSearchResponseTool()
+        vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
         
-        hint = "Related pieces of memory for "+NAME+": "+hint
-        #logging.info(hint)
+        vector_response = "Use following pieces of memory to answer: "+vector_response
+        #logging.warning(vector_response)
+        
 
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=chat_id)
-        action = agent.next_action(context=context,hint=hint,words_left=words_left)
+        action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
   
         while not isinstance(action, FinishAction):
             # TODO: Arrive at a solid design for the details of this structured log object
@@ -376,7 +381,7 @@ class MyAssistant(AgentService):
                 },
             )
             self.run_action(action=action, context=context)
-            action = agent.next_action(context=context,hint=hint,words_left=words_left)
+            action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
             # TODO: Arrive at a solid design for the details of this structured log object
             logging.info(
                 f"Next Tool: {action.tool.name}",
@@ -429,7 +434,7 @@ class MyAssistant(AgentService):
         """ This method is only used for handling debugging in the REPL """
         if not context_id:
             context_id = uuid.uuid4()
-            print(context_id)
+            
 
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
         context.chat_history.append_user_message(prompt)
@@ -459,10 +464,14 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
 
+    client = Steamship(workspace="partner-ai-dev2-ws")
+    context_id=uuid.uuid4()
+    
+    print("chat id "+str(context_id))
     AgentREPL(MyAssistant,
            method="prompt",
            agent_package_config={'botToken': 'not-a-real-token-for-local-testing'       
-        }).run(context_id=uuid.uuid4()) 
+        }).run_with_client(client=client,context_id=context_id) 
     
 
     

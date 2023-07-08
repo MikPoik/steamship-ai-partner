@@ -1,3 +1,7 @@
+8.7.2023
+- renamed response_hint_tool to VectorSearchResponseTool
+- max word limit to voice messages, prevent sending voice as files.
+
 7.7.2023
 - Refactored response_hint_tool to return similarity search results from indexed docs.
 - removed VectorSearchLearnerTool and VectorSearchQATool from used tools, now obsolete with chat_history and response_hint_tool vector memory.
