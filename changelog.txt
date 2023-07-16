@@ -1,3 +1,8 @@
+16.7.2023
+- Updated to Steamship 2.17.18
+- Changed Agent from ReACTAgent to FunctionBasedAgent
+- added /reset command to clear chat_history
+
 8.7.2023
 - renamed response_hint_tool to VectorSearchResponseTool
 - max word limit to voice messages, prevent sending voice as files.

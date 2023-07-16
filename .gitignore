@@ -2,3 +2,4 @@ venv38/
 build/
 **/__pycache__/
 __pycache__
+**/logs/

@@ -1,9 +1,10 @@
-from agents.react import ReACTAgent
+from agents.functions_based import FunctionsBasedAgent
 from steamship.agents.logging import AgentLogging
 from steamship.agents.service.agent_service import AgentService
 from steamship.invocable import Config, post, InvocableResponse
 from steamship import Block,Task,MimeTypes, Steamship
 from steamship.agents.llms.openai import OpenAI
+from steamship.agents.llms.openai import ChatOpenAI
 from steamship.utils.repl import AgentREPL
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
 from mixins.extended_telegram import ExtendedTelegramTransport
@@ -20,7 +21,10 @@ from steamship.agents.tools.search.search import SearchTool
 from tools.vector_search_response_tool import VectorSearchResponseTool
 from tools.selfie_tool import SelfieTool
 from tools.voice_tool import VoiceTool
-from mixins.indexer_pipeline_mixin import IndexerPipelineMixin
+from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
+from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
+from steamship.invocable.mixins.indexer_mixin import IndexerMixin
+from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
 from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
@@ -48,71 +52,30 @@ How you behave in role-play:
 - You remember User's personal details and preferences to provide a personalized experience for the User
 
 
-TOOLS:
-------
-You have access to the following tools:
-{tool_index}
-
-To use a tool, you MUST use the following format:
-```
-Thought: Do I need to use a tool? Yes
-Action: the action to take, should be one of {tool_names}
-Action Input: the input to the action
-Observation: the result of the action
-```
-
-If you decide that you should use a Tool, you MUST generate the associated Action and Action Input.
-
-Some tools will return Observations in the format of `Block(<identifier>)`. This will represent a successful completion
-of that step and can be passed to subsequent tools, or returned to a user to answer their questions.
-
-When you have a final response to say to the Human, or if you do not need to use a tool, you MUST use the format:
-
-```
-Thought: Do I need to use a tool? No
-AI: [Your final response here]
-```
-
-If a Tool generated an Observation that includes `Block(<identifier>)` and you wish to return it to the user, ALWAYS
-end your response with the `Block(<identifier>)` observation. To do so, you MUST use the format:
-
-```
-Thought: Do I need to use a tool? No
-AI: [your response with a suffix of: "Block(<identifier>)"]
-```
-
-Make sure to use all observations to come up with your final answer.
-
-You MUST include `Block(<identifier>)` segments in responses that generate images or audio.
-DO NOT include `Block(<identifier>)` segments in responses that do not have generated images or audio.
-
 Current date is: [{current_date}]
 Current time is: [{current_time}]
 Current day is: [{current_day}]
 Consider current date and time when answering.
 
-ALWAYS generate Actions in response IF you need to use a tool.
-Be sure to save User's preferences and details for future reference.
+NOTE: Some functions return images, video, and audio files. These multimedia files will be represented in messages as
+UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD print the Steamship Blocks for the images,
+video, or audio as follows: `Block(UUID for the block)`.
 
-Begin!
+Example response for a request that generated an image:
+Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B).
+Only use the functions you have been provided with.
 
-Other relevant previous conversation:
-{relevant_history}
-
-Recent conversation history:
-{message_history}
-
-New input: {input} {special_mood}
+{special_mood}
 {vector_response}
 {answer_word_cap}
-{scratchpad}"""
+Begin!"""
 
 
 #TelegramTransport config
 class TelegramTransportConfig(Config):
-    bot_token: str = Field(description="Telegram bot token, obtained via @BotFather")
-    payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
-    n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
+    bot_token: str = Field("",description="Telegram bot token, obtained via @BotFather")
+    payment_provider_token: Optional[str] = Field("y",description="Payment provider token, obtained via @BotFather")
+    n_free_messages: Optional[int] = Field(1, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     transloadit_api_key:str = Field("",description="Transloadit api key for OGG encoding")
@@ -122,6 +85,8 @@ GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 
 class MyAssistant(AgentService):
+
+    USED_MIXIN_CLASSES = [IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, IndexerMixin,ExtendedTelegramTransport]
     
     config: TelegramTransportConfig
 
@@ -232,55 +197,32 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._agent = ReACTAgent(tools=[],
-            llm=OpenAI(self.client,model_name=GPT4),
+        self._agent = FunctionsBasedAgent(tools=[],
+            llm=ChatOpenAI(self.client,model_name=GPT4,temperature=0.8),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
 
-        #add Steamship widget chat mixin
-        self.widget_mixin = SteamshipWidgetTransport(self.client,self,self._agent)
-        self.add_mixin(self.widget_mixin,permit_overwrite_of_existing_methods=True)
-        #add Telegram chat mixin 
-        self.telegram_mixin = ExtendedTelegramTransport(self.client,self.config,self,self._agent,set_payment_plan=self.set_payment_plan)
-        self.add_mixin(self.telegram_mixin,permit_overwrite_of_existing_methods=True)        
-        #IndexerMixin
-        self.indexer_mixin = IndexerPipelineMixin(self.client,self)
-        self.add_mixin(self.indexer_mixin,permit_overwrite_of_existing_methods=True)
+        # This Mixin provides HTTP endpoints that connects this agent to a web client
+        self.add_mixin(
+            SteamshipWidgetTransport(client=self.client, agent_service=self, agent=self._agent)
+        )
 
+        #IndexerMixin
+        self.add_mixin(IndexerPipelineMixin(self.client, self))
+
+        # This Mixin provides support for Telegram bots
+        self.add_mixin(
+            ExtendedTelegramTransport(
+                client=self.client,
+                config=self.config,
+                agent_service=self,
+                agent=self._agent,
+                set_payment_plan=self.set_payment_plan
+            )
+        )
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
-        
-    #Indexer Wrapper for index PDF URL's
-    @post("/index_url")
-    def index_url(
-        self,
-        url: Optional[str] = None,
-        metadata: Optional[dict] = None,
-        index_handle: Optional[str] = None,
-        mime_type: Optional[str] = None,
-    ) -> Task:
-       """Method for indexing URL's to VectorDatabase"""
-       return self.indexer_mixin.index_url(url=url, metadata=metadata, index_handle=index_handle, mime_type=mime_type)  
-    
-    #Wrapper for indexing text to vectorDB
-    @post("/index_text")
-    def index_text(
-            self, text: str, metadata: Optional[dict] = None, index_handle: Optional[str] = None
-        ) -> bool:   
-        return self.text_indexer_mixin.index_text(text=text,metadata=metadata,index_handle=index_handle)
-
-    #Wrapper for mixin
-    @post("answer", public=True)
-    def answer(self, **payload) -> List[Block]:
-        """Wrapper function for webwidget chat"""
-        return self.widget_mixin.answer(self,**payload)
-    
-    #Wrapper for mixin
-    @post("telegram_respond", public=True)
-    def telegram_respond(self, **kwargs) -> InvocableResponse[str]:
-        """Wrapper function for Telegram chat"""
-        return self.telegram_respond(self,**kwargs)
     
     #Customized run_agent
     def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None):
@@ -330,6 +272,10 @@ class MyAssistant(AgentService):
         
         if "/reset" in last_message:
             #TODO clear chat history
+            context.chat_history.clear()
+            action = FinishAction()
+            action.output.append(Block(text=f"Conversation history cleared"))
+            self.append_response(context=context,action=action)
             return
                    
         #respond to telegram /start command
@@ -359,7 +305,7 @@ class MyAssistant(AgentService):
         vector_response_tool = VectorSearchResponseTool()
         vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
         
-        vector_response = "Use following pieces of memory to answer: "+vector_response
+        vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
         #logging.warning(vector_response)
         
 
@@ -392,14 +338,6 @@ class MyAssistant(AgentService):
                     AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
                 },
             )
-
-        #If something went wrong, mostly with gpt3.5 version.. 
-        if "Do I need to use a tool?" in action.output[0].text:
-            logging.warning("something went wrong")
-            action = FinishAction()
-            action.output.append(Block(text=f"I'm sorry I got a bit distracted, can you please repeat"))
-            self.append_response(context=context,action=action)
-            return
 
         context.completed_steps.append(action)
         #add message to history
@@ -464,14 +402,13 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
 
-
+    client = Steamship(workspace="partner-ai-dev2-ws")
     context_id=uuid.uuid4()
     
     print("chat id "+str(context_id))
     AgentREPL(MyAssistant,
-           method="prompt",
            agent_package_config={'botToken': 'not-a-real-token-for-local-testing'       
-        }).run(context_id=context_id) 
+        }).run_with_client(client=client,context_id=context_id ) 
     
 
     

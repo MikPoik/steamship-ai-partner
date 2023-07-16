@@ -1,4 +1,5 @@
-steamship==2.17.11
+steamship==2.17.18
 termcolor~=2.3.0
 pytransloadit
 pydantic>=1.8.2
+pyngrok

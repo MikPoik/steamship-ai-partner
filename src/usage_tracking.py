@@ -17,7 +17,7 @@ class UsageEntry(BaseModel):
 class UsageTracker:
     kv_store: KeyValueStore
     gpt_price_per_thousand_tokens = 0.18           #0.18c/1000 tokens
-    elevenlabs_price_per_thousand_chars = 1        #Calculate price based on generated voice, default price 0.30c/100 chars
+    elevenlabs_price_per_thousand_chars = 1        #Calculate price based on generated voice, default price 0.30c/1000 chars
     chars_per_minute = 1010
 
     def __init__(self, client: Steamship, n_free_messages: Optional[int] = 0,usd_balance: Optional[float] = 0):
@@ -52,7 +52,7 @@ class UsageTracker:
         return voice_price   #return voice_price+token_cost for both
     
     def get_available_words(self,chat_id):
-        #get available word from balance
+        #get available words from balance
         usage_entry = self.get_usage(chat_id)
         cost_per_char = self.elevenlabs_price_per_thousand_chars / self.chars_per_minute
         chars_left = int(usage_entry.usd_balance / cost_per_char)

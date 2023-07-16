@@ -13,7 +13,7 @@ from tools.active_persona import MOOD_KEYWORDS
 
 #additional tone instruction for input
 
-DEFAULT_PROMPT = """(answer with a mood: {tone})"""
+DEFAULT_PROMPT = """You MUST Answer with a mood: {tone}"""
 
 #KV key
 MOOD_KEY = "agent-mood"
