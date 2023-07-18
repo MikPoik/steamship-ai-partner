@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-dev-bot",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "",
 	"author": "",
 	"entrypoint": "Unused",
@@ -41,12 +41,12 @@
 		},
 		"transloadit_api_key": {
 			"type": "string",
-			"description": "Transloadit api key for OGG encoding",
+			"description": "Transloadit.com api key for OGG encoding",
 			"default": ""
 		},
 		"transloadit_api_secret": {
 			"type": "string",
-			"description": "Transloadit api secret",
+			"description": "Transloadit.com api secret",
 			"default": ""
 		}
 	},

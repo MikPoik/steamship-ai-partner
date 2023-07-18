@@ -8,6 +8,7 @@ from steamship.data.workspace import SignedUrl
 from steamship.utils.signed_urls import upload_to_signed_url
 from termcolor import colored
 import requests
+import os
 
 UUID_PATTERN = re.compile(
     r"([0-9A-Za-z]{8}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{12})"
@@ -18,7 +19,9 @@ def send_file_from_local(filename: str,folder: str,context: AgentContext) -> Blo
     filename = filename
     #handle, use letters and underscore
     file_handle = filename.replace(".","_")
-
+    if not os.path.isfile(folder+filename):
+        folder = "src/assets/"
+        
     try:
         png_file = File.get(client=context.client,handle=file_handle)
         block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)

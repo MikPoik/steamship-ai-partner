@@ -74,12 +74,12 @@ Begin!"""
 #TelegramTransport config
 class TelegramTransportConfig(Config):
     bot_token: str = Field("",description="Telegram bot token, obtained via @BotFather")
-    payment_provider_token: Optional[str] = Field("y",description="Payment provider token, obtained via @BotFather")
+    payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(1, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
-    transloadit_api_key:str = Field("",description="Transloadit api key for OGG encoding")
-    transloadit_api_secret:str = Field("",description="Transloadit api secret")    
+    transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
+    transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
@@ -198,7 +198,7 @@ class MyAssistant(AgentService):
         super().__init__(**kwargs)
 
         self._agent = FunctionsBasedAgent(tools=[],
-            llm=ChatOpenAI(self.client,model_name=GPT4,temperature=0.8),
+            llm=ChatOpenAI(self.client,model_name=GPT4,temperature=0.8,max_tokens=200),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
@@ -209,7 +209,8 @@ class MyAssistant(AgentService):
         )
 
         #IndexerMixin
-        self.add_mixin(IndexerPipelineMixin(self.client, self))
+        self.indexer_mixin = IndexerPipelineMixin(self.client,self)
+        self.add_mixin(self.indexer_mixin)
 
         # This Mixin provides support for Telegram bots
         self.add_mixin(
@@ -223,10 +224,9 @@ class MyAssistant(AgentService):
         )
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
-    
     #Customized run_agent
     def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None):
-        
+        context.completed_steps = []
         chat_id=""
         if msg_chat_id != "":
             chat_id = msg_chat_id #Telegram chat
@@ -284,18 +284,18 @@ class MyAssistant(AgentService):
             action = FinishAction()
             action.output.append(Block(text=f"Hi there! Welcome to chat with "+NAME+".\n You can see the available commands with:\n /help -command"))
 
-            #OPTION 1: send picture from local assets-folder
+            #OPTION 1: send picture from url
 
             ##send from url
-            #png_file = self.indexer_mixin.importer_mixin.import_url("https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
-            #png_file.set_public_data(True)            
-            #block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
-            #action.output.append(block)
-
-
-            ##send from local assets folder       
-            block = send_file_from_local(filename="avatar.png",folder="assets/",context=context)     
+            png_file = self.indexer_mixin.importer_mixin.import_url("https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
+            png_file.set_public_data(True)            
+            block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)
             action.output.append(block)
+
+            #OPTION 2: send from local assets folder
+            ##send from local assets folder       
+            #block = send_file_from_local(filename="avatar.png",folder="assets/",context=context)     
+            #action.output.append(block)
 
             self.append_response(context=context,action=action)
             return
@@ -312,6 +312,7 @@ class MyAssistant(AgentService):
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=chat_id)
+
         action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
   
         while not isinstance(action, FinishAction):
@@ -369,7 +370,7 @@ class MyAssistant(AgentService):
     
     @post("prompt")
     def prompt(self, prompt: str,context_id: Optional[uuid.UUID] = None) -> str:
-        """ This method is only used for handling debugging in the REPL """
+        """ Prompt Agent with text input """
         if not context_id:
             context_id = uuid.uuid4()
             
@@ -402,13 +403,14 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
 
-    client = Steamship(workspace="partner-ai-dev2-ws")
+    
     context_id=uuid.uuid4()
     
     print("chat id "+str(context_id))
     AgentREPL(MyAssistant,
+            method="prompt",
            agent_package_config={'botToken': 'not-a-real-token-for-local-testing'       
-        }).run_with_client(client=client,context_id=context_id ) 
+        }).run(context_id=context_id ) 
     
 
     

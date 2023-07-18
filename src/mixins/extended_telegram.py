@@ -3,11 +3,13 @@ import tempfile
 from typing import Any, Dict, List, Optional, Callable
 import json
 import requests
+from steamship.agents.llms import OpenAI
 from steamship import Block, Steamship, SteamshipError
 from steamship.agents.mixins.transports.telegram import TelegramTransportConfig
 from steamship.agents.mixins.transports.transport import Transport
 from steamship.agents.schema import Agent, AgentContext, EmitFunc, Metadata
 from steamship.agents.service.agent_service import AgentService
+from steamship.agents.utils import with_llm
 from steamship.invocable import Config, InvocableResponse, InvocationContext, post
 
 
@@ -60,17 +62,24 @@ class ExtendedTelegramTransport(Transport):
                 #logging.info("callback msg "+str(message )+"\nargs "+str(callback_args ))
  
             chat_id = message.get("chat", {}).get("id")
-
             incoming_message = self.parse_inbound(message)
 
-            if incoming_message is not None and incoming_message.text is not None:
-                
+            if incoming_message is not None:
                 context = AgentContext.get_or_create(self.client, context_keys={"chat_id": chat_id})
                 context.chat_history.append_user_message(
                     text=incoming_message.text, tags=incoming_message.tags
                 )
                 context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
-
+                
+                # Add an LLM to the context, using the Agent's if it exists.
+                llm = None
+                if hasattr(self.agent, "llm"):
+                    llm = self.agent.llm
+                else:
+                    llm = OpenAI(client=self.client)
+                
+                context = with_llm(context=context, llm=llm)
+                
                 response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args)
                 if response is not None:
                     self.send(response)
@@ -243,12 +252,14 @@ class ExtendedTelegramTransport(Transport):
         # Some incoming messages (like the group join message) don't have message text.
         # Rather than throw an error, we just don't return a Block.
         message_text = payload.get("text")
-
-        result = Block(text=message_text)
-        result.set_chat_id(str(chat_id))
-        result.set_message_id(str(message_id))
-        return result
-
+        if message_text is not None:
+            result = Block(text=message_text)
+            result.set_chat_id(str(chat_id))
+            result.set_message_id(str(message_id))
+            return result
+        else:
+            return None
+        
     def build_emit_func(self, chat_id: str) -> EmitFunc:
         def new_emit_func(blocks: List[Block], metadata: Metadata):
             for block in blocks:

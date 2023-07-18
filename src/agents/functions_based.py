@@ -42,7 +42,7 @@ Only use the functions you have been provided with."""
 
         messages = []
 
-        respond_with_words = "Answer with a word limit of 200!"
+        respond_with_words = "Answer with a word limit of 150!"
         if words_left < 50 and words_left > 0:
             respond_with_words = "You MUST Answer with a word limit of "+str(words_left)+"!"
 
