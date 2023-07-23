@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional,List
 
 from pydantic import BaseModel
 from steamship import Steamship,Block
@@ -11,6 +11,7 @@ class UsageEntry(BaseModel):
     message_count: int = 0
     message_limit: int = 0
     usd_balance: float = 0
+    indexed:int = 0
     
 
 
@@ -72,7 +73,15 @@ class UsageTracker:
         if not self.exists(chat_id):
             self.add_user(chat_id)
         return UsageEntry.parse_obj(self.kv_store.get(chat_id))
-
+    
+    def set_index_status(self,chat_id):
+        usage_entry = self.get_usage(chat_id)   
+        usage_entry.indexed = 1
+        self._set_usage(chat_id, usage_entry)    
+    
+    def get_index_status(self,chat_id):      
+         usage_entry = self.get_usage(chat_id)
+         return usage_entry.indexed
     def _set_usage(self, chat_id, usage: UsageEntry) -> None:
         self.kv_store.set(chat_id, usage.dict())
 

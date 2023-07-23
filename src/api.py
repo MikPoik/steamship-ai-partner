@@ -6,10 +6,10 @@ from steamship import Block,Task,MimeTypes, Steamship
 from steamship.agents.llms.openai import OpenAI
 from steamship.agents.llms.openai import ChatOpenAI
 from steamship.utils.repl import AgentREPL
-from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
+from mixins.steamship_widget import SteamshipWidgetTransport
 from mixins.extended_telegram import ExtendedTelegramTransport
 from usage_tracking import UsageTracker
-import uuid
+import uuid,os
 import logging
 from steamship import File,Tag,DocTag
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
@@ -21,6 +21,7 @@ from steamship.agents.tools.search.search import SearchTool
 from tools.vector_search_response_tool import VectorSearchResponseTool
 from tools.selfie_tool import SelfieTool
 from tools.voice_tool import VoiceTool
+from tools.dolly_llm_tool import DollyLLMTool
 from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
 from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
 from steamship.invocable.mixins.indexer_mixin import IndexerMixin
@@ -80,13 +81,15 @@ class TelegramTransportConfig(Config):
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
+    openai_api_key:str = Field("",description="OpenAI key for Moderation checking")
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 
+
 class MyAssistant(AgentService):
 
-    USED_MIXIN_CLASSES = [IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, IndexerMixin,ExtendedTelegramTransport]
+    USED_MIXIN_CLASSES = [IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, IndexerMixin,ExtendedTelegramTransport,SteamshipWidgetTransport]
     
     config: TelegramTransportConfig
 
@@ -106,6 +109,28 @@ class MyAssistant(AgentService):
             #logging.info(f"Emitting via function: {func.__name__}")
             func(action.output, context.metadata)
 
+    def check_moderation(self,input_message:str):
+        url = "https://api.openai.com/v1/moderations"
+        if self.config.openai_api_key == "":
+            return False
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer "+self.config.openai_api_key
+        }
+
+        data = {
+            "input": input_message
+        }
+        response = requests.post(url, headers=headers, json=data)
+        #logging.warning(response.json())
+        json_resp = response.json()
+        if json_resp["results"][0]["flagged"]:
+            logging.warning("flagged")
+            return True
+        else:
+            return False
+        
     def send_buy_options(self,chat_id):
         requests.post(
             f"{self.config.api_base}{self.config.bot_token}/sendMessage",
@@ -168,8 +193,8 @@ class MyAssistant(AgentService):
     def check_usage(self, chat_id: str, context: AgentContext) -> bool:
         
         if not self.usage.exists(chat_id):
-            self.usage.add_user(chat_id)
-        if self.usage.usage_exceeded(chat_id):
+            self.usage.add_user(str(chat_id))
+        if self.usage.usage_exceeded(str(chat_id)):
             action = FinishAction()
             if chat_id.isdigit():
                 action.output.append(Block(text=f"I'm sorry, You have used all of your $ balance. "
@@ -197,11 +222,12 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._agent = FunctionsBasedAgent(tools=[],
+        self._agent = FunctionsBasedAgent(tools=[SelfieTool()],
             llm=ChatOpenAI(self.client,model_name=GPT4,temperature=0.8,max_tokens=200),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
+
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         self.add_mixin(
@@ -225,7 +251,7 @@ class MyAssistant(AgentService):
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
     #Customized run_agent
-    def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None):
+    def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None,use_dolly:bool = False):
         context.completed_steps = []
         chat_id=""
         if msg_chat_id != "":
@@ -246,6 +272,15 @@ class MyAssistant(AgentService):
                 self.send_invoice(chat_id=chat_id,amount=params[0],price=params[1])
                 return   
         
+        if use_dolly == True:
+            #dolly_context = AgentContext.get_or_create(self.client, {"id": f"different_context_id"})    
+            dolly_tool = DollyLLMTool()
+            dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
+            action = FinishAction()
+            action.output.append(Block(text=dolly_response[0].text))
+            self.append_response(context=context,action=action)
+            return
+
         #buy messages
         if last_message == "/deposit":
             self.send_buy_options(chat_id=chat_id)
@@ -311,7 +346,7 @@ class MyAssistant(AgentService):
 
         
         #If balance low, guide answer length
-        words_left = self.usage.get_available_words(chat_id=chat_id)
+        words_left = self.usage.get_available_words(chat_id=str(chat_id))
 
         action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
   
@@ -353,15 +388,18 @@ class MyAssistant(AgentService):
 
         #Increase message count
         if self.config.n_free_messages > 0:
-            self.usage.increase_message_count(chat_id)
+            self.usage.increase_message_count(str(chat_id))
         #increase used tokens and reduce balance
-        self.usage.increase_token_count(action.output,chat_id=chat_id)
+        self.usage.increase_token_count(action.output,chat_id=str(chat_id))
 
 
         #OPTION 3: Add voice to response
 
         voice_tool = VoiceTool()
+        ##if OGG encoding:
         voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
+        ## if default audio format (change voice_tool_orig.py to voice_tool.py):
+        voice_tool.run(action.output,context=context)
         action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
@@ -371,12 +409,17 @@ class MyAssistant(AgentService):
     @post("prompt")
     def prompt(self, prompt: str,context_id: Optional[uuid.UUID] = None) -> str:
         """ Prompt Agent with text input """
+        flagged = False
         if not context_id:
             context_id = uuid.uuid4()
-            
+        if self.check_moderation(prompt):
+            flagged = True
+            context_id = str(context_id)+"-dolly"
 
+        print(context_id)
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
         context.chat_history.append_user_message(prompt)
+        
         
         #add context
         context = with_llm(context=context, llm=OpenAI(client=self.client))
@@ -394,23 +437,54 @@ class MyAssistant(AgentService):
                         print("audio url for console: " +str(block.content_url))                        
                 else:
                     output += f"{block.text}\n"
-
+        
         context.emit_funcs.append(sync_emit)
-        self.run_agent(self._agent, context)
+        self.run_agent(self._agent, context,msg_chat_id=context_id,use_dolly=flagged)
 
        
         return output
+    
+    @post("initial_index")
+    def initial_index(self,chat_id:str =""):
+        """Index a file from assets folder"""
+        #logging.warning(str(self.usage.get_index_status(chat_id=chat_id)))
 
+        if self.usage.get_index_status(chat_id=chat_id) == 0:
+
+            filename="file.pdf"
+            folder="assets/"    
+            #handle, use letters and underscore
+            file_handle = filename.replace(".","_")
+            if not os.path.isfile(folder+filename):
+                folder = "src/assets/"            
+            try:
+                with open(folder+filename,"rb") as f:             
+                    bytes = f.read()
+                    title_tag = Tag(kind=DocTag.TITLE, name=filename) 
+                    source_tag = Tag(kind=DocTag.SOURCE, name=filename)
+                    tags = [source_tag, title_tag]
+                    pdf_file = File.create(self.client,content=bytes,mime_type=MimeTypes.PDF,tags=tags,handle=file_handle)                                             
+                    pdf_file.set_public_data(True)
+                    blockify_task = self.indexer_mixin.blockifier_mixin.blockify(pdf_file.id)
+                    blockify_task.wait()
+                    self.indexer_mixin.indexer_mixin.index_file(pdf_file.id)    
+                    self.usage.set_index_status(chat_id=chat_id)
+                    #logging.warning(str(self.usage.get_index_status(chat_id=chat_id)))
+                
+            except Exception as e:
+                logging.warning(e)
+
+        return "indexed"    
 if __name__ == "__main__":
 
-    
+    client = Steamship(workspace="partner-ai-dev2-ws")
     context_id=uuid.uuid4()
     
     print("chat id "+str(context_id))
     AgentREPL(MyAssistant,
             method="prompt",
            agent_package_config={'botToken': 'not-a-real-token-for-local-testing'       
-        }).run(context_id=context_id ) 
+        }).run_with_client(client=client,context_id=context_id ) 
     
 
     
