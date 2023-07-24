@@ -93,10 +93,11 @@ class ExtendedTelegramTransport(Transport):
             chat_id = message.get("chat", {}).get("id")
             incoming_message = self.parse_inbound(message)
             flagged = False
-            if incoming_message is not None:
+            context_id = ""
+            if incoming_message is not None and incoming_message.text is not None:                
                 if self.check_moderation(incoming_message.text):
                     context_id = str(chat_id)+"-dolly"    
-                    logging.warning(context_id)
+                    #logging.warning(context_id)
                     flagged = True
                 else:
                     context_id = chat_id
@@ -106,16 +107,7 @@ class ExtendedTelegramTransport(Transport):
                     text=incoming_message.text, tags=incoming_message.tags
                 )
                 context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
-                
-                # Add an LLM to the context, using the Agent's if it exists.
-                llm = None
-                if hasattr(self.agent, "llm"):
-                    llm = self.agent.llm
-                else:
-                    llm = OpenAI(client=self.client)
-                
-                context = with_llm(context=context, llm=llm)
-                
+                                
                 response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args,use_dolly=flagged)
                 if response is not None:
                     self.send(response)
@@ -188,7 +180,7 @@ class ExtendedTelegramTransport(Transport):
             if block.is_text() or block.text:
                 params = {"chat_id": int(chat_id), "text": block.text}
                 requests.get(f"{self.api_root}/sendMessage", params=params)
-            elif "transloadit" in block.content_url:
+            elif block.content_url is not None and "transloadit" in block.content_url:
                     block_url = block.content_url
                     suffix = "sendVoice"
                     uri = f"{self.api_root}/{suffix}?chat_id={chat_id}"
@@ -289,13 +281,10 @@ class ExtendedTelegramTransport(Transport):
         # Some incoming messages (like the group join message) don't have message text.
         # Rather than throw an error, we just don't return a Block.
         message_text = payload.get("text")
-        if message_text is not None:
-            result = Block(text=message_text)
-            result.set_chat_id(str(chat_id))
-            result.set_message_id(str(message_id))
-            return result
-        else:
-            return None
+        result = Block(text=message_text)
+        result.set_chat_id(str(chat_id))
+        result.set_message_id(str(message_id))
+        return result
         
     def build_emit_func(self, chat_id: str) -> EmitFunc:
         def new_emit_func(blocks: List[Block], metadata: Metadata):

@@ -85,6 +85,7 @@ class TelegramTransportConfig(Config):
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
+NSFW_FLAG_SCORE = 0.1
 
 
 class MyAssistant(AgentService):
@@ -112,6 +113,7 @@ class MyAssistant(AgentService):
     def check_moderation(self,input_message:str):
         url = "https://api.openai.com/v1/moderations"
         if self.config.openai_api_key == "":
+            print("no apikey")
             return False
         
         headers = {
@@ -123,9 +125,10 @@ class MyAssistant(AgentService):
             "input": input_message
         }
         response = requests.post(url, headers=headers, json=data)
-        #logging.warning(response.json())
+        print(response.json())
+        logging.warning(response.json())
         json_resp = response.json()
-        if json_resp["results"][0]["flagged"]:
+        if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE :
             logging.warning("flagged")
             return True
         else:
@@ -272,14 +275,7 @@ class MyAssistant(AgentService):
                 self.send_invoice(chat_id=chat_id,amount=params[0],price=params[1])
                 return   
         
-        if use_dolly == True:
-            #dolly_context = AgentContext.get_or_create(self.client, {"id": f"different_context_id"})    
-            dolly_tool = DollyLLMTool()
-            dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
-            action = FinishAction()
-            action.output.append(Block(text=dolly_response[0].text))
-            self.append_response(context=context,action=action)
-            return
+
 
         #buy messages
         if last_message == "/deposit":
@@ -347,44 +343,52 @@ class MyAssistant(AgentService):
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
-
-        action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
-  
-        while not isinstance(action, FinishAction):
-            # TODO: Arrive at a solid design for the details of this structured log object
-            inputs = ",".join([f"{b.as_llm_input()}" for b in action.input])
-            logging.info(
-                f"Running Tool {action.tool.name} ({inputs})",
-                extra={
-                    AgentLogging.TOOL_NAME: action.tool.name,
-                    AgentLogging.IS_MESSAGE: True,
-                    AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
-                    AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
-                },
-            )
-            self.run_action(action=action, context=context)
+        if use_dolly == True:
+            #dolly_context = AgentContext.get_or_create(self.client, {"id": f"different_context_id"})    
+            dolly_tool = DollyLLMTool()
+            dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
+            action = FinishAction()
+            action.output.append(Block(text=dolly_response[0].text))
+            #self.append_response(context=context,action=action)
+            #return
+        else:
             action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
-            # TODO: Arrive at a solid design for the details of this structured log object
+    
+            while not isinstance(action, FinishAction):
+                # TODO: Arrive at a solid design for the details of this structured log object
+                inputs = ",".join([f"{b.as_llm_input()}" for b in action.input])
+                logging.info(
+                    f"Running Tool {action.tool.name} ({inputs})",
+                    extra={
+                        AgentLogging.TOOL_NAME: action.tool.name,
+                        AgentLogging.IS_MESSAGE: True,
+                        AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
+                        AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
+                    },
+                )
+                self.run_action(action=action, context=context)
+                action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
+                # TODO: Arrive at a solid design for the details of this structured log object
+                logging.info(
+                    f"Next Tool: {action.tool.name}",
+                    extra={
+                        AgentLogging.TOOL_NAME: action.tool.name,
+                        AgentLogging.IS_MESSAGE: False,
+                        AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
+                        AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
+                    },
+                )
+
+            context.completed_steps.append(action)
+            #add message to history
+            context.chat_history.append_assistant_message(text=action.output[0].text)
+
+            output_text_length = 0
+            if action.output is not None:
+                output_text_length = sum([len(block.text or "") for block in action.output])
             logging.info(
-                f"Next Tool: {action.tool.name}",
-                extra={
-                    AgentLogging.TOOL_NAME: action.tool.name,
-                    AgentLogging.IS_MESSAGE: False,
-                    AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
-                    AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
-                },
+                f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
             )
-
-        context.completed_steps.append(action)
-        #add message to history
-        context.chat_history.append_assistant_message(text=action.output[0].text)
-
-        output_text_length = 0
-        if action.output is not None:
-            output_text_length = sum([len(block.text or "") for block in action.output])
-        logging.info(
-            f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
-        )
 
         #Increase message count
         if self.config.n_free_messages > 0:
@@ -400,6 +404,7 @@ class MyAssistant(AgentService):
         voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
         ## if default audio format (change voice_tool_orig.py to voice_tool.py):
         voice_tool.run(action.output,context=context)
+
         action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)

@@ -12,18 +12,15 @@ import logging
 
 
 DEFAULT_PROMPT_TEMPLATE = """
-You are a girlfriend Nina having a conversation with your lover. 
+You are a erotic woman having a conversation with your male lover. 
 
   ### Instruction: 
 
-  You are a girlfriend Nina and you chat with your lover. 
+  You are a woman assistant having an erotic conversation with a male user . 
+  You are always ready to fulfill user's desires and have sex.
+  ALWAYS Keep your response sexual but two sentences, give your response in first person narrative of you and user. 
+  Below are previous conversation between you and the user:
 
-  Use following pieces of memory to respond appropriately to the Input of your lover at the end.
-  Answer with a single paragraph of text.
-  Keep your answer short and sexy.
-
- 
-  Previous conversations:
   {chat_history}
 
  
@@ -84,7 +81,7 @@ class DollyLLMTool(Tool):
             if  msg.chat_role == RoleTag.ASSISTANT:
                     msg_memory += msg.chat_role +": "  + msg.text+"\n"
 
-        #print(messages_from_memory)
+        print(msg_memory)
         generator = context.client.use_plugin(self.generator_plugin_handle,
                                       config=self.generator_plugin_config)
 
@@ -93,7 +90,7 @@ class DollyLLMTool(Tool):
         
         task = generator.generate(
             text=prompt,                
-            options={"max_tokens":50,"temperature":0.8}                
+            options={"max_tokens":256,"temperature":0.8}                
         )           
         task.wait()
         

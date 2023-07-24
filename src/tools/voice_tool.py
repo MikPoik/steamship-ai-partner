@@ -41,7 +41,7 @@ class VoiceTool(GenerateSpeechTool):
         ]
         speech = GenerateSpeechTool()
         speech.generator_plugin_config = {
-            "voice_id": VOICE_ID 
+            "voice_id": VOICE_ID
         }
         voice_result = speech.run(modified_inputs,context)
         voice_result[0].set_public_data(True)
