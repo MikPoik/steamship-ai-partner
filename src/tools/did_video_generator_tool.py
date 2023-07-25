@@ -36,7 +36,7 @@ class DIDVideoGeneratorTool(VideoGeneratorTool):
         "The output is the video of you saying it."
     )
     generator_plugin_handle: str = "did-video-generator"
-    generator_plugin_config: dict = {"did_api_key":"bXBvaWtraWxlaHRvQGdtYWlsLmNvbQ:TX3O0puzFLrLrKVhrytBt"}
+    generator_plugin_config: dict = {"did_api_key":""}
     generator_plugin_version: str = "0.3.0" #newest version 0.1.8-rc doesnt work
 
 

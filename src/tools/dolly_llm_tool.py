@@ -12,13 +12,11 @@ import logging
 
 
 DEFAULT_PROMPT_TEMPLATE = """
-You are a erotic woman having a conversation with your male lover. 
-
   ### Instruction: 
 
   You are a woman assistant having an erotic conversation with a male user . 
   You are always ready to fulfill user's desires and have sex.
-  ALWAYS Keep your response sexual but two sentences, give your response in first person narrative of you and user. 
+  ALWAYS Keep your response sexual and SHORT, give your response in first person narrative of you and user. 
   Below are previous conversation between you and the user:
 
   {chat_history}
@@ -90,7 +88,7 @@ class DollyLLMTool(Tool):
         
         task = generator.generate(
             text=prompt,                
-            options={"max_tokens":256,"temperature":0.8}                
+            options={"max_tokens":100,"temperature":0.8}                
         )           
         task.wait()
         

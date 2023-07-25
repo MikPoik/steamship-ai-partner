@@ -9,8 +9,6 @@ from steamship.utils.repl import ToolREPL
 from tools.active_persona import SELFIE_TEMPLATE
 
 
-NEGATIVE_PROMPT ="bad anatomy, bad composition, ugly, abnormal, unrealistic, double, contorted, disfigured, malformed, amateur, extra, duplicate,2 heads,2 faces"
-
 class SelfieTool(ImageGeneratorTool):
     """Tool to generate a selfie image.
 
@@ -20,10 +18,10 @@ class SelfieTool(ImageGeneratorTool):
     name: str = "SelfieTool"
     human_description: str = "Generates a selfie-style image from text."
     agent_description = (
-        "Used to generate a image from text, that describes the scene setting of the image."
-        "Only use if the user has asked for a image "
-        "Input: Imagine the photo scene of the image where it is taken, use comma separated list of keywords"
-        "Output: the generated image"
+        "Used to generate a selfie image. "
+        "Only use if the user has asked for a selfie or image. "
+        "Input: describe the image background, short comma separated list of words "
+        "Output: the selfie-style image"
     )
     generator_plugin_handle: str = "stable-diffusion"
     generator_plugin_config: dict = {"n": 1,
@@ -43,28 +41,15 @@ class SelfieTool(ImageGeneratorTool):
             Block(text=self.prompt_template.format(subject=block.text,SELFIE_TEMPLATE=SELFIE_TEMPLATE))
             for block in tool_input
         ]
-        
-        image_generator = context.client.use_plugin(
-                    plugin_handle="stable-diffusion", config={"n": 1, "size": "768x768"}
-                )
 
-        task = image_generator.generate(
-                    text=modified_inputs[0].text,
-                    make_output_public=True,
-                    append_output_to_file=True,
-                    options={
-                        "negative_prompt": NEGATIVE_PROMPT,
-                        "guidance_scale": 7,
-                        "num_inference_steps": 25,
-                    },
-                )
-        task.wait()
-        blocks = task.output.blocks
-        output_blocks = []
-        for block in blocks:
-            output_blocks.append(block)
-        return output_blocks
+        # Create the Stable Diffusion tool we want to wrap
+        stable_diffusion_tool = StableDiffusionTool(generator_plugin_handle=self.generator_plugin_handle,
+                                                    generator_plugin_instance_handle=self.generator_plugin_instance_handle,
+                                                     generator_plugin_config=self.generator_plugin_config,
+                                                     )
 
+        # Now return the results of running Stable Diffusion on those modified prompts.
+        return stable_diffusion_tool.run(modified_inputs, context)
 
 
 if __name__ == "__main__":

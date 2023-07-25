@@ -399,13 +399,13 @@ class MyAssistant(AgentService):
 
         #OPTION 3: Add voice to response
 
-        voice_tool = VoiceTool()
+        #voice_tool = VoiceTool()
         ##if OGG encoding:
-        voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
+        #voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
         ## if default audio format (change voice_tool_orig.py to voice_tool.py):
-        voice_tool.run(action.output,context=context)
+        #voice_tool.run(action.output,context=context)
 
-        action.output.append(voice_response[0])
+        #action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
 
