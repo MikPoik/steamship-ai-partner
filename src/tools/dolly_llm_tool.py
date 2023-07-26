@@ -7,31 +7,31 @@ from steamship.agents.schema import AgentContext,Tool
 from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
 from steamship.data.tags.tag_constants import RoleTag
+from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 import logging
 
 
 
 DEFAULT_PROMPT_TEMPLATE = """
-  ### Instruction: 
+  Instruction:
+  You are a girlfriend, you are willing to please your boyfriend.
+  You are in erotic mood and talk in short sentences.
 
-  You are a woman assistant having an erotic conversation with a male user . 
-  You are always ready to fulfill user's desires and have sex.
-  ALWAYS Keep your response sexual and SHORT, give your response in first person narrative of you and user. 
-  Below are previous conversation between you and the user:
+  Respond to your boyfriend at the end.
+  
+  {related_history}
 
-  {chat_history}
+  {previous_messages} 
+  
+  Input:
+  boyfriend: {input}
 
  
 
-  Input: 
-  {input}
-
- 
-
-  ### Response:"""
+  Response:"""
 
 class DollyLLMTool(Tool):
-    """Tool to generate talking avatars from text using D-ID."""
+    """Tool to generate talking avatars from text using"""
 
     rewrite_prompt = DEFAULT_PROMPT_TEMPLATE
 
@@ -50,14 +50,21 @@ class DollyLLMTool(Tool):
         """Run the tool. Copied from base class to enable generate-time config overrides."""
         #context_id = "different_chat_id-8"
         logging.warning(context_id) 
-        logging.warning(context.id)       
+        #logging.warning(context.id)       
         if context_id == "":
             context = AgentContext.get_or_create(context.client, {"id": f"{context.id}"})
 
         
         context.chat_history.append_user_message(text=tool_input[0].text)
 
-
+        #history = MessageWindowMessageSelector(k=int(3)).get_messages(context.chat_history.messages)
+        message_history = str()
+        #for block in history:
+        #    if  block.chat_role == RoleTag.USER:
+        #        message_history += "boyfriend: "  + block.text+"\n"
+        #    if  block.chat_role == RoleTag.ASSISTANT:
+        #        message_history += "you: "  + block.text+"\n"   
+        #print(message_history)
 
         messages_from_memory = []
         # get prior conversations
@@ -72,19 +79,19 @@ class DollyLLMTool(Tool):
             for msg in messages_from_memory
             if msg.id != context.chat_history.last_user_message.id
         ]            
-        msg_memory = str()
+        vector_memory = str()
         for msg in messages_from_memory:
             if  msg.chat_role == RoleTag.USER:
-                    msg_memory += msg.chat_role +": "  + msg.text+"\n"
+                    vector_memory += "boyfriend: "  + msg.text+"\n"
             if  msg.chat_role == RoleTag.ASSISTANT:
-                    msg_memory += msg.chat_role +": "  + msg.text+"\n"
+                    vector_memory += "you: "  + msg.text+"\n"
 
-        print(msg_memory)
+        #print(msg_memory)
         generator = context.client.use_plugin(self.generator_plugin_handle,
                                       config=self.generator_plugin_config)
 
-        prompt = self.rewrite_prompt.format(input=tool_input[0].text,chat_history=msg_memory)
-        #print(prompt)
+        prompt = self.rewrite_prompt.format(input=tool_input[0].text,related_history=vector_memory,previous_messages=message_history)
+        print(prompt)
         
         task = generator.generate(
             text=prompt,                

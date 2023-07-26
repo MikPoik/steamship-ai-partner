@@ -76,7 +76,7 @@ Begin!"""
 class TelegramTransportConfig(Config):
     bot_token: str = Field("",description="Telegram bot token, obtained via @BotFather")
     payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
-    n_free_messages: Optional[int] = Field(1, description="Number of free messages assigned to new users.")
+    n_free_messages: Optional[int] = Field(10, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
@@ -85,7 +85,7 @@ class TelegramTransportConfig(Config):
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
-NSFW_FLAG_SCORE = 0.1
+NSFW_FLAG_SCORE = 0.01
 
 
 class MyAssistant(AgentService):
@@ -126,7 +126,7 @@ class MyAssistant(AgentService):
         }
         response = requests.post(url, headers=headers, json=data)
         print(response.json())
-        logging.warning(response.json())
+        #logging.warning(response.json())
         json_resp = response.json()
         if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE :
             logging.warning("flagged")
@@ -276,7 +276,6 @@ class MyAssistant(AgentService):
                 return   
         
 
-
         #buy messages
         if last_message == "/deposit":
             self.send_buy_options(chat_id=chat_id)
@@ -291,9 +290,7 @@ class MyAssistant(AgentService):
             self.append_response(context=context,action=action)
             return
         
-        #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
-        if not self.check_usage(chat_id=chat_id,context=context):
-            return        
+     
 
         if "/help" in last_message:
             action = FinishAction()
@@ -308,7 +305,9 @@ class MyAssistant(AgentService):
             action.output.append(Block(text=f"Conversation history cleared"))
             self.append_response(context=context,action=action)
             return
-                   
+        
+   
+                          
         #respond to telegram /start command
         if "/start" in last_message:
 
@@ -331,6 +330,10 @@ class MyAssistant(AgentService):
             self.append_response(context=context,action=action)
             return
 
+        #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
+        if not self.check_usage(chat_id=chat_id,context=context):
+            return 
+        
         #Searh response hints for role-play character from vectorDB, if any related text is indexed        
         vector_response = ""
         vector_response_tool = VectorSearchResponseTool()
@@ -421,7 +424,7 @@ class MyAssistant(AgentService):
             flagged = True
             context_id = str(context_id)+"-dolly"
 
-        print(context_id)
+        #print(context_id)
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
         context.chat_history.append_user_message(prompt)
         
