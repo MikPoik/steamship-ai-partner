@@ -9,7 +9,7 @@ from steamship.utils.repl import AgentREPL
 from mixins.steamship_widget import SteamshipWidgetTransport
 from mixins.extended_telegram import ExtendedTelegramTransport
 from usage_tracking import UsageTracker
-import uuid,os
+import uuid,os,re
 import logging
 from steamship import File,Tag,DocTag
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
@@ -28,6 +28,7 @@ from steamship.invocable.mixins.indexer_mixin import IndexerMixin
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
 from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
+from tools.kandinsky_image_tool import KandinskyImageTool
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
 from utils import send_file_from_local
@@ -63,7 +64,7 @@ UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD print
 video, or audio as follows: `Block(UUID for the block)`.
 
 Example response for a request that generated an image:
-Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B).
+Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B)
 Only use the functions you have been provided with.
 
 {special_mood}
@@ -74,14 +75,14 @@ Begin!"""
 
 #TelegramTransport config
 class TelegramTransportConfig(Config):
-    bot_token: str = Field("",description="Telegram bot token, obtained via @BotFather")
-    payment_provider_token: Optional[str] = Field("",description="Payment provider token, obtained via @BotFather")
+    bot_token: str = Field(":",description="Telegram bot token, obtained via @BotFather")
+    payment_provider_token: Optional[str] = Field(":TEST:",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(10, description="Number of free messages assigned to new users.")
     usd_balance:Optional[float] = Field(1,description="USD balance for new users")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
-    openai_api_key:str = Field("",description="OpenAI key for Moderation checking")
+    openai_api_key:str = Field("sk-",description="OpenAI key for Moderation checking")
 
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
@@ -110,10 +111,15 @@ class MyAssistant(AgentService):
             #logging.info(f"Emitting via function: {func.__name__}")
             func(action.output, context.metadata)
 
+    def contains_send_with_keywords(self,text:str):
+        pattern = r'\b(?:send|picture|photo|image|selfie|nude|nudes|pic)\b'
+        return bool(re.search(pattern, text, re.IGNORECASE))
+    
     def check_moderation(self,input_message:str):
+    
         url = "https://api.openai.com/v1/moderations"
         if self.config.openai_api_key == "":
-            print("no apikey")
+            logging.warning("no openai apikey")
             return False
         
         headers = {
@@ -125,7 +131,7 @@ class MyAssistant(AgentService):
             "input": input_message
         }
         response = requests.post(url, headers=headers, json=data)
-        print(response.json())
+        #print(response.json())
         #logging.warning(response.json())
         json_resp = response.json()
         if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE :
@@ -338,20 +344,36 @@ class MyAssistant(AgentService):
         vector_response = ""
         vector_response_tool = VectorSearchResponseTool()
         vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
-        
         vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
         #logging.warning(vector_response)
         
-
+        
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
         if use_dolly == True:
-            #dolly_context = AgentContext.get_or_create(self.client, {"id": f"different_context_id"})    
-            dolly_tool = DollyLLMTool()
-            dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
-            action = FinishAction()
-            action.output.append(Block(text=dolly_response[0].text))
+            #TODO parse message for keywords if image is requested and run explicit image tool
+
+            #dolly_context = AgentContext.get_or_create(self.client, {"id": f"different_context_id"})  
+            dolly_response = []  
+            
+            if self.contains_send_with_keywords(last_message):
+                
+                kandinsky_tool = KandinskyImageTool()
+                kandinsky_response = kandinsky_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
+                action = FinishAction()
+                for block in kandinsky_response:
+                    action.output.append(block)
+                                         
+            else:            
+                dolly_tool = DollyLLMTool()
+                dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
+                action = FinishAction()
+                action.output.append(Block(text=dolly_response[0].text))
+
+
+
+
             #self.append_response(context=context,action=action)
             #return
         else:
@@ -402,13 +424,13 @@ class MyAssistant(AgentService):
 
         #OPTION 3: Add voice to response
 
-        #voice_tool = VoiceTool()
+        voice_tool = VoiceTool()
         ##if OGG encoding:
-        #voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
+        voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
         ## if default audio format (change voice_tool_orig.py to voice_tool.py):
-        #voice_tool.run(action.output,context=context)
+        #voice_response = voice_tool.run(action.output,context=context)
 
-        #action.output.append(voice_response[0])
+        action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
 
@@ -483,9 +505,10 @@ class MyAssistant(AgentService):
                 logging.warning(e)
 
         return "indexed"    
+    
 if __name__ == "__main__":
-
-    client = Steamship(workspace="partner-ai-dev2-ws")
+    #your workspace name
+    client = Steamship(workspace="workspace-name")
     context_id=uuid.uuid4()
     
     print("chat id "+str(context_id))

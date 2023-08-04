@@ -13,6 +13,8 @@ from steamship.agents.utils import with_llm
 from steamship.invocable import Config, InvocableResponse, InvocationContext, post
 from pydantic import Field
 
+NSFW_FLAG_SCORE = 0.01
+
 class TelegramTransportConfig(Config):
     bot_token: str = Field(description="The secret token for your Telegram bot")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
@@ -29,6 +31,7 @@ class ExtendedTelegramTransport(Transport):
     def check_moderation(self,input_message:str):
         url = "https://api.openai.com/v1/moderations"
         if self.openai_key == "":
+            logging.warning("Openai api key not set")
             return False
         
         headers = {
@@ -42,7 +45,7 @@ class ExtendedTelegramTransport(Transport):
         response = requests.post(url, headers=headers, json=data)
         #print(response.json())
         json_resp = response.json()
-        if json_resp["results"][0]["flagged"]:
+        if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE :
             logging.warning("flagged")
             return True
         else:
@@ -97,7 +100,7 @@ class ExtendedTelegramTransport(Transport):
             if incoming_message is not None and incoming_message.text is not None:                
                 if self.check_moderation(incoming_message.text):
                     context_id = str(chat_id)+"-dolly"    
-                    #logging.warning(context_id)
+                    logging.warning("flagged content")
                     flagged = True
                 else:
                     context_id = chat_id
@@ -107,7 +110,15 @@ class ExtendedTelegramTransport(Transport):
                     text=incoming_message.text, tags=incoming_message.tags
                 )
                 context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
-                                
+
+                # Add an LLM to the context, using the Agent's if it exists.
+                llm = None
+                if hasattr(self.agent, "llm"):
+                    llm = self.agent.llm
+                else:
+                    llm = OpenAI(client=self.client)
+
+                context = with_llm(context=context, llm=llm)                                
                 response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args,use_dolly=flagged)
                 if response is not None:
                     self.send(response)
@@ -281,11 +292,14 @@ class ExtendedTelegramTransport(Transport):
         # Some incoming messages (like the group join message) don't have message text.
         # Rather than throw an error, we just don't return a Block.
         message_text = payload.get("text")
-        result = Block(text=message_text)
-        result.set_chat_id(str(chat_id))
-        result.set_message_id(str(message_id))
-        return result
-        
+        if message_text is not None:
+            result = Block(text=message_text)
+            result.set_chat_id(str(chat_id))
+            result.set_message_id(str(message_id))
+            return result
+        else:
+            return None
+
     def build_emit_func(self, chat_id: str) -> EmitFunc:
         def new_emit_func(blocks: List[Block], metadata: Metadata):
             for block in blocks:
