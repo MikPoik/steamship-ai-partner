@@ -43,11 +43,13 @@ class DollyLLMTool(Tool):
     generator_plugin_config: dict = {"replicate_api_key" : ""}
 
 
-    def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "") -> Union[List[Block], Task[Any]]:
+    def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "",api_key = "") -> Union[List[Block], Task[Any]]:
         """Run the tool. Copied from base class to enable generate-time config overrides."""
         #context_id = "different_chat_id-8"        
-        logging.warning(context_id) 
-        
+        #logging.warning(context_id) 
+
+        self.generator_plugin_config["replicate_api_key"] = api_key        
+
         if context_id == "":
             context = AgentContext.get_or_create(context.client, {"id": f"{context.id}"})
 

@@ -1,63 +1,52 @@
-"""Tool for generating images. Moved from tools folder because template import issues"""
-from typing import List, Union, Any
-import sys
-from steamship import Block, Task
-from steamship.agents.schema import AgentContext
-from steamship.agents.tools.base_tools import ImageGeneratorTool
-from steamship.agents.tools.image_generation.stable_diffusion import StableDiffusionTool
+"""Tool for generating text with Dolly."""
+from typing import Any, List, Optional, Union
+
+from steamship import Block, Steamship, Task
+from steamship.agents.llms import OpenAI
+from steamship.agents.schema import AgentContext,Tool
+from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
 from tools.active_persona import SELFIE_TEMPLATE
+import logging
 
 
-NEGATIVE_PROMPT ="bad anatomy, bad composition, ugly, abnormal, unrealistic, double, contorted, disfigured, malformed, amateur, extra, duplicate,2 heads,2 faces"
 
-class SelfieTool(ImageGeneratorTool):
-    """Tool to generate a selfie image.
+class SelfieTool(Tool):
+    """Tool to generate images from text using"""
 
-    This example illustrates wrapping a tool (StableDiffusionTool) with a fixed prompt template that is combined with user input.
-    """
+    rewrite_prompt =  SELFIE_TEMPLATE +",{subject}"
 
     name: str = "SelfieTool"
-    human_description: str = "Generates a selfie-style image from text."
+    human_description: str = "Generates images from text."
     agent_description = (
-        "Used to generate a image from text, that describes the scene setting of the image."
-        "Only use if the user has asked for a image "
-        "Input: Imagine the photo scene of the image where it is taken, use comma separated list of keywords"
-        "Output: the generated image"
+        "Used to generate images from text prompts. Only use if the user has asked directly for an image. "
+        "When using this tool, the input should be a plain text string that describes, "
+        "in detail, the desired image."
     )
-    generator_plugin_handle: str = "stable-diffusion"
-    generator_plugin_config: dict = {"n": 1,
-                                     "inference_steps": 25
-                                     }
-                                     
+    generator_plugin_handle: str = "replicate-kandinsky"
+    generator_plugin_config: dict = {"replicate_api_key" : ""}
 
-    prompt_template = (
-        "{SELFIE_TEMPLATE}, {subject}"
-    )
 
-    def run(
-        self, tool_input: List[Block], context: AgentContext
-    ) -> Union[List[Block], Task[Any]]:
-        # Modify the tool inputs by interpolating them with stored prompt here
+    def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "") -> Union[List[Block], Task[Any]]:
+        """Run the tool. Copied from base class to enable generate-time config overrides."""
+
         modified_inputs = [
-            Block(text=self.prompt_template.format(subject=block.text,SELFIE_TEMPLATE=SELFIE_TEMPLATE))
+            Block(text=self.rewrite_prompt.format(subject=block.text))
             for block in tool_input
         ]
-        
-        image_generator = context.client.use_plugin(
-                    plugin_handle="stable-diffusion", config={"n": 1, "size": "768x768"}
-                )
+        #print(str(modified_inputs))
+        generator = context.client.use_plugin(self.generator_plugin_handle,
+                                      config=self.generator_plugin_config)
 
-        task = image_generator.generate(
-                    text=modified_inputs[0].text,
-                    make_output_public=True,
-                    append_output_to_file=True,
-                    options={
-                        "negative_prompt": NEGATIVE_PROMPT,
-                        "guidance_scale": 7,
-                        "num_inference_steps": 25,
-                    },
-                )
+        prompt = self.rewrite_prompt.format(subject=modified_inputs)
+        #print(prompt)
+        task = generator.generate(
+            text=prompt,
+            make_output_public=True,
+            append_output_to_file=True,                
+            options={"num_inference_steps" : 18,
+                     "num_steps_prior":2}                
+        )           
         task.wait()
         blocks = task.output.blocks
         output_blocks = []
@@ -65,8 +54,12 @@ class SelfieTool(ImageGeneratorTool):
             output_blocks.append(block)
         return output_blocks
 
+        
 
 
 if __name__ == "__main__":
-    print("Try running with an input like 'penguin'")
-    ToolREPL(SelfieTool()).run()
+    tool = SelfieTool()
+    client = Steamship(workspace="partner-ai-dev2-ws")
+    context_id="test-uuuid-5"
+    #with Steamship.temporary_workspace() as client:
+    ToolREPL(tool).run_with_client(client=client, context=with_llm(llm=OpenAI(client=client)))

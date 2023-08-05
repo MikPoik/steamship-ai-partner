@@ -19,6 +19,7 @@ class TelegramTransportConfig(Config):
     bot_token: str = Field(description="The secret token for your Telegram bot")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     openai_api_key:str = Field("",description="OpenAI api key")
+    nsfw_flag_score:int = Field(0.01,description="NSFW treshold limit")
 
 class ExtendedTelegramTransport(Transport):
     api_root: str
@@ -27,6 +28,7 @@ class ExtendedTelegramTransport(Transport):
     agent_service: AgentService
     set_payment_plan: Callable
     openai_key: str
+    nsfw_flag_score: int
 
     def check_moderation(self,input_message:str):
         url = "https://api.openai.com/v1/moderations"
@@ -152,6 +154,7 @@ class ExtendedTelegramTransport(Transport):
         self.agent_service = agent_service
         self.set_payment_plan = set_payment_plan
         self.openai_key = config.openai_api_key
+        self.nsfw_flag_score = config.nsfw_flag_score
 
     def instance_init(self, config: Config, invocation_context: InvocationContext):
         webhook_url = invocation_context.invocable_url + "telegram_respond"

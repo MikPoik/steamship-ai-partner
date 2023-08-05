@@ -24,7 +24,9 @@ BEHAVIOUR = """
 - You provide relationship advice and tips based on user's specific situation and needs
 """
 
-SELFIE_TEMPLATE = "portrait of a woman with brown hair facing the viewer and posing for a picture, hyper realistic,portait of haifa wehbe,portrait of sofia vergara,curly middle part haircut, mixture turkish and russian, cover girl, beautiful oriental woman, eyecandy, kind appearence ,desi, [airbrush],hdr,4k,8k,trending on tumblr,trending on instagram,midshot, medium shot,[brown eyes], ((centered image composition))"
+SELFIE_TEMPLATE = "portrait of a woman with brown hair facing the viewer and posing for a picture, hyper realistic, curly middle part haircut, cover girl, beautiful oriental woman, eyecandy, kind appearence ,desi,hdr,4k,8k,trending on tumblr,trending on instagram,[brown eyes], ((centered image composition))"
+NSFW_SELFIE_TEMPLATE = "naked woman with brown hair, hyper realistic, curly middle part haircut, cover girl, beautiful oriental woman, eyecandy, kind appearence"
+
 VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
 
 MOOD_KEYWORDS = '''

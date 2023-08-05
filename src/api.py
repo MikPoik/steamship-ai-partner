@@ -20,6 +20,7 @@ import requests
 from steamship.agents.tools.search.search import SearchTool
 from tools.vector_search_response_tool import VectorSearchResponseTool
 from tools.selfie_tool import SelfieTool
+from tools.dolly_selfie_tool import DollySelfieTool
 from tools.voice_tool import VoiceTool
 from tools.dolly_llm_tool import DollyLLMTool
 from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
@@ -28,7 +29,6 @@ from steamship.invocable.mixins.indexer_mixin import IndexerMixin
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
 from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
-from tools.kandinsky_image_tool import KandinskyImageTool
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
 from utils import send_file_from_local
@@ -72,6 +72,8 @@ Only use the functions you have been provided with.
 {answer_word_cap}
 Begin!"""
 
+GPT3 = "gpt-3.5-turbo-0613"
+GPT4 = "gpt-4-0613"
 
 #TelegramTransport config
 class TelegramTransportConfig(Config):
@@ -83,9 +85,12 @@ class TelegramTransportConfig(Config):
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     openai_api_key:str = Field("sk-",description="OpenAI key for Moderation checking")
+    use_voice: bool = Field(False, description="Send voice messages addition to text")
+    gpt_version: str = Field(GPT3,description="GPT version to use")
+    nsfw_flag_score:int = Field(0.01,description="NSFW content treshold limit to direct prompt to dolly")
+    replicate_api_key:str = Field("",description="Replicate api key")
 
-GPT3 = "gpt-3.5-turbo-0613"
-GPT4 = "gpt-4-0613"
+
 NSFW_FLAG_SCORE = 0.01
 
 
@@ -240,7 +245,7 @@ class MyAssistant(AgentService):
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         self.add_mixin(
-            SteamshipWidgetTransport(client=self.client, agent_service=self, agent=self._agent)
+            SteamshipWidgetTransport(client=self.client, agent_service=self, agent=self._agent,config=self.config)
         )
 
         #IndexerMixin
@@ -359,15 +364,15 @@ class MyAssistant(AgentService):
             
             if self.contains_send_with_keywords(last_message):
                 
-                kandinsky_tool = KandinskyImageTool()
-                kandinsky_response = kandinsky_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
+                kandinsky_tool = DollySelfieTool()
+                kandinsky_response = kandinsky_tool.run([Block(text=last_message)],context=context, context_id=chat_id,api_key=self.config.replicate_api_key)
                 action = FinishAction()
                 for block in kandinsky_response:
                     action.output.append(block)
                                          
             else:            
                 dolly_tool = DollyLLMTool()
-                dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id)
+                dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,api_key=self.config.replicate_api_key)
                 action = FinishAction()
                 action.output.append(Block(text=dolly_response[0].text))
 
@@ -419,18 +424,18 @@ class MyAssistant(AgentService):
         if self.config.n_free_messages > 0:
             self.usage.increase_message_count(str(chat_id))
         #increase used tokens and reduce balance
-        self.usage.increase_token_count(action.output,chat_id=str(chat_id))
+        self.usage.increase_token_count(action.output,chat_id=str(chat_id),use_voice=self.config.use_voice)
 
 
         #OPTION 3: Add voice to response
+        if self.config.use_voice:
+            voice_tool = VoiceTool()
+            ##if OGG encoding:
+            voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
+            ## if default audio format (change voice_tool_orig.py to voice_tool.py):
+            #voice_response = voice_tool.run(action.output,context=context)
 
-        voice_tool = VoiceTool()
-        ##if OGG encoding:
-        voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
-        ## if default audio format (change voice_tool_orig.py to voice_tool.py):
-        #voice_response = voice_tool.run(action.output,context=context)
-
-        action.output.append(voice_response[0])
+            action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
 
@@ -508,7 +513,7 @@ class MyAssistant(AgentService):
     
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="workspace-name")
+    client = Steamship(workspace="partner-ai-dev2-ws")
     context_id=uuid.uuid4()
     
     print("chat id "+str(context_id))

@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-dolly-test",
-	"version": "0.0.4",
+	"version": "0.0.6",
 	"description": "",
 	"author": "mpoikkilehto",
 	"entrypoint": "Unused",
@@ -22,7 +22,7 @@
 		"payment_provider_token": {
 			"type": "string",
 			"description": "Payment provider token, obtained via @BotFather",
-			"default": ""
+			"default": ":TEST:"
 		},
 		"n_free_messages": {
 			"type": "number",
@@ -53,6 +53,26 @@
 			"type": "string",
 			"description": "OpenAI key for Moderation checking",
 			"default": "sk-"
+		},
+		"use_voice": {
+			"type": "boolean",
+			"description": "Send voice messages addition to text",
+			"default": false
+		},
+		"gpt_version": {
+			"type": "string",
+			"description": "GPT version to use",
+			"default": "gpt-3.5-turbo-0613"
+		},
+		"nsfw_flag_score": {
+			"type": "number",
+			"description": "NSFW content treshold limit to direct prompt to dolly",
+			"default": 0.01
+		},
+		"replicate_api_key": {
+			"type": "string",
+			"description": "Replicate api key",
+			"default": ""
 		}
 	},
 	"steamshipRegistry": {

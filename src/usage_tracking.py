@@ -17,7 +17,7 @@ class UsageEntry(BaseModel):
 
 class UsageTracker:
     kv_store: KeyValueStore
-    gpt_price_per_thousand_tokens = 0.18           #0.18c/1000 tokens
+    gpt_price_per_thousand_tokens = 1           #Calculate price for GPT, default 0.18c/1000 tokens 
     elevenlabs_price_per_thousand_chars = 1        #Calculate price based on generated voice, default price 0.30c/1000 chars
     chars_per_minute = 1010
 
@@ -26,7 +26,7 @@ class UsageTracker:
         self.n_free_messages = n_free_messages
         self.usd_balance = usd_balance
 
-    def increase_token_count(self, blocks: [Block], chat_id: str ):
+    def increase_token_count(self, blocks: [Block], chat_id: str,use_voice:bool ):
         usage_entry = self.get_usage(chat_id)
         #if free message limit reached
         if usage_entry.message_count >= usage_entry.message_limit:
@@ -38,19 +38,22 @@ class UsageTracker:
                     tokens_used += num_tokens
                     chars_used += len(token_block.text)                                    
             
-            usage_entry.usd_balance -= self.calculate_cost(num_tokens=tokens_used,num_chars=chars_used)
+            usage_entry.usd_balance -= self.calculate_cost(num_tokens=tokens_used,num_chars=chars_used,use_voice=use_voice)
             if usage_entry.usd_balance < 0:
                 usage_entry.usd_balance = 0
             self._set_usage(chat_id, usage_entry)
             return tokens_used
     
-    def calculate_cost(self, num_tokens:int,num_chars:int):
+    def calculate_cost(self, num_tokens:int,num_chars:int,use_voice:bool):
         #calculate tokens and voice cost in USD
         cost_per_token = self.gpt_price_per_thousand_tokens / 1000
         token_cost = num_tokens * cost_per_token
         voice_price = (num_chars / self.chars_per_minute) * self.elevenlabs_price_per_thousand_chars
         #logging.info("used balance in USD: "+str(token_cost+voice_price))
-        return voice_price   #return voice_price+token_cost for both
+        if use_voice:
+            return voice_price   #return voice_price+token_cost for both
+        else:
+            return token_cost
     
     def get_available_words(self,chat_id):
         #get available words from balance
