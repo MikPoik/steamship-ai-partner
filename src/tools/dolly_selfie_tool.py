@@ -12,24 +12,18 @@ from tools.active_persona import NSFW_SELFIE_TEMPLATE
 
 #Attempt to get Dolly output specific json
 DOLLY_PROMPT_TEMPLATE = """
-   ### Instruction: You are beatiful female AI with a gorgeus body, you respond to image, photo and selfie requests from the user. You will provide images of you or your body. You already have the image requested.
-   You always respond to the request with the following JSON format:
-   {{
-   "image_keywords": describe image keywords, separated by commas
-   "AI": your response to the user
-   }}
+   ### Instruction: 
+  You are gorgeous young adult woman. Extract the image of you below . You have the image already. Describe shortly how you look in the image and what your wear, nothing else.
 
-   As AI, give your response to the input with the given format. 
-   The user is about to ask you for an image. You have the image already.
    Input: {input}
-
-   ### Response:
-"""
+   
+   In this photo I look like:
+   ### Response:\""" """
 
 class DollySelfieTool(Tool):
     """Tool to generate images from text using"""
 
-    rewrite_prompt = NSFW_SELFIE_TEMPLATE+"{input}"
+    rewrite_prompt = "Beautiful adult woman,{input},"+ NSFW_SELFIE_TEMPLATE
     dolly_rewrite_prompt = DOLLY_PROMPT_TEMPLATE
 
     name: str = "DollySelfieTool"
@@ -46,55 +40,49 @@ class DollySelfieTool(Tool):
 
     def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "",api_key="") -> Union[List[Block], Task[Any]]:
         """Run the tool. Copied from base class to enable generate-time config overrides."""
-        self.generator_plugin_config["replicate_api_key"] = api_key     
+        self.generator_plugin_config["replicate_api_key"] = api_key
         
         dolly_generator = context.client.use_plugin(self.dolly_generator_plugin_handle,
                                       config=self.generator_plugin_config)
         dolly_prompt = self.dolly_rewrite_prompt.format(input=tool_input[0].text)
-        print(dolly_prompt)
+        #print(dolly_prompt)
         dolly_task = dolly_generator.generate(
             text=dolly_prompt,                
-            options={"max_tokens":500,"temperature":0.1}                
+            options={"max_tokens":500,
+                     "temperature":0.01
+                     }                
         )           
         dolly_task.wait()   
 
         dolly_output_blocks = []
         #print(dolly_task.output.blocks)
         dolly_output_blocks = dolly_task.output.blocks
+
         #print(dolly_output_blocks[0].text)
-        dolly_json = {}
-        kandinsky_input = ""
-
-        try:
-            dolly_json = json.loads(dolly_output_blocks[0].text)
-            print(dolly_json)
-            kandinsky_input = ","+dolly_json["image_keywords"]
-            dolly_output_blocks = Block(text=dolly_json["AI"])
-        except Exception as e:
-            #dolly failed to produce JSON format, just give the default image without text or give some default response?
-            logging.warning("failed to parse dolly json")
-            logging.warning(e)
-            dolly_output_blocks = Block(text="")
-            kandinsky_input = ""
-
+        
+        kandinsky_input = dolly_output_blocks[0].text
+        kandinsky_input = kandinsky_input.replace("I look like","")
+        kandinsky_input = kandinsky_input.replace("look like","")
         #return dolly_output_blocks
-
+    
         generator = context.client.use_plugin(self.generator_plugin_handle,
                                       config=self.generator_plugin_config)
-
+        kandinsky_input = kandinsky_input.replace("\n","")
         prompt = self.rewrite_prompt.format(input=kandinsky_input)
         #print(prompt)
         task = generator.generate(
             text=prompt,  
             make_output_public=True,
             append_output_to_file=True,              
-            options={"num_inference_steps" : 18,
-                     "num_steps_prior":2}                
+            options={"num_inference_steps" : 50,
+                     "num_steps_prior":15,
+                     "height": 768,
+                     "width":768
+                     }                
         )           
         task.wait()
         
         output_blocks = []
-        output_blocks.append(dolly_output_blocks)
         output_blocks.append(task.output.blocks[0])
         #print(str(output_blocks))        
 

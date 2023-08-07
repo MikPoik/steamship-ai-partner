@@ -14,14 +14,13 @@ import logging
 class SelfieTool(Tool):
     """Tool to generate images from text using"""
 
-    rewrite_prompt =  SELFIE_TEMPLATE +",{subject}"
+    rewrite_prompt = "Beautiful adult woman,{subject}," + SELFIE_TEMPLATE 
 
     name: str = "SelfieTool"
     human_description: str = "Generates images from text."
     agent_description = (
         "Used to generate images from text prompts. Only use if the user has asked directly for an image. "
-        "When using this tool, the input should be a plain text string that describes, "
-        "in detail, the desired image."
+        "When using this tool, the input should be a plain text string that describes in detail, the desired image."
     )
     generator_plugin_handle: str = "replicate-kandinsky"
     generator_plugin_config: dict = {"replicate_api_key" : ""}
@@ -44,8 +43,11 @@ class SelfieTool(Tool):
             text=prompt,
             make_output_public=True,
             append_output_to_file=True,                
-            options={"num_inference_steps" : 18,
-                     "num_steps_prior":2}                
+            options={"num_inference_steps" : 50,
+                     "num_steps_prior":15,
+                     "height":768,
+                     "width": 768
+                     }                
         )           
         task.wait()
         blocks = task.output.blocks

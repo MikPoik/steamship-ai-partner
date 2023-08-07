@@ -61,7 +61,7 @@ Consider current date and time when answering.
 
 NOTE: Some functions return images, video, and audio files. These multimedia files will be represented in messages as
 UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD print the Steamship Blocks for the images,
-video, or audio as follows: `Block(UUID for the block)`.
+video, or audio as follows: `Block(UUID for the block)`
 
 Example response for a request that generated an image:
 Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B)
@@ -121,7 +121,7 @@ class MyAssistant(AgentService):
         return bool(re.search(pattern, text, re.IGNORECASE))
     
     def check_moderation(self,input_message:str):
-    
+        
         url = "https://api.openai.com/v1/moderations"
         if self.config.openai_api_key == "":
             logging.warning("no openai apikey")
@@ -237,7 +237,7 @@ class MyAssistant(AgentService):
         super().__init__(**kwargs)
 
         self._agent = FunctionsBasedAgent(tools=[SelfieTool()],
-            llm=ChatOpenAI(self.client,model_name=GPT4,temperature=0.8,max_tokens=200),
+            llm=ChatOpenAI(self.client,model_name=self.config.gpt_version,temperature=0.8,max_tokens=200),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
         self._agent.PROMPT = SYSTEM_PROMPT
@@ -245,7 +245,7 @@ class MyAssistant(AgentService):
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         self.add_mixin(
-            SteamshipWidgetTransport(client=self.client, agent_service=self, agent=self._agent,config=self.config)
+            SteamshipWidgetTransport(client=self.client, agent_service=self, agent=self._agent)
         )
 
         #IndexerMixin
@@ -272,7 +272,7 @@ class MyAssistant(AgentService):
             chat_id = msg_chat_id #Telegram chat
         else:
             chat_id = context.id #repl or webchat
-
+        print(chat_id)
         last_message = context.chat_history.last_user_message.text.lower()
         #logging.info("last message: "+last_message)
 
@@ -349,6 +349,7 @@ class MyAssistant(AgentService):
         vector_response = ""
         vector_response_tool = VectorSearchResponseTool()
         vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
+        raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
         vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
         #logging.warning(vector_response)
         
@@ -356,31 +357,25 @@ class MyAssistant(AgentService):
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
-        if use_dolly == True:
-            #TODO parse message for keywords if image is requested and run explicit image tool
-
-            #dolly_context = AgentContext.get_or_create(self.client, {"id": f"different_context_id"})  
-            dolly_response = []  
+        #If input flagged, redirect to dolly.
+        if use_dolly == True:           
             
+            dolly_response = []  
+                                                             
+            dolly_tool = DollyLLMTool()
+            dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_key=self.config.replicate_api_key)
+            action = FinishAction()
+            action.output.append(Block(text=dolly_response[0].text))
+
+
             if self.contains_send_with_keywords(last_message):
                 
                 kandinsky_tool = DollySelfieTool()
                 kandinsky_response = kandinsky_tool.run([Block(text=last_message)],context=context, context_id=chat_id,api_key=self.config.replicate_api_key)
-                action = FinishAction()
+                
                 for block in kandinsky_response:
                     action.output.append(block)
-                                         
-            else:            
-                dolly_tool = DollyLLMTool()
-                dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,api_key=self.config.replicate_api_key)
-                action = FinishAction()
-                action.output.append(Block(text=dolly_response[0].text))
 
-
-
-
-            #self.append_response(context=context,action=action)
-            #return
         else:
             action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
     
@@ -513,9 +508,9 @@ class MyAssistant(AgentService):
     
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="partner-ai-dev2-ws")
+    client = Steamship(workspace="partner-ai-dev3-ws")
     context_id=uuid.uuid4()
-    
+    #context_id="89f3946d-4bf3-4177-9abe-3a9024c5428c"
     print("chat id "+str(context_id))
     AgentREPL(MyAssistant,
             method="prompt",
