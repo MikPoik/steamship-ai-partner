@@ -13,7 +13,7 @@ import logging
 
 API_BASE = "https://api.telegram.org/bot"
 OPENAI_API_KEY=""
-NSFW_FLAG_SCORE = 0.01
+
 
 class SteamshipWidgetTransport(Transport):
     """Experimental base class to encapsulate a Steamship web widget communication channel."""
@@ -34,7 +34,7 @@ class SteamshipWidgetTransport(Transport):
         response = requests.post(url, headers=headers, json=data)
         #print(response.json())
         json_resp = response.json()
-        if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE:
+        if json_resp["results"][0]["flagged"]:
             logging.warning("flagged")
             return True
         else:

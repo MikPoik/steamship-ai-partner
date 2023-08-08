@@ -13,13 +13,13 @@ from steamship.agents.utils import with_llm
 from steamship.invocable import Config, InvocableResponse, InvocationContext, post
 from pydantic import Field
 
-NSFW_FLAG_SCORE = 0.01
+
 
 class TelegramTransportConfig(Config):
     bot_token: str = Field(description="The secret token for your Telegram bot")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     openai_api_key:str = Field("",description="OpenAI api key")
-    nsfw_flag_score:int = Field(0.01,description="NSFW treshold limit")
+    use_dolly:bool = Field(False,description="Use dolly llm")
 
 class ExtendedTelegramTransport(Transport):
     api_root: str
@@ -28,7 +28,7 @@ class ExtendedTelegramTransport(Transport):
     agent_service: AgentService
     set_payment_plan: Callable
     openai_key: str
-    nsfw_flag_score: int
+    use_dolly: bool
 
     def check_moderation(self,input_message:str):
         url = "https://api.openai.com/v1/moderations"
@@ -47,8 +47,7 @@ class ExtendedTelegramTransport(Transport):
         response = requests.post(url, headers=headers, json=data)
         #print(response.json())
         json_resp = response.json()
-        if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE :
-            logging.warning("flagged")
+        if json_resp["results"][0]["flagged"] :
             return True
         else:
             return False
@@ -100,9 +99,9 @@ class ExtendedTelegramTransport(Transport):
             flagged = False
             context_id = ""
             if incoming_message is not None and incoming_message.text is not None:                
-                if self.check_moderation(incoming_message.text):
+                if self.use_dolly or self.check_moderation(incoming_message.text):
                     context_id = str(chat_id)+"-dolly"    
-                    logging.warning("flagged content")
+                    #logging.warning("flagged content")
                     flagged = True
                 else:
                     context_id = chat_id
@@ -154,7 +153,7 @@ class ExtendedTelegramTransport(Transport):
         self.agent_service = agent_service
         self.set_payment_plan = set_payment_plan
         self.openai_key = config.openai_api_key
-        self.nsfw_flag_score = config.nsfw_flag_score
+        self.use_dolly = config.use_dolly
 
     def instance_init(self, config: Config, invocation_context: InvocationContext):
         webhook_url = invocation_context.invocable_url + "telegram_respond"

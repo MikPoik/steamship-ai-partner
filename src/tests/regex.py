@@ -1,10 +1,10 @@
 import re
 
 def contains_send_with_keywords(text:str):
-    pattern = r'\b(?:send|picture|photo|image|selfie|nude|pic)\b'
+    pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
     return bool(re.search(pattern, text, re.IGNORECASE))
 
-text = "Please send me a selfie."
+text = "send this image"
 if contains_send_with_keywords(text):
 
     print("Found 'send' with one of the keywords.")

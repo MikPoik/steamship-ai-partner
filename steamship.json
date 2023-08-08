@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-dolly-test",
-	"version": "0.0.7",
+	"version": "0.0.8",
 	"description": "",
 	"author": "mpoikkilehto",
 	"entrypoint": "Unused",
@@ -64,10 +64,10 @@
 			"description": "GPT version to use",
 			"default": "gpt-3.5-turbo-0613"
 		},
-		"nsfw_flag_score": {
-			"type": "number",
-			"description": "NSFW content treshold limit to direct prompt to dolly",
-			"default": 0.01
+		"use_dolly": {
+			"type": "boolean",
+			"description": "Use dolly llm",
+			"default": true
 		},
 		"replicate_api_key": {
 			"type": "string",

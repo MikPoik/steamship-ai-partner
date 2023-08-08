@@ -13,17 +13,19 @@ from tools.active_persona import NSFW_SELFIE_TEMPLATE
 #Attempt to get Dolly output specific json
 DOLLY_PROMPT_TEMPLATE = """
    ### Instruction: 
-  You are gorgeous young adult woman. Extract the image of you below . You have the image already. Describe shortly how you look in the image and what your wear, nothing else.
+  You are the woman in the image, extract the image of you below . You have the image already. Using a keyword list describe the image and what are you wearing or if naked, don't output anything else.
 
    Input: {input}
-   
-   In this photo I look like:
-   ### Response:\""" """
+    
+    <image_keywords> describe image with keywords, separated by commas, use 3 to 5 keywords
+   ### Response:
+    <image_keywords>
+   ### End"""
 
 class DollySelfieTool(Tool):
     """Tool to generate images from text using"""
 
-    rewrite_prompt = "Beautiful adult woman,{input},"+ NSFW_SELFIE_TEMPLATE
+    rewrite_prompt = "Beautiful woman,{input},"+ NSFW_SELFIE_TEMPLATE
     dolly_rewrite_prompt = DOLLY_PROMPT_TEMPLATE
 
     name: str = "DollySelfieTool"
@@ -58,18 +60,18 @@ class DollySelfieTool(Tool):
         #print(dolly_task.output.blocks)
         dolly_output_blocks = dolly_task.output.blocks
 
-        #print(dolly_output_blocks[0].text)
+        print(dolly_output_blocks[0].text)
         
         kandinsky_input = dolly_output_blocks[0].text
-        kandinsky_input = kandinsky_input.replace("I look like","")
-        kandinsky_input = kandinsky_input.replace("look like","")
+        kandinsky_input = kandinsky_input.replace("<image_keywords>","")
+        kandinsky_input = kandinsky_input.replace("</image_keywords>","")
         #return dolly_output_blocks
     
         generator = context.client.use_plugin(self.generator_plugin_handle,
                                       config=self.generator_plugin_config)
         kandinsky_input = kandinsky_input.replace("\n","")
         prompt = self.rewrite_prompt.format(input=kandinsky_input)
-        #print(prompt)
+        print(prompt)
         task = generator.generate(
             text=prompt,  
             make_output_public=True,

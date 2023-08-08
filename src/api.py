@@ -87,11 +87,11 @@ class TelegramTransportConfig(Config):
     openai_api_key:str = Field("sk-",description="OpenAI key for Moderation checking")
     use_voice: bool = Field(False, description="Send voice messages addition to text")
     gpt_version: str = Field(GPT3,description="GPT version to use")
-    nsfw_flag_score:int = Field(0.01,description="NSFW content treshold limit to direct prompt to dolly")
+    use_dolly:bool = Field(True,description="Use dolly llm")
     replicate_api_key:str = Field("",description="Replicate api key")
 
 
-NSFW_FLAG_SCORE = 0.01
+
 
 
 class MyAssistant(AgentService):
@@ -117,11 +117,10 @@ class MyAssistant(AgentService):
             func(action.output, context.metadata)
 
     def contains_send_with_keywords(self,text:str):
-        pattern = r'\b(?:send|picture|photo|image|selfie|nude|nudes|pic)\b'
+        pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
         return bool(re.search(pattern, text, re.IGNORECASE))
     
-    def check_moderation(self,input_message:str):
-        
+    def check_moderation(self,input_message:str):        
         url = "https://api.openai.com/v1/moderations"
         if self.config.openai_api_key == "":
             logging.warning("no openai apikey")
@@ -139,8 +138,7 @@ class MyAssistant(AgentService):
         #print(response.json())
         #logging.warning(response.json())
         json_resp = response.json()
-        if json_resp["results"][0]["flagged"] or json_resp["results"][0]["category_scores"]["sexual"] > NSFW_FLAG_SCORE :
-            logging.warning("flagged")
+        if json_resp["results"][0]["flagged"]:            
             return True
         else:
             return False
@@ -317,7 +315,20 @@ class MyAssistant(AgentService):
             self.append_response(context=context,action=action)
             return
         
-   
+        if "/nsfw" in last_message:
+            self.usage.toggle_nsfw_mode(chat_id=chat_id)
+            self.config.use_dolly = not self.config.use_dolly
+
+            if self.usage.get_nsfw_mode(chat_id=chat_id) == True:
+                action = FinishAction()
+                action.output.append(Block(text=f"NSFW mode enabled."))
+                self.append_response(context=context,action=action)
+                return 
+            else:
+                action = FinishAction()
+                action.output.append(Block(text=f"NSFW mode disabled."))
+                self.append_response(context=context,action=action)
+                return
                           
         #respond to telegram /start command
         if "/start" in last_message:
@@ -442,7 +453,7 @@ class MyAssistant(AgentService):
         flagged = False
         if not context_id:
             context_id = uuid.uuid4()
-        if self.check_moderation(prompt):
+        if self.usage.get_nsfw_mode(chat_id=context_id) or self.check_moderation(prompt):
             flagged = True
             context_id = str(context_id)+"-dolly"
 

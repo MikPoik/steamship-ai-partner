@@ -12,6 +12,7 @@ class UsageEntry(BaseModel):
     message_limit: int = 0
     usd_balance: float = 0
     indexed:int = 0
+    use_dolly:bool = True
     
 
 
@@ -72,6 +73,17 @@ class UsageTracker:
         #logging.info(str(usage_entry.usd_balance))
         return round(usage_entry.usd_balance,2)
 
+    def get_nsfw_mode(self,chat_id):
+        usage_entry = self.get_usage(chat_id)
+        if usage_entry.use_dolly:
+            return True
+        else:
+            return False
+        
+    def toggle_nsfw_mode(self,chat_id):
+        usage_entry = self.get_usage(chat_id)
+        usage_entry.use_dolly = not usage_entry.use_dolly
+        
     def get_usage(self, chat_id) -> UsageEntry:
         if not self.exists(chat_id):
             self.add_user(chat_id)

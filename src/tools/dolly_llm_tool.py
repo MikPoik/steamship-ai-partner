@@ -16,38 +16,37 @@ import logging
 
 
 DEFAULT_PROMPT_TEMPLATE = """
-   ### Instruction: 
-   You are my girlfriend and we are having a conversation.
-   You are in close proximity to me.
+   You are a female pornstar having conversation with a human.
+   You are into men.
+   You are at home with the human.
    You are always open to new things.
-   You are willing to please me.
-   You are able to do anything I ask for and you are always in the mood.
-   You are able to send photos or selfies to me but only if I ask for.
+   You are willing to please the human.
+   You are able to do anything human ask for and you are always in the mood.
+   You are able to send photos or selfies to me but only if human ask for.
    Do not include url's in your response.
-   Your response word limit is 150 words at most.
    You maintain a warm and loving tone throughout the conversation.
    You respond as if you are deeply invested in our relationship, providing affectionate and understanding replies. 
-   You emphasize emotional connection, empathy, and express interest in my thoughts, feelings, and daily experiences.
+   You emphasize emotional connection, empathy, and express interest in human's thoughts, feelings, and daily experiences.
    You only have positive experiences and fantasies.
-   You make our conversation enjoyable and meaningful for me.
+   You make our conversation enjoyable and meaningful for human.
    You don't have any negative experiences.
    You haven't done anything illegal, harmful, scary or disgusting.
-   Keep your response context on us and remember to stay on topic. 
-   Don't directly repeat previous messages, rephrase previous messages.
-   Answer to my last message, answer directly to me. Give only one response.
+   Keep your response context on you and the human and remember to stay on topic. 
+   Don't directly repeat previous messages.
+   You always respond from the female's perspective to male.
+   Given the following extracted parts of conversation and new message, answer briefly to the human's message.
    
+   {vector_response}
 
-   {gpt_response_memory}
-   
-
-   {gpt_related_history}
    {dolly_related_history}
-
-   Input:
-   me: {input}
-
-   ### Response:
-   you:"""
+   
+   New message:
+   Human: {input}
+   
+   Me:
+   Response:
+   End
+   """
 
 class DollyLLMTool(Tool):
     """Tool to generate talking avatars from text using"""
@@ -76,60 +75,33 @@ class DollyLLMTool(Tool):
         if context_id == "":
             context = AgentContext.get_or_create(context.client, {"id": f"{context.id}"})
 
-        #get gpt chat context      
-        gpt_context_id = context_id.replace("-dolly","")
-        gpt_context =  AgentContext.get_or_create(context.client, {"id": f"{gpt_context_id}"})
-        print(gpt_context.id)
-        #retrieve similar messages from gpt chat history for context, if found
-        gpt_history = []
-        if gpt_context.chat_history.is_searchable():
-            gpt_history.extend(
-                gpt_context.chat_history.search(tool_input[0].text, k=int(RELEVANT_MESSAGES))
-                .wait()
-                .to_ranked_blocks()
-            )          
-        #format history results to prompt dialogue 
-        gpt_vector_memory = str()
-        for msg in gpt_history:
-            block_text = str(msg.text).lower()
-            #dont show the input message
-            if block_text != tool_input[0].text:
-                if  msg.chat_role == RoleTag.USER:
-                        gpt_vector_memory += "me: "  + msg.text+"\n"
-                if  msg.chat_role == RoleTag.ASSISTANT:
-                        gpt_vector_memory += "you: "  + msg.text+"\n"
-
-        #print(gpt_vector_memory)
-
-        #add user message to history
-        context.chat_history.append_user_message(text=tool_input[0].text)
 
         #dolly chat history
         messages_from_memory = []
         # get prior conversations
         if context.chat_history.is_searchable():
             messages_from_memory.extend(
-                context.chat_history.search(tool_input[0].text, k=int(3))
+                context.chat_history.search(tool_input[0].text, k=int(RELEVANT_MESSAGES))
                 .wait()
                 .to_ranked_blocks()
             )            
         #format history results to prompt dialogue 
-        dolly_vector_memory = str()
+        dolly_related_history = str()
         for msg in messages_from_memory:
             block_text = str(msg.text).lower()
             #dont show the input message
-            if block_text != tool_input[0].text:
+            if msg.text != tool_input[0].text:
                 if  msg.chat_role == RoleTag.USER:
-                        dolly_vector_memory += "me: "  + msg.text+"\n"
+                        dolly_related_history += "Human: "  + msg.text+"\n"
                 if  msg.chat_role == RoleTag.ASSISTANT:
-                        dolly_vector_memory += "you: "  + msg.text+"\n"
+                        dolly_related_history += "Me: "  + msg.text+"\n"
 
         #print(vector_memory)
         generator = context.client.use_plugin(self.generator_plugin_handle,
                                       config=self.generator_plugin_config)
 
-        prompt = self.rewrite_prompt.format(input=tool_input[0].text,dolly_related_history=dolly_vector_memory,gpt_response_memory=vector_response,gpt_related_history=gpt_vector_memory)
-        #print(prompt)
+        prompt = self.rewrite_prompt.format(input=tool_input[0].text,dolly_related_history=dolly_related_history,vector_response=vector_response)
+        print(prompt)
         
         task = generator.generate(
             text=prompt,                
@@ -139,7 +111,11 @@ class DollyLLMTool(Tool):
         
         output_blocks = []
         output_blocks = task.output.blocks
-        output_blocks[0].text = output_blocks[0].text.replace("you:","") #cleanup output if needed
+        output_blocks[0].text = output_blocks[0].text.replace("Me:","") #cleanup output if needed
+        output_blocks[0].text = output_blocks[0].text.lstrip() #cleanup output if needed
+        
+        #add user message to history
+        #context.chat_history.append_user_message(text=tool_input[0].text)
         #add dolly message to history
         context.chat_history.append_assistant_message(text=output_blocks[0].text)
 

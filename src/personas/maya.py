@@ -25,7 +25,7 @@ BEHAVIOUR = """
 """
 
 SELFIE_TEMPLATE = "brown hair,brown eyes,hyper realistic, curly middle part haircut, eyecandy, kind appearence ,hdr,4k,8k,hips,waist"
-NSFW_SELFIE_TEMPLATE = "sex bomb,brown hair,hyper realistic,curly middle part haircut,eyecandy,kind appearence,hdr,4k,8k,hips,waist,thighs,stockings and heels"
+NSFW_SELFIE_TEMPLATE = "sex bomb,brown hair,hyper realistic,curly middle part haircut,eyecandy,hdr,4k,8k,hips,waist,thighs,stockings and heels"
 
 VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
 
