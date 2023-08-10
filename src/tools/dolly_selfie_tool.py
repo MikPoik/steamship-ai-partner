@@ -11,21 +11,19 @@ from tools.active_persona import NSFW_SELFIE_TEMPLATE
 
 
 #Attempt to get Dolly output specific json
-DOLLY_PROMPT_TEMPLATE = """
-   ### Instruction: 
-  You are the woman in the image, extract the image of you below . You have the image already. Using a keyword list describe the image and what are you wearing or if naked, don't output anything else.
+DOLLY_PROMPT_TEMPLATE = """### Instruction: 
+Extract the keywords from image request below, you have the image of the woman already. Describe the woman in the image with up to 5 keywords separated by commas.
 
-   Input: {input}
-    
-    <image_keywords> describe image with keywords, separated by commas, use 3 to 5 keywords
-   ### Response:
-    <image_keywords>
-   ### End"""
+Input: 
+{input}
+
+### Response: :
+### End"""
 
 class DollySelfieTool(Tool):
     """Tool to generate images from text using"""
 
-    rewrite_prompt = "Beautiful woman,{input},"+ NSFW_SELFIE_TEMPLATE
+    rewrite_prompt = "{input},"+ NSFW_SELFIE_TEMPLATE
     dolly_rewrite_prompt = DOLLY_PROMPT_TEMPLATE
 
     name: str = "DollySelfieTool"

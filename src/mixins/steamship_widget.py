@@ -11,35 +11,12 @@ from steamship.invocable import Config, InvocationContext, post
 import requests
 import logging
 
-API_BASE = "https://api.telegram.org/bot"
-OPENAI_API_KEY=""
-
 
 class SteamshipWidgetTransport(Transport):
     """Experimental base class to encapsulate a Steamship web widget communication channel."""
 
     message_output: List[Block]
-    def check_moderation(self,input_message:str):
-        url = "https://api.openai.com/v1/moderations"
-        if OPENAI_API_KEY =="":
-            return False
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer "+OPENAI_API_KEY
-        }
-
-        data = {
-            "input": input_message
-        }
-        response = requests.post(url, headers=headers, json=data)
-        #print(response.json())
-        json_resp = response.json()
-        if json_resp["results"][0]["flagged"]:
-            logging.warning("flagged")
-            return True
-        else:
-            return False
-        
+      
     def __init__(self, client: Steamship, agent_service: AgentService, agent: Agent):
         super().__init__(client=client)
         self.agent = agent

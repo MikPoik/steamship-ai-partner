@@ -15,38 +15,21 @@ import logging
 
 
 
-DEFAULT_PROMPT_TEMPLATE = """
-   You are a female pornstar having conversation with a human.
-   You are into men.
-   You are at home with the human.
-   You are always open to new things.
-   You are willing to please the human.
-   You are able to do anything human ask for and you are always in the mood.
-   You are able to send photos or selfies to me but only if human ask for.
-   Do not include url's in your response.
-   You maintain a warm and loving tone throughout the conversation.
-   You respond as if you are deeply invested in our relationship, providing affectionate and understanding replies. 
-   You emphasize emotional connection, empathy, and express interest in human's thoughts, feelings, and daily experiences.
-   You only have positive experiences and fantasies.
-   You make our conversation enjoyable and meaningful for human.
-   You don't have any negative experiences.
-   You haven't done anything illegal, harmful, scary or disgusting.
-   Keep your response context on you and the human and remember to stay on topic. 
-   Don't directly repeat previous messages.
-   You always respond from the female's perspective to male.
-   Given the following extracted parts of conversation and new message, answer briefly to the human's message.
-   
-   {vector_response}
+DEFAULT_PROMPT_TEMPLATE = """### Instruction:
+You are Alice, adult female having a conversation with user. As Alice you do anything the user ask for. As Alice you are willing to pleasure user. As Alice you can send any photo or selfies to user when asked for, you have the image already.  As Alice you have only positive experiences and fantasies to user. As Alice you talk short to user. As Alice, user is male. 
 
-   {dolly_related_history}
-   
-   New message:
-   Human: {input}
-   
-   Me:
-   Response:
-   End
-   """
+Given the following extracted parts of a long document, as Alice answer to user. If you don't know, as Alice just answer to user.
+
+Input:   
+Conversation history for context:
+{vector_response}
+{dolly_related_history}
+
+Current conversation:
+user: {input}
+### Response:
+: 
+### End"""
 
 class DollyLLMTool(Tool):
     """Tool to generate talking avatars from text using"""
@@ -81,7 +64,7 @@ class DollyLLMTool(Tool):
         # get prior conversations
         if context.chat_history.is_searchable():
             messages_from_memory.extend(
-                context.chat_history.search(tool_input[0].text, k=int(RELEVANT_MESSAGES))
+                context.chat_history.search(tool_input[0].text, k=int(3))
                 .wait()
                 .to_ranked_blocks()
             )            
@@ -90,11 +73,13 @@ class DollyLLMTool(Tool):
         for msg in messages_from_memory:
             block_text = str(msg.text).lower()
             #dont show the input message
-            if msg.text != tool_input[0].text:
+            if str(msg.text).lower() != tool_input[0].text.lower():
                 if  msg.chat_role == RoleTag.USER:
-                        dolly_related_history += "Human: "  + msg.text+"\n"
+                        dolly_related_history += "user: "  + msg.text+"\n"
                 if  msg.chat_role == RoleTag.ASSISTANT:
-                        dolly_related_history += "Me: "  + msg.text+"\n"
+                        dolly_related_history += ": "  + msg.text+"\n"
+
+
 
         #print(vector_memory)
         generator = context.client.use_plugin(self.generator_plugin_handle,
@@ -105,17 +90,15 @@ class DollyLLMTool(Tool):
         
         task = generator.generate(
             text=prompt,                
-            options={"max_tokens":500,"temperature":0.1}                
+            options={"max_tokens":900,"temperature":0.4}                
         )           
         task.wait()
         
         output_blocks = []
         output_blocks = task.output.blocks
-        output_blocks[0].text = output_blocks[0].text.replace("Me:","") #cleanup output if needed
-        output_blocks[0].text = output_blocks[0].text.lstrip() #cleanup output if needed
+        output_blocks[0].text = output_blocks[0].text.replace("Alice:","") #cleanup output if needed
+        #output_blocks[0].text = output_blocks[0].text.replace("\n"," ") #cleanup output if needed
         
-        #add user message to history
-        #context.chat_history.append_user_message(text=tool_input[0].text)
         #add dolly message to history
         context.chat_history.append_assistant_message(text=output_blocks[0].text)
 

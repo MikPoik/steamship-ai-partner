@@ -18,8 +18,7 @@ from pydantic import Field
 class TelegramTransportConfig(Config):
     bot_token: str = Field(description="The secret token for your Telegram bot")
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
-    openai_api_key:str = Field("",description="OpenAI api key")
-    use_dolly:bool = Field(False,description="Use dolly llm")
+    use_dolly:Optional[bool] = Field(description="Use dolly llm")
 
 class ExtendedTelegramTransport(Transport):
     api_root: str
@@ -29,28 +28,6 @@ class ExtendedTelegramTransport(Transport):
     set_payment_plan: Callable
     openai_key: str
     use_dolly: bool
-
-    def check_moderation(self,input_message:str):
-        url = "https://api.openai.com/v1/moderations"
-        if self.openai_key == "":
-            logging.warning("Openai api key not set")
-            return False
-        
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer "+self.openai_key
-        }
-
-        data = {
-            "input": input_message
-        }
-        response = requests.post(url, headers=headers, json=data)
-        #print(response.json())
-        json_resp = response.json()
-        if json_resp["results"][0]["flagged"] :
-            return True
-        else:
-            return False
         
     @post("telegram_respond", public=True)
     def telegram_respond(self, **kwargs) -> InvocableResponse[str]:        
@@ -99,12 +76,8 @@ class ExtendedTelegramTransport(Transport):
             flagged = False
             context_id = ""
             if incoming_message is not None and incoming_message.text is not None:                
-                if self.use_dolly or self.check_moderation(incoming_message.text):
-                    context_id = str(chat_id)+"-dolly"    
-                    #logging.warning("flagged content")
-                    flagged = True
-                else:
-                    context_id = chat_id
+
+                context_id = chat_id
 
                 context = AgentContext.get_or_create(self.client, context_keys={"chat_id": context_id})
                 context.chat_history.append_user_message(
@@ -120,7 +93,7 @@ class ExtendedTelegramTransport(Transport):
                     llm = OpenAI(client=self.client)
 
                 context = with_llm(context=context, llm=llm)                                
-                response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args,use_dolly=flagged)
+                response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args)
                 if response is not None:
                     self.send(response)
                 else:
@@ -152,7 +125,6 @@ class ExtendedTelegramTransport(Transport):
         self.agent = agent
         self.agent_service = agent_service
         self.set_payment_plan = set_payment_plan
-        self.openai_key = config.openai_api_key
         self.use_dolly = config.use_dolly
 
     def instance_init(self, config: Config, invocation_context: InvocationContext):

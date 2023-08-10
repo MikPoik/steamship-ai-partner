@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-dolly-test",
-	"version": "0.0.8",
+	"version": "y",
 	"description": "",
 	"author": "mpoikkilehto",
 	"entrypoint": "Unused",
@@ -48,11 +48,6 @@
 			"type": "string",
 			"description": "Transloadit.com api secret",
 			"default": ""
-		},
-		"openai_api_key": {
-			"type": "string",
-			"description": "OpenAI key for Moderation checking",
-			"default": "sk-"
 		},
 		"use_voice": {
 			"type": "boolean",

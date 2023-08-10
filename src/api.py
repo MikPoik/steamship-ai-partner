@@ -84,13 +84,10 @@ class TelegramTransportConfig(Config):
     api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
-    openai_api_key:str = Field("sk-",description="OpenAI key for Moderation checking")
     use_voice: bool = Field(False, description="Send voice messages addition to text")
     gpt_version: str = Field(GPT3,description="GPT version to use")
-    use_dolly:bool = Field(True,description="Use dolly llm")
-    replicate_api_key:str = Field("",description="Replicate api key")
-
-
+    use_dolly: Optional[bool] = Field(True,description="Use dolly llm")
+    replicate_api_key: Optional[str] = Field("",description="Replicate api key")
 
 
 
@@ -120,28 +117,6 @@ class MyAssistant(AgentService):
         pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
         return bool(re.search(pattern, text, re.IGNORECASE))
     
-    def check_moderation(self,input_message:str):        
-        url = "https://api.openai.com/v1/moderations"
-        if self.config.openai_api_key == "":
-            logging.warning("no openai apikey")
-            return False
-        
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer "+self.config.openai_api_key
-        }
-
-        data = {
-            "input": input_message
-        }
-        response = requests.post(url, headers=headers, json=data)
-        #print(response.json())
-        #logging.warning(response.json())
-        json_resp = response.json()
-        if json_resp["results"][0]["flagged"]:            
-            return True
-        else:
-            return False
         
     def send_buy_options(self,chat_id):
         requests.post(
@@ -315,21 +290,7 @@ class MyAssistant(AgentService):
             self.append_response(context=context,action=action)
             return
         
-        if "/nsfw" in last_message:
-            self.usage.toggle_nsfw_mode(chat_id=chat_id)
-            self.config.use_dolly = not self.config.use_dolly
-
-            if self.usage.get_nsfw_mode(chat_id=chat_id) == True:
-                action = FinishAction()
-                action.output.append(Block(text=f"NSFW mode enabled."))
-                self.append_response(context=context,action=action)
-                return 
-            else:
-                action = FinishAction()
-                action.output.append(Block(text=f"NSFW mode disabled."))
-                self.append_response(context=context,action=action)
-                return
-                          
+   
         #respond to telegram /start command
         if "/start" in last_message:
 
@@ -369,7 +330,7 @@ class MyAssistant(AgentService):
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
         #If input flagged, redirect to dolly.
-        if use_dolly == True:           
+        if self.config.use_dolly == True:           
             
             dolly_response = []  
                                                              
@@ -453,9 +414,9 @@ class MyAssistant(AgentService):
         flagged = False
         if not context_id:
             context_id = uuid.uuid4()
-        if self.usage.get_nsfw_mode(chat_id=context_id) or self.check_moderation(prompt):
-            flagged = True
-            context_id = str(context_id)+"-dolly"
+        #if self.usage.get_nsfw_mode(chat_id=context_id) or self.check_moderation(prompt):
+        #    flagged = True
+        #    context_id = str(context_id)+"-dolly"
 
         #print(context_id)
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
@@ -480,7 +441,7 @@ class MyAssistant(AgentService):
                     output += f"{block.text}\n"
         
         context.emit_funcs.append(sync_emit)
-        self.run_agent(self._agent, context,msg_chat_id=context_id,use_dolly=flagged)
+        self.run_agent(self._agent, context,msg_chat_id=context_id)
 
        
         return output
