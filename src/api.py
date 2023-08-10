@@ -329,7 +329,7 @@ class MyAssistant(AgentService):
         
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
-        #If input flagged, redirect to dolly.
+        #If use Dolly
         if self.config.use_dolly == True:           
             
             dolly_response = []  
@@ -411,12 +411,8 @@ class MyAssistant(AgentService):
     @post("prompt")
     def prompt(self, prompt: str,context_id: Optional[uuid.UUID] = None) -> str:
         """ Prompt Agent with text input """
-        flagged = False
         if not context_id:
             context_id = uuid.uuid4()
-        #if self.usage.get_nsfw_mode(chat_id=context_id) or self.check_moderation(prompt):
-        #    flagged = True
-        #    context_id = str(context_id)+"-dolly"
 
         #print(context_id)
         context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})

@@ -79,7 +79,8 @@ class DollyLLMTool(Tool):
                 if  msg.chat_role == RoleTag.ASSISTANT:
                         dolly_related_history += ": "  + msg.text+"\n"
 
-
+        if dolly_related_history == "":
+             dolly_related_history = ": hi"
 
         #print(vector_memory)
         generator = context.client.use_plugin(self.generator_plugin_handle,
@@ -99,6 +100,7 @@ class DollyLLMTool(Tool):
         output_blocks[0].text = output_blocks[0].text.replace("Alice:","") #cleanup output if needed
         #output_blocks[0].text = output_blocks[0].text.replace("\n"," ") #cleanup output if needed
         
+
         #add dolly message to history
         context.chat_history.append_assistant_message(text=output_blocks[0].text)
 
