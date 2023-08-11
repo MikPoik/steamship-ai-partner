@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-dolly-test",
-	"version": "0.0.10",
+	"version": "0.0.12",
 	"description": "",
 	"author": "mpoikkilehto",
 	"entrypoint": "Unused",
@@ -61,13 +61,18 @@
 		},
 		"use_dolly": {
 			"type": "boolean",
-			"description": "Use dolly llm",
+			"description": "Use dolly llm instead of GPT",
 			"default": true
 		},
 		"replicate_api_key": {
 			"type": "string",
 			"description": "Replicate api key",
 			"default": ""
+		},
+		"getimgai_api_key": {
+			"type": "string",
+			"description": "getimg.ai api key",
+			"default": "key-"
 		}
 	},
 	"steamshipRegistry": {

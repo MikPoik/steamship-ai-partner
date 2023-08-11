@@ -19,8 +19,9 @@ from typing import Type
 import requests
 from steamship.agents.tools.search.search import SearchTool
 from tools.vector_search_response_tool import VectorSearchResponseTool
+from tools.dolly_extract_keywords_tool import ExtractKeywordsTool
 from tools.selfie_tool import SelfieTool
-from tools.dolly_selfie_tool import DollySelfieTool
+from tools.getimgai_tool import SelfieNSFWTool
 from tools.voice_tool import VoiceTool
 from tools.dolly_llm_tool import DollyLLMTool
 from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
@@ -86,8 +87,9 @@ class TelegramTransportConfig(Config):
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: bool = Field(False, description="Send voice messages addition to text")
     gpt_version: str = Field(GPT3,description="GPT version to use")
-    use_dolly: Optional[bool] = Field(True,description="Use dolly llm")
+    use_dolly: Optional[bool] = Field(True,description="Use dolly llm instead of GPT")
     replicate_api_key: Optional[str] = Field("",description="Replicate api key")
+    getimgai_api_key:Optional[str] = Field("key-",description="getimg.ai api key")
 
 
 
@@ -183,6 +185,7 @@ class MyAssistant(AgentService):
             self.usage.add_user(str(chat_id))
         if self.usage.usage_exceeded(str(chat_id)):
             action = FinishAction()
+            action.output = []
             if chat_id.isdigit():
                 action.output.append(Block(text=f"I'm sorry, You have used all of your $ balance. "
                 ))
@@ -269,6 +272,7 @@ class MyAssistant(AgentService):
         if last_message == "/balance":
             usage_entry = self.usage.get_balance(chat_id=chat_id)
             action = FinishAction()
+            action.output = []
             action.output.append(Block(text=f"You have {usage_entry} $ balance left. "
             ))
             self.append_response(context=context,action=action)
@@ -278,6 +282,7 @@ class MyAssistant(AgentService):
 
         if "/help" in last_message:
             action = FinishAction()
+            action.output = []
             action.output.append(Block(text=f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance"))
             self.append_response(context=context,action=action)
             return
@@ -286,6 +291,7 @@ class MyAssistant(AgentService):
             #TODO clear chat history
             context.chat_history.clear()
             action = FinishAction()
+            action.output = []
             action.output.append(Block(text=f"Conversation history cleared"))
             self.append_response(context=context,action=action)
             return
@@ -295,6 +301,7 @@ class MyAssistant(AgentService):
         if "/start" in last_message:
 
             action = FinishAction()
+            action.output = []
             action.output.append(Block(text=f"Hi there! Welcome to chat with "+NAME+".\n You can see the available commands with:\n /help -command"))
 
             #OPTION 1: send picture from url
@@ -332,44 +339,41 @@ class MyAssistant(AgentService):
         #If use Dolly
         if self.config.use_dolly == True:           
             
-            dolly_response = []  
+            #dolly_response = []  
                                                              
             dolly_tool = DollyLLMTool()
             dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_key=self.config.replicate_api_key)
             action = FinishAction()
+            action.output = []
             action.output.append(Block(text=dolly_response[0].text))
 
 
             if self.contains_send_with_keywords(last_message):
+                #extract keywords for image
+                img_keywords_tool = ExtractKeywordsTool()
+                img_keywords = img_keywords_tool.run([Block(text=last_message)],context=context,api_key=self.config.replicate_api_key)
+                #pass keywords to getimg.ai generator
+                getimg_tool = SelfieNSFWTool()
+                getimg_response = getimg_tool.run([Block(text=str(img_keywords))],context=context,api_key=self.config.getimgai_api_key)
                 
-                kandinsky_tool = DollySelfieTool()
-                kandinsky_response = kandinsky_tool.run([Block(text=last_message)],context=context, context_id=chat_id,api_key=self.config.replicate_api_key)
-                
-                for block in kandinsky_response:
+                for block in getimg_response:
                     action.output.append(block)
 
         else:
-            action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
-    
+
+            action = self.next_action(
+                agent=agent, input_blocks=[context.chat_history.last_user_message], context=context,vector_response=vector_response,words_left=words_left
+            )
+
             while not isinstance(action, FinishAction):
-                # TODO: Arrive at a solid design for the details of this structured log object
-                inputs = ",".join([f"{b.as_llm_input()}" for b in action.input])
-                logging.info(
-                    f"Running Tool {action.tool.name} ({inputs})",
-                    extra={
-                        AgentLogging.TOOL_NAME: action.tool.name,
-                        AgentLogging.IS_MESSAGE: True,
-                        AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
-                        AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
-                    },
-                )
-                self.run_action(action=action, context=context)
-                action = agent.next_action(context=context,vector_response=vector_response,words_left=words_left)
+                self.run_action(agent=agent, action=action, context=context)
+                action = self.next_action(agent=agent, input_blocks=action.output, context=context,vector_response=vector_response,words_left=words_left)
+
                 # TODO: Arrive at a solid design for the details of this structured log object
                 logging.info(
-                    f"Next Tool: {action.tool.name}",
+                    f"Next Tool: {action.tool}",
                     extra={
-                        AgentLogging.TOOL_NAME: action.tool.name,
+                        AgentLogging.TOOL_NAME: action.tool,
                         AgentLogging.IS_MESSAGE: False,
                         AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
                         AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,

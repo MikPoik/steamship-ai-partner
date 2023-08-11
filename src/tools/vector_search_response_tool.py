@@ -65,12 +65,12 @@ if __name__ == "__main__":
     with repl.temporary_workspace() as client:
         index = tool.get_embedding_index(client)
         index.insert(
-                        [Tag(text="Maya loves apple pie."), Tag(text="Mayas last travel was to Spain"),Tag(text="Mayas favourite music is reggaeton")],
-                        [Tag(text="Mayas last travel was to Spain"),Tag(text="Maya plays the guitar")]
+                        [Tag(text="I love apple pie."), Tag(text="My was to Spain"),Tag(text="my favourite music is reggaeton")],
+                        [Tag(text="My last travel was to Spain"),Tag(text="I play the guitar")]
 
                     )
         index.insert(                        
-                        [Tag(text="Maya likes concerts"),Tag(text="Mayas advocates mental health awarness")]                        
+                        [Tag(text="I like concerts"),Tag(text="I advocate mental health awarness")]                        
                     )        
         repl.run_with_client(
             client, context=with_llm(context=AgentContext(), llm=OpenAI(client=client))

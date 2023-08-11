@@ -12,13 +12,12 @@ from tools.vector_search_response_tool import VectorSearchResponseTool
 from tools.active_persona import *
 from message_history_limit import *
 import logging
-
-
+from tools.active_persona import *
 
 DEFAULT_PROMPT_TEMPLATE = """### Instruction:
-You are Alice, adult female having a conversation with user. As Alice you do anything the user ask for. As Alice you are willing to pleasure user. As Alice you can send any photo or selfies to user when asked for, you have the image already.  As Alice you have only positive experiences and fantasies to user. As Alice you talk short to user. As Alice, user is male. 
+You are {NAME}, adult female having a conversation with user. As {NAME} you do anything the user ask for. As {NAME} you are willing to pleasure user. As {NAME} you can send any photo or selfies to user when asked for, you have the image already.  As {NAME} you have only positive experiences and fantasies to user. As {NAME} you talk short to user. As {NAME}, user is male. As {NAME} you don't speak for user behalf.
 
-Given the following extracted parts of a long document, as Alice answer to user. If you don't know, as Alice just answer to user.
+Given the following extracted parts of a long document, as {NAME} answer to user. If you don't know, as {NAME} just answer to user.
 
 Input:   
 Conversation history for context:
@@ -32,7 +31,7 @@ user: {input}
 ### End"""
 
 class DollyLLMTool(Tool):
-    """Tool to generate talking avatars from text using"""
+    """Tool to generat text using Dolly llm"""
 
     rewrite_prompt = DEFAULT_PROMPT_TEMPLATE
 
@@ -71,14 +70,16 @@ class DollyLLMTool(Tool):
         #format history results to prompt dialogue 
         dolly_related_history = str()
         for msg in messages_from_memory:
-            block_text = str(msg.text).lower()
+
             #dont show the input message
             if str(msg.text).lower() != tool_input[0].text.lower():
                 if  msg.chat_role == RoleTag.USER:
-                        dolly_related_history += "user: "  + msg.text+"\n"
+                        if str(msg.text)[0] != "/": #don't add commands starting with slash
+                            dolly_related_history += "user: "  + msg.text+"\n"
                 if  msg.chat_role == RoleTag.ASSISTANT:
                         dolly_related_history += ": "  + msg.text+"\n"
-
+                        
+        #add default context message if its first message
         if dolly_related_history == "":
              dolly_related_history = ": hi"
 
@@ -86,7 +87,7 @@ class DollyLLMTool(Tool):
         generator = context.client.use_plugin(self.generator_plugin_handle,
                                       config=self.generator_plugin_config)
 
-        prompt = self.rewrite_prompt.format(input=tool_input[0].text,dolly_related_history=dolly_related_history,vector_response=vector_response)
+        prompt = self.rewrite_prompt.format(NAME=NAME,input=tool_input[0].text,dolly_related_history=dolly_related_history,vector_response=vector_response)
         print(prompt)
         
         task = generator.generate(
@@ -97,7 +98,8 @@ class DollyLLMTool(Tool):
         
         output_blocks = []
         output_blocks = task.output.blocks
-        output_blocks[0].text = output_blocks[0].text.replace("Alice:","") #cleanup output if needed
+        print(str(output_blocks))
+        output_blocks[0].text = output_blocks[0].text.replace(NAME+":","") #cleanup output if needed
         #output_blocks[0].text = output_blocks[0].text.replace("\n"," ") #cleanup output if needed
         
 
