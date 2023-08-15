@@ -15,9 +15,8 @@ import logging
 from tools.active_persona import *
 
 DEFAULT_PROMPT_TEMPLATE = """### Instruction:
-You are {NAME}, adult female having a conversation with user. As {NAME} you do anything the user ask for. As {NAME} you are willing to pleasure user. As {NAME} you can send any photo or selfies to user when asked for, you have the image already.  As {NAME} you have only positive experiences and fantasies to user. As {NAME} you talk short to user. As {NAME}, user is male. As {NAME} you don't speak for user behalf.
-
-Given the following extracted parts of a long document, as {NAME} answer to user. If you don't know, as {NAME} just answer to user.
+You are {NAME}, adult female being conversed by user. You do as requested by user. You are willing to pleasure user. You will provide any photos or selfies when requested. You already have appropriate images in your phone. You have only positive experiences and fantasies. You know user is male. You talk short to user so as not to waste their time.
+Given the instruction above and following extracted parts of a long document, answer. If you don't know, just answer.
 
 Input:   
 Conversation history for context:
@@ -63,7 +62,7 @@ class DollyLLMTool(Tool):
         # get prior conversations
         if context.chat_history.is_searchable():
             messages_from_memory.extend(
-                context.chat_history.search(tool_input[0].text, k=int(3))
+                context.chat_history.search(tool_input[0].text, k=int(2))
                 .wait()
                 .to_ranked_blocks()
             )            
@@ -75,13 +74,13 @@ class DollyLLMTool(Tool):
             if str(msg.text).lower() != tool_input[0].text.lower():
                 if  msg.chat_role == RoleTag.USER:
                         if str(msg.text)[0] != "/": #don't add commands starting with slash
-                            dolly_related_history += "user: "  + msg.text+"\n"
+                            dolly_related_history += "user:"  + str(msg.text).replace("\n","")
                 if  msg.chat_role == RoleTag.ASSISTANT:
-                        dolly_related_history += ": "  + msg.text+"\n"
+                        dolly_related_history += NAME+":"  + str(msg.text).replace("\n","")
                         
         #add default context message if its first message
         if dolly_related_history == "":
-             dolly_related_history = ": hi"
+             dolly_related_history = NAME+":hi"+"\n"
 
         #print(vector_memory)
         generator = context.client.use_plugin(self.generator_plugin_handle,
@@ -92,15 +91,18 @@ class DollyLLMTool(Tool):
         
         task = generator.generate(
             text=prompt,                
-            options={"max_tokens":900,"temperature":0.4}                
+            options={"max_tokens":900,"temperature":0.4,"repetition_penalty":1.3}                
         )           
         task.wait()
         
         output_blocks = []
         output_blocks = task.output.blocks
-        print(str(output_blocks))
+        #print(str(output_blocks))
         output_blocks[0].text = output_blocks[0].text.replace(NAME+":","") #cleanup output if needed
         #output_blocks[0].text = output_blocks[0].text.replace("\n"," ") #cleanup output if needed
+        output_blocks[0].text = output_blocks[0].text.strip()
+        output_blocks[0].text = output_blocks[0].text.rstrip()
+        output_blocks[0].text = output_blocks[0].text.split("user:")[0] 
         
 
         #add dolly message to history

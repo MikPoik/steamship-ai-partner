@@ -1,4 +1,5 @@
 venv38/
+venv310/
 build/
 **/__pycache__/
 __pycache__

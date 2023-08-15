@@ -48,7 +48,7 @@ class SelfieNSFWTool(ImageGeneratorTool):
             "model": "realistic-vision-v3",
             "prompt": NSFW_SELFIE_TEMPLATE_PRE + tool_input[0].text + NSFW_SELFIE_TEMPLATE_POST,
             "negative_prompt": NEGATIVE_PROMPT,
-            "width": 1024,
+            "width": 768,
             "height": 1024,
             "steps": 25,
             "guidance": 7.5,

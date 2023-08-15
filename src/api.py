@@ -34,6 +34,7 @@ from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
 from utils import send_file_from_local
 from message_history_limit import MESSAGE_COUNT
+from tools.llama_llm_tool import LlamaLLMTool
 
 
 
@@ -87,9 +88,12 @@ class TelegramTransportConfig(Config):
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: bool = Field(False, description="Send voice messages addition to text")
     gpt_version: str = Field(GPT3,description="GPT version to use")
-    use_dolly: Optional[bool] = Field(True,description="Use dolly llm instead of GPT")
+    use_dolly: Optional[bool] = Field(False,description="Use dolly llm instead of GPT")
+    use_llama: Optional[bool] = Field(True,description="Use llama with modal")
     replicate_api_key: Optional[str] = Field("",description="Replicate api key")
     getimgai_api_key:Optional[str] = Field("key-",description="getimg.ai api key")
+    modal_api_url:Optional[str] = Field("https://.execute-api.eu-central-1.amazonaws.com/",description="Huggingface Modal api url")
+    aws_api_key:Optional[str] = Field("",description="AWS api key for Modal")
 
 
 
@@ -283,7 +287,7 @@ class MyAssistant(AgentService):
         if "/help" in last_message:
             action = FinishAction()
             action.output = []
-            action.output.append(Block(text=f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance"))
+            action.output.append(Block(text=f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance \n/reset - reset message logs"))
             self.append_response(context=context,action=action)
             return
         
@@ -337,15 +341,22 @@ class MyAssistant(AgentService):
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
         #If use Dolly
-        if self.config.use_dolly == True:           
-            
-            #dolly_response = []  
-                                                             
-            dolly_tool = DollyLLMTool()
-            dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_key=self.config.replicate_api_key)
+        if self.config.use_dolly == True or self.config.use_llama == True:      
+
             action = FinishAction()
-            action.output = []
-            action.output.append(Block(text=dolly_response[0].text))
+            action.output = []          
+            if self.config.use_llama == True:      
+                llama = LlamaLLMTool()
+                llama_response = llama.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_url=self.config.modal_api_url,api_key=self.config.aws_api_key)
+                action.output.append(Block(text=llama_response[0].text))
+
+            if self.config.use_dolly == True:    
+                dolly_response = []                                                               
+                dolly_tool = DollyLLMTool()
+                dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_key=self.config.replicate_api_key)
+                action = FinishAction()
+                action.output.append(Block(text=dolly_response[0].text))
+
 
 
             if self.contains_send_with_keywords(last_message):

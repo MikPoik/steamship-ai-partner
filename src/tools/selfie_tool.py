@@ -31,7 +31,7 @@ class SelfieTool(Tool):
         """Run the tool. Copied from base class to enable generate-time config overrides."""
         if api_key != "":
             self.generator_plugin_config["replicate_api_key"] = api_key
-
+            
         modified_inputs = [
             Block(text=self.rewrite_prompt.format(subject=block.text))
             for block in tool_input

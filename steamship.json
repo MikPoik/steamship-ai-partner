@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "partner-ai-dolly-test",
-	"version": "0.0.12",
+	"version": "0.0.14",
 	"description": "",
 	"author": "mpoikkilehto",
 	"entrypoint": "Unused",
