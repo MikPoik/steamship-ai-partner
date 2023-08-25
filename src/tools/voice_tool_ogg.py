@@ -14,7 +14,7 @@ from tools.active_persona import VOICE_ID
 
 
 
-class VoiceTool(GenerateSpeechTool):
+class VoiceToolOGG(GenerateSpeechTool):
     """Tool to generate audio from text."""
 
     name: str = "GenerateSpokenAudio"
@@ -75,6 +75,6 @@ class VoiceTool(GenerateSpeechTool):
             return[Block()]
 
 if __name__ == "__main__":
-    tool = VoiceTool()
+    tool = VoiceToolOGG()
     with Steamship.temporary_workspace() as client:
         ToolREPL(tool).run_with_client(client=client, context=with_llm(llm=OpenAI(client=client)))

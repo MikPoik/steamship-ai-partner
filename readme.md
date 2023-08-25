@@ -14,7 +14,8 @@ Partner AI with vector database memory for learning, customizable personality.
 - Cost tracking by generated voice or tokens
 - Telegram invoicing with Stripe
 - User balance tracking
--
+- Multiple image generation tools
+- alternative llm's
 
 
 

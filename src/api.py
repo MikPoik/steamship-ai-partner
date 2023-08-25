@@ -1,13 +1,12 @@
 from agents.functions_based import FunctionsBasedAgent
 from steamship.agents.logging import AgentLogging
 from steamship.agents.service.agent_service import AgentService
-from steamship.invocable import Config, post, InvocableResponse
+from steamship.invocable import Config, post
 from steamship import Block,Task,MimeTypes, Steamship
-from steamship.agents.llms.openai import OpenAI
 from steamship.agents.llms.openai import ChatOpenAI
 from steamship.utils.repl import AgentREPL
-from mixins.steamship_widget import SteamshipWidgetTransport
-from mixins.extended_telegram import ExtendedTelegramTransport
+from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
+from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
 from usage_tracking import UsageTracker
 import uuid,os,re
 import logging
@@ -22,19 +21,20 @@ from tools.vector_search_response_tool import VectorSearchResponseTool
 from tools.dolly_extract_keywords_tool import ExtractKeywordsTool
 from tools.selfie_tool import SelfieTool
 from tools.getimgai_tool import SelfieNSFWTool
-from tools.voice_tool import VoiceTool
+from tools.voice_tool_ogg import VoiceToolOGG
+from tools.voice_tool_mp3 import VoiceToolMP3
 from tools.dolly_llm_tool import DollyLLMTool
 from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
 from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
 from steamship.invocable.mixins.indexer_mixin import IndexerMixin
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
-from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
 from utils import send_file_from_local
 from message_history_limit import MESSAGE_COUNT
-from tools.llama_llm_tool import LlamaLLMTool
+from tools.llama_api_tool import LlamaLLMTool
+
 
 
 
@@ -74,26 +74,26 @@ Only use the functions you have been provided with.
 {answer_word_cap}
 Begin!"""
 
+#Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
+DOLLY = "dolly"
+LLAMA2_HERMES = "llama2-hermes"
 
 #TelegramTransport config
-class TelegramTransportConfig(Config):
+class MyAssistantConfig(Config):
     bot_token: str = Field(":",description="Telegram bot token, obtained via @BotFather")
     payment_provider_token: Optional[str] = Field(":TEST:",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(10, description="Number of free messages assigned to new users.")
-    usd_balance:Optional[float] = Field(1,description="USD balance for new users")
-    api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
+    usd_balance:Optional[float] = Field(1,description="USD balance for new users")    
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
-    use_voice: bool = Field(False, description="Send voice messages addition to text")
-    gpt_version: str = Field(GPT3,description="GPT version to use")
-    use_dolly: Optional[bool] = Field(False,description="Use dolly llm instead of GPT")
-    use_llama: Optional[bool] = Field(True,description="Use llama with modal")
-    replicate_api_key: Optional[str] = Field("",description="Replicate api key")
+    use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
+    llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
+    replicate_api_key: Optional[str] = Field("r8",description="Replicate api key")
     getimgai_api_key:Optional[str] = Field("key-",description="getimg.ai api key")
-    modal_api_url:Optional[str] = Field("https://.execute-api.eu-central-1.amazonaws.com/",description="Huggingface Modal api url")
-    aws_api_key:Optional[str] = Field("",description="AWS api key for Modal")
+    aws_api_url:Optional[str] = Field("https://",description="AWS api url") 
+    llama_api_key:Optional[str] = Field("LL-",description="Llama api key") #llama-api key
 
 
 
@@ -101,12 +101,12 @@ class MyAssistant(AgentService):
 
     USED_MIXIN_CLASSES = [IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, IndexerMixin,ExtendedTelegramTransport,SteamshipWidgetTransport]
     
-    config: TelegramTransportConfig
+    config: MyAssistantConfig
 
     @classmethod
     def config_cls(cls) -> Type[Config]:
         """Return the Configuration class."""
-        return TelegramTransportConfig
+        return MyAssistantConfig
     
     def set_payment_plan(self, pre_checkout_query):
         chat_id = str(pre_checkout_query["from"]["id"])
@@ -215,17 +215,25 @@ class MyAssistant(AgentService):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        
+        gpt_model = ""
+        if "gpt" in self.config.llm_model:
+            gpt_model = self.config.llm_model
+        else:
+            gpt_model = GPT3
 
-        self._agent = FunctionsBasedAgent(tools=[SelfieTool()],
-            llm=ChatOpenAI(self.client,model_name=self.config.gpt_version,temperature=0.8,max_tokens=200),
+        self.set_default_agent(
+            FunctionsBasedAgent(tools=[SelfieTool()],
+            llm=ChatOpenAI(self.client,model_name=gpt_model,temperature=0.8,max_tokens=200),
             conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
         )
-        self._agent.PROMPT = SYSTEM_PROMPT
+        )
+        self.get_default_agent().PROMPT = SYSTEM_PROMPT
 
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         self.add_mixin(
-            SteamshipWidgetTransport(client=self.client, agent_service=self, agent=self._agent)
+            SteamshipWidgetTransport(client=self.client, agent_service=self)
         )
 
         #IndexerMixin
@@ -236,9 +244,8 @@ class MyAssistant(AgentService):
         self.add_mixin(
             ExtendedTelegramTransport(
                 client=self.client,
-                config=self.config,
+                config=TelegramTransportConfig(bot_token=self.config.bot_token),
                 agent_service=self,
-                agent=self._agent,
                 set_payment_plan=self.set_payment_plan
             )
         )
@@ -341,20 +348,20 @@ class MyAssistant(AgentService):
         #If balance low, guide answer length
         words_left = self.usage.get_available_words(chat_id=str(chat_id))
         #If use Dolly
-        if self.config.use_dolly == True or self.config.use_llama == True:      
+        if DOLLY in self.config.llm_model or LLAMA2_HERMES in self.config.llm_model:      
 
             action = FinishAction()
             action.output = []          
-            if self.config.use_llama == True:      
+
+            if LLAMA2_HERMES in self.config.llm_model:      
                 llama = LlamaLLMTool()
-                llama_response = llama.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_url=self.config.modal_api_url,api_key=self.config.aws_api_key)
+                llama_response = llama.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_url=self.config.aws_api_url,api_key=self.config.llama_api_key)
                 action.output.append(Block(text=llama_response[0].text))
 
-            if self.config.use_dolly == True:    
+            if DOLLY in self.config.llm_model:    
                 dolly_response = []                                                               
                 dolly_tool = DollyLLMTool()
                 dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_key=self.config.replicate_api_key)
-                action = FinishAction()
                 action.output.append(Block(text=dolly_response[0].text))
 
 
@@ -373,12 +380,12 @@ class MyAssistant(AgentService):
         else:
 
             action = self.next_action(
-                agent=agent, input_blocks=[context.chat_history.last_user_message], context=context,vector_response=vector_response,words_left=words_left
+                agent=agent, input_blocks=[context.chat_history.last_user_message], context=context
             )
 
             while not isinstance(action, FinishAction):
                 self.run_action(agent=agent, action=action, context=context)
-                action = self.next_action(agent=agent, input_blocks=action.output, context=context,vector_response=vector_response,words_left=words_left)
+                action = self.next_action(agent=agent, input_blocks=action.output, context=context)
 
                 # TODO: Arrive at a solid design for the details of this structured log object
                 logging.info(
@@ -408,15 +415,15 @@ class MyAssistant(AgentService):
         #increase used tokens and reduce balance
         self.usage.increase_token_count(action.output,chat_id=str(chat_id),use_voice=self.config.use_voice)
 
-
+        voice_response = []
         #OPTION 3: Add voice to response
-        if self.config.use_voice:
-            voice_tool = VoiceTool()
-            ##if OGG encoding:
+        if "ogg" in self.config.use_voice:
+            voice_tool = VoiceToolOGG()
             voice_response = voice_tool.run(action.output,context=context,transloadit_api_key=self.config.transloadit_api_key,transloadit_api_secret=self.config.transloadit_api_secret)
-            ## if default audio format (change voice_tool_orig.py to voice_tool.py):
-            #voice_response = voice_tool.run(action.output,context=context)
-
+            action.output.append(voice_response[0])
+        elif "mp3" in self.config.use_voice:  ## if default audio format (change voice_tool_orig.py to voice_tool.py):
+            voice_tool = VoiceToolMP3()
+            voice_response = voice_tool.run(action.output,context=context)
             action.output.append(voice_response[0])
 
         self.append_response(context=context,action=action)
@@ -430,12 +437,12 @@ class MyAssistant(AgentService):
             context_id = uuid.uuid4()
 
         #print(context_id)
-        context = AgentContext.get_or_create(self.client, {"id": f"{context_id}"})
+        context = self.build_default_context(context_id=context_id)
         context.chat_history.append_user_message(prompt)
         
         
         #add context
-        context = with_llm(context=context, llm=OpenAI(client=self.client))
+        #context = with_llm(context=context, llm=OpenAI(client=self.client))
         output = ""
 
         def sync_emit(blocks: List[Block], meta: Metadata):
@@ -452,7 +459,7 @@ class MyAssistant(AgentService):
                     output += f"{block.text}\n"
         
         context.emit_funcs.append(sync_emit)
-        self.run_agent(self._agent, context,msg_chat_id=context_id)
+        self.run_agent(self.get_default_agent(), context,msg_chat_id=context_id)
 
        
         return output

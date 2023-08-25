@@ -12,7 +12,7 @@ from tools.active_persona import VOICE_ID
 
 
 
-class VoiceTool(GenerateSpeechTool):
+class VoiceToolMP3(GenerateSpeechTool):
     """Tool to generate audio from text."""
 
     name: str = "GenerateSpokenAudio"
@@ -38,6 +38,6 @@ class VoiceTool(GenerateSpeechTool):
         return speech.run(modified_inputs,context)
 
 if __name__ == "__main__":
-    tool = VoiceTool()
+    tool = VoiceToolMP3()
     with Steamship.temporary_workspace() as client:
         ToolREPL(tool).run_with_client(client=client, context=with_llm(llm=OpenAI(client=client)))

@@ -3,11 +3,11 @@ from typing import List, Optional
 from steamship import Block, Steamship, PluginInstance
 from steamship.agents.schema import LLM
 
-PLUGIN_HANDLE = "dolly-lm-test"
+PLUGIN_HANDLE = ""
 REPLICATE_API_KEY = ""
 DEFAULT_MAX_TOKENS = 256
 
-class DollyLLM(LLM):
+class SomeLLM(LLM):
     generator: PluginInstance
     client: Steamship
     _max_tokens: int

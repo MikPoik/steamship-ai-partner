@@ -62,7 +62,7 @@ class ExtractKeywordsTool(Tool):
         keywords = keywords.replace("<image_keywords>","")
         keywords = keywords.replace("</image_keywords>","")
         keywords = keywords.replace("woman,","")
-        print(keywords)
+        #print(keywords)
         #return dolly_output_blocks     
 
         return [Block(text=keywords)]

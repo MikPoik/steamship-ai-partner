@@ -12,7 +12,7 @@ from steamship import File, Tag,DocTag
 from tools.active_persona import *
 
 
-NEGATIVE_PROMPT ="disfigured, cartoon, blurry,two person"
+NEGATIVE_PROMPT ="disfigured, cartoon, blurry"
 
 class SelfieNSFWTool(ImageGeneratorTool):
 

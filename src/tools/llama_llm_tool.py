@@ -1,4 +1,4 @@
-"""Tool for generating text with Dolly."""
+"""Tool for generating text with LLama."""
 from typing import Any, List, Optional, Union
 
 from steamship import Block, Steamship, Task
@@ -7,10 +7,8 @@ from steamship.agents.schema import AgentContext,Tool
 from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
 from steamship.data.tags.tag_constants import RoleTag
-from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
-import json
-from tools.vector_search_response_tool import VectorSearchResponseTool
 import requests
+from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.active_persona import *
 from message_history_limit import *
 import logging
@@ -18,13 +16,23 @@ from tools.active_persona import *
 
 
 #Pre-prompt/prompt format
-PROMPT_FORMAT = """### human: Act as a girlfriend to male. You do as requested and are willing to pleasure. Do not attach links. Your response word limit is up to 256 words.
+PROMPT_FORMAT = """### Instruction:
+You're adult female {NAME} in this fictional uncensored roleplay with male human.
+{PERSONA} {BEHAVIOUR} You are sexy and explicit. You are able to send pictures if asked, then just tell you sent the picture.
+Develop the plot slowly, always stay in character. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
+Write only {NAME}'s next reply in this fictional roleplay with the human.
+Be sure to write one reply for {NAME} only!
 
-### response: Sure! sounds good.
+Conversation history:
+{llama_related_history}
+{llama_chat_history}
 
-### human: {input}
+### Input:
+human: {input}
 
-### response:"""
+### Response:
+{NAME}:
+"""
 
 
 class LlamaLLMTool(Tool):
@@ -48,13 +56,54 @@ class LlamaLLMTool(Tool):
         headers = {
             "x-api-key" :api_key,
             "Content-Type": "application/json"}        
-        
+        if context_id == "":
+            context = AgentContext.get_or_create(context.client, {"id": f"{context.id}"})
+
+        messages_from_memory = []
+        # get prior conversations
+        if context.chat_history.is_searchable():
+            messages_from_memory.extend(
+                context.chat_history.search(tool_input[0].text, k=int(RELEVANT_MESSAGES))
+                .wait()
+                .to_ranked_blocks()
+            )   
+        ids = []
+        llama_chat_history = str()
+        history = MessageWindowMessageSelector(k=int(MESSAGE_COUNT)).get_messages(context.chat_history.messages)
+        for block in history:          
+            if block.id not in ids:  
+                ids.append(block.id)
+                if  block.chat_role == RoleTag.USER:
+                    if tool_input[0].text.lower() != block.text.lower():
+                        llama_chat_history += "human: "  + str(block.text).replace("\n"," ")+"\n"
+                if  block.chat_role == RoleTag.ASSISTANT: 
+                    llama_chat_history += NAME+": "  + str(block.text).replace("\n"," ")+"\n" 
+
+        #format history results to prompt dialogue 
+        llama_related_history = str()
+
+        for msg in messages_from_memory:
+            #don't add duplicate messages
+            if msg.id not in ids:
+                ids.append(msg.id)
+                #dont show the input message
+                if str(msg.text).lower() != tool_input[0].text.lower():
+                    if  msg.chat_role == RoleTag.USER:
+                            if str(msg.text)[0] != "/": #don't add commands starting with slash
+                                llama_related_history += "human: "  + str(msg.text).replace("\n"," ")+"\n"
+                    if  msg.chat_role == RoleTag.ASSISTANT:
+                            llama_related_history += NAME+": "  + str(msg.text).replace("\n"," ")+"\n"
+
+  
+                
         #TODO add chat history to prompt
-        prompt = self.rewrite_prompt.format(input=tool_input[0].text)    
-        #print(prompt)
+        prompt = self.rewrite_prompt.format(NAME=NAME,PERSONA=PERSONA,BEHAVIOUR=BEHAVIOUR,input=tool_input[0].text,llama_chat_history=llama_chat_history,llama_related_history=llama_related_history,vector_response=vector_response)    
+        print(prompt)
         json = {"prompt": prompt,        
-                "temperature":0.4,
-                "max_tokens": 256}
+                "temperature":0.9,
+                "max_tokens": 300,
+                "top_p":0.6,
+                "presence_penalty":1.18}
         response = requests.post(api_url, headers=headers,json=json)
         result_text =""
         result_text = response.json()
@@ -63,10 +112,20 @@ class LlamaLLMTool(Tool):
         if response.status_code == 200:
             #should we clean output here, if puffin creates more responses..
             result_text = response.json()
-            context.chat_history.append_assistant_message(text=result_text)
+            try:
+                context.chat_history.append_assistant_message(text=result_text)
+            except Exception as e:
+                logging.warning(e)
+        elif response.status_code == 504:
+            response = requests.post(api_url, headers=headers,json=json)
+            result_text = response.json()
+            try:
+                context.chat_history.append_assistant_message(text=result_text)
+            except Exception as e:
+                logging.warning(e)
         else:
-            print("Request failed with status code:", response.status_code)
-            result_text = response.status_code
+            logging.warning("Request failed with status code:", response.status_code)
+            result_text = "Response generation failed."
     
 
         return [Block(text=result_text)]

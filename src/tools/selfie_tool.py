@@ -24,7 +24,7 @@ class SelfieTool(Tool):
         "in detail, the desired image."
     )
     generator_plugin_handle: str = "replicate-kandinsky"
-    generator_plugin_config: dict = {"replicate_api_key" : ""}
+    generator_plugin_config: dict = {"replicate_api_key" : "your-api-key"}
 
 
     def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "",api_key="") -> Union[List[Block], Task[Any]]:
@@ -48,7 +48,7 @@ class SelfieTool(Tool):
             append_output_to_file=True,                
             options={"num_inference_steps" : 75,
                      "num_steps_prior":25,
-                     "height":768,
+                     "height":1024,
                      "width": 768
                      }                
         )           

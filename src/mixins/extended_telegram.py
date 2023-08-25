@@ -12,13 +12,16 @@ from steamship.agents.service.agent_service import AgentService
 from steamship.agents.utils import with_llm
 from steamship.invocable import Config, InvocableResponse, InvocationContext, post
 from pydantic import Field
+from steamship.utils.kv_store import KeyValueStore
 
 
 
 class TelegramTransportConfig(Config):
-    bot_token: str = Field(description="The secret token for your Telegram bot")
-    api_base: str = Field("https://api.telegram.org/bot", description="The root API for Telegram")
-    use_dolly:Optional[bool] = Field(description="Use dolly llm")
+    bot_token: Optional[str] = Field("", description="The secret token for your Telegram bot")
+    api_base: Optional[str] = Field(
+        "https://api.telegram.org/bot", description="The root API for Telegram"
+    )
+
 
 class ExtendedTelegramTransport(Transport):
     api_root: str
@@ -26,8 +29,8 @@ class ExtendedTelegramTransport(Transport):
     agent: Agent
     agent_service: AgentService
     set_payment_plan: Callable
-    openai_key: str
-    use_dolly: bool
+    config: TelegramTransportConfig
+    context: InvocationContext
         
     @post("telegram_respond", public=True)
     def telegram_respond(self, **kwargs) -> InvocableResponse[str]:        
@@ -78,22 +81,15 @@ class ExtendedTelegramTransport(Transport):
             if incoming_message is not None and incoming_message.text is not None:                
 
                 context_id = chat_id
-
-                context = AgentContext.get_or_create(self.client, context_keys={"chat_id": context_id})
+                context = self.agent_service.build_default_context(chat_id)                
                 context.chat_history.append_user_message(
                     text=incoming_message.text, tags=incoming_message.tags
                 )
                 context.emit_funcs = [self.build_emit_func(chat_id=chat_id)]
 
-                # Add an LLM to the context, using the Agent's if it exists.
-                llm = None
-                if hasattr(self.agent, "llm"):
-                    llm = self.agent.llm
-                else:
-                    llm = OpenAI(client=self.client)
-
-                context = with_llm(context=context, llm=llm)                                
-                response = self.agent_service.run_agent(self.agent, context,str(chat_id),callback_args)
+                response = self.agent_service.run_agent(
+                    self.agent_service.get_default_agent(), context,str(chat_id),callback_args
+                )                
                 if response is not None:
                     self.send(response)
                 else:
@@ -116,19 +112,27 @@ class ExtendedTelegramTransport(Transport):
             client: Steamship,
             config: TelegramTransportConfig,
             agent_service: AgentService,
-            agent: Agent,
             set_payment_plan: Callable
     ):
         super().__init__(client=client)
+        self.config = config
+        self.store = KeyValueStore(self.client, store_identifier="_telegram_config")
         self.api_root = f"{config.api_base}{config.bot_token}"
-        self.bot_token = config.bot_token
-        self.agent = agent
+        bot_token = (self.store.get("bot_token") or {}).get("token")
+        self.bot_token = config.bot_token or bot_token
         self.agent_service = agent_service
-        self.set_payment_plan = set_payment_plan
-        self.use_dolly = config.use_dolly
+        self.set_payment_plan = set_payment_plan     
 
-    def instance_init(self, config: Config, invocation_context: InvocationContext):
-        webhook_url = invocation_context.invocable_url + "telegram_respond"
+    def instance_init(self):
+        if self.bot_token:
+            self.api_root = f"{self.config.api_base}{self.config.bot_token or self.bot_token}"
+            try:
+                self._instance_init()
+            except Exception:  # noqa: S110
+                pass
+
+    def _instance_init(self):
+        webhook_url = self.agent_service.context.invocable_url + "telegram_respond"        
 
         logging.info(
             f"Setting Telegram webhook URL: {webhook_url}. Post is to {self.api_root}/setWebhook"
@@ -147,6 +151,17 @@ class ExtendedTelegramTransport(Transport):
             raise SteamshipError(
                 f"Could not set webhook for bot. Webhook URL was {webhook_url}. Telegram response message: {response.text}"
             )
+        
+    @post("connect_telegram")
+    def connect_telegram(self, bot_token: str):
+        self.store.set("bot_token", {"token": bot_token})
+        self.bot_token = bot_token
+
+        try:
+            self.instance_init()
+            return "OK"
+        except Exception as e:
+            return f"Could not set webhook for bot. Exception: {e}"
 
     @post("telegram_webhook_info")
     def telegram_webhook_info(self) -> dict:
