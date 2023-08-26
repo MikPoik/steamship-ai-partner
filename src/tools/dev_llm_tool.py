@@ -8,6 +8,7 @@ from steamship.agents.utils import with_llm
 from steamship.utils.repl import ToolREPL
 from steamship.data.tags.tag_constants import RoleTag
 import requests
+import time
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.active_persona import *
 from message_history_limit import *
@@ -50,6 +51,20 @@ class LlamaLLMTool(Tool):
     generator_plugin_handle: str = "llama-llm"
     generator_plugin_config: dict = {}
 
+    def make_api_request(api_url, headers, json_data, max_retries=3, retry_delay=5):
+        for retry in range(max_retries + 1):
+            response = requests.post(api_url, headers=headers, json=json_data)
+            
+            if response.status_code == 200:
+                result_text = response.json()
+                return result_text
+            elif response.status_code == 504 and retry < max_retries:
+                print(f"Received a 504 timeout error. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                logging.warning("Request failed with status code:", response.status_code)
+                result_text = "Response generation failed."
+            return result_text
 
     def run(self, tool_input: List[Block], context: AgentContext, context_id:str = "",vector_response:str="",api_url = "",api_key="") -> Union[List[Block], Task[Any]]:
         """Run the tool. Copied from base class to enable generate-time config overrides."""
@@ -99,33 +114,14 @@ class LlamaLLMTool(Tool):
         #TODO add chat history to prompt
         prompt = self.rewrite_prompt.format(NAME=NAME,PERSONA=PERSONA,BEHAVIOUR=BEHAVIOUR,input=tool_input[0].text,llama_chat_history=llama_chat_history,llama_related_history=llama_related_history,vector_response=vector_response)    
         print(prompt)
-        json = {"prompt": prompt,        
+
+        json_data = {"prompt": prompt,        
                 "temperature":0.9,
                 "max_tokens": 300,
                 "top_p":0.6,
                 "presence_penalty":1.18}
-        response = requests.post(api_url, headers=headers,json=json)
-        result_text =""
-        result_text = response.json()
-
-
-        if response.status_code == 200:
-            #should we clean output here, if puffin creates more responses..
-            result_text = response.json()
-            try:
-                context.chat_history.append_assistant_message(text=result_text)
-            except Exception as e:
-                logging.warning(e)
-        elif response.status_code == 504:
-            response = requests.post(api_url, headers=headers,json=json)
-            result_text = response.json()
-            try:
-                context.chat_history.append_assistant_message(text=result_text)
-            except Exception as e:
-                logging.warning(e)
-        else:
-            logging.warning("Request failed with status code:", response.status_code)
-            result_text = "Response generation failed."
+        
+        result_text = self.make_api_request(api_url, headers, json_data)
     
 
         return [Block(text=result_text)]

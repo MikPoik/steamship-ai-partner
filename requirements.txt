@@ -3,4 +3,3 @@ termcolor~=2.3.0
 pytransloadit
 pydantic~=1.10.2
 pyngrok
-llamaapi

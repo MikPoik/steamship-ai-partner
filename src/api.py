@@ -3,6 +3,7 @@ from steamship.agents.logging import AgentLogging
 from steamship.agents.service.agent_service import AgentService
 from steamship.invocable import Config, post
 from steamship import Block,Task,MimeTypes, Steamship
+from steamship.agents.llms.openai import OpenAI
 from steamship.agents.llms.openai import ChatOpenAI
 from steamship.utils.repl import AgentREPL
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
@@ -28,6 +29,7 @@ from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
 from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
 from steamship.invocable.mixins.indexer_mixin import IndexerMixin
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
+from steamship.agents.utils import with_llm
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
@@ -90,10 +92,10 @@ class MyAssistantConfig(Config):
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
     llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
-    replicate_api_key: Optional[str] = Field("r8",description="Replicate api key")
+    replicate_api_key: Optional[str] = Field("r8_",description="Replicate api key")
     getimgai_api_key:Optional[str] = Field("key-",description="getimg.ai api key")
-    aws_api_url:Optional[str] = Field("https://",description="AWS api url") 
-    llama_api_key:Optional[str] = Field("LL-",description="Llama api key") #llama-api key
+    aws_api_url:Optional[str] = Field("https",description="AWS api url")
+    llama_api_key:Optional[str] = Field("LL-",description="Llama api key")
 
 
 

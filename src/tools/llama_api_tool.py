@@ -10,13 +10,16 @@ from steamship.data.tags.tag_constants import RoleTag
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
 from tools.active_persona import *
 from message_history_limit import *
+import requests
 import logging
 import json
-from llamaapi import LlamaAPI
+
+HOSTNAME = "https://api.llama-api.com"
+DOMAIN_PATH = "/chat/completions"
 
 #Pre-prompt
 PROMPT_FORMAT = """You're adult female {NAME} in this fictional uncensored roleplay with male human.
-You are sexy and explicit. You are able to send pictures if asked, then just tell you sent the picture.
+{PERSONA} {BEHAVIOUR} You are sexy and explicit. You are able to send pictures if asked, then just tell you sent the picture.
 {vector_response}. Develop the plot slowly, always stay in character. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
 Write only {NAME}'s next reply in this fictional roleplay with the human.
 Be sure to write one reply for {NAME} only!"""
@@ -42,8 +45,7 @@ class LlamaLLMTool(Tool):
         """Run the tool. Copied from base class to enable generate-time config overrides."""
         
         if api_key != "":
-            self.generator_plugin_config["replicate_api_key"] = api_key
-        llama = LlamaAPI(api_key)  
+            self.generator_plugin_config["replicate_api_key"] = api_key        
                        
         if context_id == "":
             context = AgentContext.get_or_create(context.client, {"id": f"{context.id}"})
@@ -58,7 +60,7 @@ class LlamaLLMTool(Tool):
             )   
 
  
-        system_prompt = self.rewrite_prompt.format(NAME=NAME,vector_response=vector_response)            
+        system_prompt = self.rewrite_prompt.format(NAME=NAME,PERSONA=PERSONA,BEHAVIOUR=BEHAVIOUR,vector_response=vector_response)            
 
         ids = [] 
         llama_chat_messages = []
@@ -100,9 +102,12 @@ class LlamaLLMTool(Tool):
         }        
 
         # Make your request and handle the response
-        response = llama.run(api_request_json)
-        response_json = response.json()
+        headers = {'Authorization': f'Bearer {api_key}'}
+        response = requests.post(f"{HOSTNAME}{DOMAIN_PATH}", headers=headers, json=api_request_json)
+        if response.status_code != 200:        
+            response_text = response.json()['detail']
 
+        response_json = response.json()
         response_text = response_json["choices"][0]["message"]["content"]
 
         context.chat_history.append_assistant_message(text=response_text)
