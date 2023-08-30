@@ -19,7 +19,7 @@ class TodoTool(Tool):
     """
 
     name: str = "TodoTool"
-    human_description: str = "Generate a todo list"
+    human_description: str = "Useful for generating a todo list"
     agent_description: str = (
         "Use this tool to generate a TODO list "
         "The input is the task to create a TODO list for"

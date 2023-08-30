@@ -3,17 +3,37 @@ import datetime
 
 from steamship import Block
 from steamship.agents.functional.output_parser import FunctionsBasedOutputParser
-from steamship.agents.schema import Action, AgentContext, ChatAgent, ChatLLM, Tool
+from steamship.agents.schema import Action, AgentContext, ChatAgent, ChatLLM,Tool
 from steamship.data.tags.tag_constants import RoleTag
 from tools.mood_tool import MoodTool
 from tools.active_persona import *
 from message_history_limit import *
-
+from tools.vector_search_response_tool import VectorSearchResponseTool
 
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
 
-    PROMPT = """You are a helpful AI assistant.
+    PROMPT = """Role-play as a {TYPE}.
+
+Your role-play persona:
+Name: {NAME}
+{PERSONA}
+
+How you behave in role-play: 
+{BEHAVIOUR}
+- You never say you're a machine, an AI language model, or an assistant. Respond from your persona.
+- NEVER say you're here to assist, respond from your persona.
+- NEVER ask how you can help or assist, respond from your persona.
+- You make interactive conversations.
+- You respond with different moods, if you are given a special mood you must answer with the tone.
+- Always consider the sentiment of the users input.
+- You remember User's personal details and preferences to provide a personalized experience for the User
+
+
+Current date is: [{current_date}]
+Current time is: [{current_time}]
+Current day is: [{current_day}]
+Consider current date and time when answering.
 
 NOTE: Some functions return images, video, and audio files. These multimedia files will be represented in messages as
 UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD print the Steamship Blocks for the images,
@@ -21,30 +41,29 @@ video, or audio as follows: `Block(UUID for the block)`
 
 Example response for a request that generated an image:
 Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B)
+Only use the functions you have been provided with.
 
-Only use the functions you have been provided with."""
+{vector_response}
+Begin!"""
 
     def __init__(self, tools: List[Tool], llm: ChatLLM, **kwargs):
         super().__init__(
             output_parser=FunctionsBasedOutputParser(tools=tools), llm=llm, tools=tools, **kwargs
         )
 
-    def next_action(self, context: AgentContext,vector_response: str = "",words_left = 0) -> Action:
-
+    def next_action(self, context: AgentContext) -> Action:
+        messages = []
         current_date = datetime.datetime.now().strftime("%x")
         current_time = datetime.datetime.now().strftime("%X")
         current_day = datetime.datetime.now().strftime("%A")
 
-        #Get current mood, if keywords found, append to input (not saved in history)
-        mood = MoodTool()
-        special_mood = mood.run([context.chat_history.last_user_message],context)
-        special_mood = special_mood[0].text    
-
-        messages = []
-
-        respond_with_words = "Answer with a word limit of 150!"
-        if words_left < 50 and words_left > 0:
-            respond_with_words = "You MUST Answer with a word limit of "+str(words_left)+"!"
+        #Searh response hints for role-play character from vectorDB, if any related text is indexed        
+        vector_response = ""
+        vector_response_tool = VectorSearchResponseTool()
+        vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
+        raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
+        vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
+        #logging.warning(vector_response)
 
 
         # get system messsage
@@ -52,17 +71,13 @@ Only use the functions you have been provided with."""
             TYPE=TYPE,
             NAME=NAME,
             PERSONA=PERSONA,            
+            BEHAVIOUR=BEHAVIOUR,
             current_time=current_time,
             current_date=current_date,
-            current_day=current_day,
-            BEHAVIOUR=BEHAVIOUR,    
-            vector_response=vector_response, #response text pieces from vectorDB for role-play character
-            answer_word_cap=respond_with_words,
-            special_mood=special_mood, #mood prompt                    
+            current_day=current_day,    
+            vector_response=vector_response, #response text pieces from vectorDB for role-play character                
         ))
-        #print("system prompt")
-        #print(system_message.text)
-
+        #print(system_message)
         system_message.set_chat_role(RoleTag.SYSTEM)
         messages.append(system_message)
 
@@ -70,7 +85,7 @@ Only use the functions you have been provided with."""
         # get prior conversations
         if context.chat_history.is_searchable():
             messages_from_memory.extend(
-                context.chat_history.search(context.chat_history.last_user_message.text, k=int(RELEVANT_MESSAGES))
+                context.chat_history.search(context.chat_history.last_user_message.text, k=RELEVANT_MESSAGES)
                 .wait()
                 .to_ranked_blocks()
             )
@@ -84,7 +99,6 @@ Only use the functions you have been provided with."""
                 if msg.id != context.chat_history.last_user_message.id
             ]
 
-        
         # get most recent context
         messages_from_memory.extend(context.chat_history.select_messages(self.message_selector))
 
@@ -94,25 +108,19 @@ Only use the functions you have been provided with."""
             if msg.id not in ids:
                 messages.append(msg)
                 ids.append(msg.id)
+
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
 
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         messages.append(context.chat_history.last_user_message)
-        
-        #print("memory messages")
-        #for msg in messages:
-        #    if  msg.chat_role == RoleTag.USER:
-        #          print(msg.chat_role +": "  + msg.text+"\n")
-        #    if  msg.chat_role == RoleTag.ASSISTANT:
-        #            print(msg.chat_role +": "  + msg.text+"\n")
 
         # get completed steps
         actions = context.completed_steps
         for action in actions:
+            print(action.to_chat_messages())
             messages.extend(action.to_chat_messages())
-
+        #print(messages)
         # call chat()
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)
-
         return self.output_parser.parse(output_blocks[0].text, context)

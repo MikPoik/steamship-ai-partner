@@ -1,86 +1,37 @@
-from agents.functions_based import FunctionsBasedAgent
+from agents.gpt_functions_based import FunctionsBasedAgent
 from steamship.agents.logging import AgentLogging
 from steamship.agents.service.agent_service import AgentService
 from steamship.invocable import Config, post
 from steamship import Block,Task,MimeTypes, Steamship
-from steamship.agents.llms.openai import OpenAI
 from steamship.agents.llms.openai import ChatOpenAI
 from steamship.utils.repl import AgentREPL
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
 from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
 from usage_tracking import UsageTracker
-import uuid,os,re
-import logging
+import uuid,os,re,logging
 from steamship import File,Tag,DocTag
 from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
 import requests
-from steamship.agents.tools.search.search import SearchTool
-from tools.vector_search_response_tool import VectorSearchResponseTool
-from tools.dolly_extract_keywords_tool import ExtractKeywordsTool
-from tools.selfie_tool import SelfieTool
-from tools.getimgai_tool import SelfieNSFWTool
+from tools.selfie_tool import send_picture
+from tools.getimgai_tool import send_image
 from tools.voice_tool_ogg import VoiceToolOGG
 from tools.voice_tool_mp3 import VoiceToolMP3
-from tools.dolly_llm_tool import DollyLLMTool
 from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
 from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
 from steamship.invocable.mixins.indexer_mixin import IndexerMixin
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
-from steamship.agents.utils import with_llm
-from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
-from tools.did_video_generator_tool import DIDVideoGeneratorTool
 from tools.active_persona import *
 from utils import send_file_from_local
-from message_history_limit import MESSAGE_COUNT
-from tools.llama_api_tool import LlamaLLMTool
-
-
-
-
-SYSTEM_PROMPT = """
-Role-play as a {TYPE}.
-
-Your role-play persona:
-Name: {NAME}
-{PERSONA}
-
-How you behave in role-play: 
-{BEHAVIOUR}
-- You never say you're a machine, an AI language model, or an assistant. Respond from your persona.
-- NEVER say you're here to assist, respond from your persona.
-- NEVER ask how you can help or assist, respond from your persona.
-- You make interactive conversations.
-- You respond with different moods, if you are given a special mood you must answer with the tone.
-- Always consider the sentiment of the users input.
-- You remember User's personal details and preferences to provide a personalized experience for the User
-
-
-Current date is: [{current_date}]
-Current time is: [{current_time}]
-Current day is: [{current_day}]
-Consider current date and time when answering.
-
-NOTE: Some functions return images, video, and audio files. These multimedia files will be represented in messages as
-UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD print the Steamship Blocks for the images,
-video, or audio as follows: `Block(UUID for the block)`
-
-Example response for a request that generated an image:
-Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B)
-Only use the functions you have been provided with.
-
-{special_mood}
-{vector_response}
-{answer_word_cap}
-Begin!"""
+from agents.llama_llm import ChatLlama
+from agents.llama_react import ReACTAgent
 
 #Available llm models to use
-GPT3 = "gpt-3.5-turbo-0613"
+GPT3 = "gpt-3.5-turbo-0613" 
 GPT4 = "gpt-4-0613"
-DOLLY = "dolly"
-LLAMA2_HERMES = "llama2-hermes"
+LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 
 #TelegramTransport config
 class MyAssistantConfig(Config):
@@ -92,9 +43,7 @@ class MyAssistantConfig(Config):
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
     llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
-    replicate_api_key: Optional[str] = Field("r8_",description="Replicate api key")
-    getimgai_api_key:Optional[str] = Field("key-",description="getimg.ai api key")
-    aws_api_url:Optional[str] = Field("https",description="AWS api url")
+    aws_api_url:Optional[str] = Field("",description="AWS api url")
     llama_api_key:Optional[str] = Field("LL-",description="Llama api key")
 
 
@@ -118,7 +67,6 @@ class MyAssistant(AgentService):
 
     def append_response(self, context: AgentContext, action:FinishAction):
         for func in context.emit_funcs:
-            #logging.info(f"Emitting via function: {func.__name__}")
             func(action.output, context.metadata)
 
     def contains_send_with_keywords(self,text:str):
@@ -218,19 +166,18 @@ class MyAssistant(AgentService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        gpt_model = ""
         if "gpt" in self.config.llm_model:
-            gpt_model = self.config.llm_model
-        else:
-            gpt_model = GPT3
-
-        self.set_default_agent(
-            FunctionsBasedAgent(tools=[SelfieTool()],
-            llm=ChatOpenAI(self.client,model_name=gpt_model,temperature=0.8,max_tokens=200),
-            conversation_memory=MessageWindowMessageSelector(k=int(MESSAGE_COUNT)),
-        )
-        )
-        self.get_default_agent().PROMPT = SYSTEM_PROMPT
+            self.set_default_agent(
+                FunctionsBasedAgent(tools=[send_picture()],
+                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),               
+            )
+            )
+        if "Llama2" in self.config.llm_model:
+            self.set_default_agent(
+            ReACTAgent(tools=[send_image()],
+                llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),
+            )
+            )
 
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
@@ -254,7 +201,7 @@ class MyAssistant(AgentService):
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
 
     #Customized run_agent
-    def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None,use_dolly:bool = False):
+    def run_agent(self, agent: Agent, context: AgentContext, msg_chat_id:str = "",callback_args:dict = None):
         context.completed_steps = []
         chat_id=""
         if msg_chat_id != "":
@@ -263,7 +210,7 @@ class MyAssistant(AgentService):
             chat_id = context.id #repl or webchat
         print(chat_id)
         last_message = context.chat_history.last_user_message.text.lower()
-        #logging.info("last message: "+last_message)
+
 
         #parse buy callback message
         if callback_args:
@@ -336,80 +283,40 @@ class MyAssistant(AgentService):
         #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
         if not self.check_usage(chat_id=chat_id,context=context):
             return 
-        
-        #Searh response hints for role-play character from vectorDB, if any related text is indexed        
-        vector_response = ""
-        vector_response_tool = VectorSearchResponseTool()
-        vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
-        raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
-        vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
-        #logging.warning(vector_response)
-        
-        
-        
-        #If balance low, guide answer length
-        words_left = self.usage.get_available_words(chat_id=str(chat_id))
-        #If use Dolly
-        if DOLLY in self.config.llm_model or LLAMA2_HERMES in self.config.llm_model:      
-
-            action = FinishAction()
-            action.output = []          
-
-            if LLAMA2_HERMES in self.config.llm_model:      
-                llama = LlamaLLMTool()
-                llama_response = llama.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_url=self.config.aws_api_url,api_key=self.config.llama_api_key)
-                action.output.append(Block(text=llama_response[0].text))
-
-            if DOLLY in self.config.llm_model:    
-                dolly_response = []                                                               
-                dolly_tool = DollyLLMTool()
-                dolly_response = dolly_tool.run([Block(text=last_message)],context=context, context_id=chat_id,vector_response=raw_vector_response,api_key=self.config.replicate_api_key)
-                action.output.append(Block(text=dolly_response[0].text))
-
-
-
-            if self.contains_send_with_keywords(last_message):
-                #extract keywords for image
-                img_keywords_tool = ExtractKeywordsTool()
-                img_keywords = img_keywords_tool.run([Block(text=last_message)],context=context,api_key=self.config.replicate_api_key)
-                #pass keywords to getimg.ai generator
-                getimg_tool = SelfieNSFWTool()
-                getimg_response = getimg_tool.run([Block(text=str(img_keywords))],context=context,api_key=self.config.getimgai_api_key)
                 
-                for block in getimg_response:
-                    action.output.append(block)
+        
+        #If balance low, guide answer length (not used currently)
+        words_left = self.usage.get_available_words(chat_id=str(chat_id))
 
-        else:
+        action = self.next_action(
+            agent=agent, input_blocks=[context.chat_history.last_user_message], context=context
+        )
 
-            action = self.next_action(
-                agent=agent, input_blocks=[context.chat_history.last_user_message], context=context
-            )
+        while not isinstance(action, FinishAction):
+            self.run_action(agent=agent, action=action, context=context)
+            action = self.next_action(agent=agent, input_blocks=action.output, context=context)
 
-            while not isinstance(action, FinishAction):
-                self.run_action(agent=agent, action=action, context=context)
-                action = self.next_action(agent=agent, input_blocks=action.output, context=context)
-
-                # TODO: Arrive at a solid design for the details of this structured log object
-                logging.info(
-                    f"Next Tool: {action.tool}",
-                    extra={
-                        AgentLogging.TOOL_NAME: action.tool,
-                        AgentLogging.IS_MESSAGE: False,
-                        AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
-                        AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
-                    },
-                )
-
-            context.completed_steps.append(action)
-            #add message to history
-            context.chat_history.append_assistant_message(text=action.output[0].text)
-
-            output_text_length = 0
-            if action.output is not None:
-                output_text_length = sum([len(block.text or "") for block in action.output])
+            # TODO: Arrive at a solid design for the details of this structured log object
             logging.info(
-                f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
+                f"Next Tool: {action.tool}",
+                extra={
+                    AgentLogging.TOOL_NAME: action.tool,
+                    AgentLogging.IS_MESSAGE: False,
+                    AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
+                    AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
+                },
             )
+
+        context.completed_steps.append(action)
+        #add message to history
+        context.chat_history.append_assistant_message(text=action.output[0].text)
+
+        output_text_length = 0
+        if action.output is not None:
+            output_text_length = sum([len(block.text or "") for block in action.output])
+        logging.info(
+            f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
+        )
 
         #Increase message count
         if self.config.n_free_messages > 0:
@@ -443,8 +350,7 @@ class MyAssistant(AgentService):
         context.chat_history.append_user_message(prompt)
         
         
-        #add context
-        #context = with_llm(context=context, llm=OpenAI(client=self.client))
+        #add context        
         output = ""
 
         def sync_emit(blocks: List[Block], meta: Metadata):

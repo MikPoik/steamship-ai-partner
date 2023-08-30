@@ -64,7 +64,7 @@ class LlamaLLMTool(Tool):
             else:
                 logging.warning("Request failed with status code:", response.status_code)
                 result_text = "Response generation failed."
-            return result_text
+                return result_text
 
     def run(self, tool_input: List[Block], context: AgentContext, context_id:str = "",vector_response:str="",api_url = "",api_key="") -> Union[List[Block], Task[Any]]:
         """Run the tool. Copied from base class to enable generate-time config overrides."""

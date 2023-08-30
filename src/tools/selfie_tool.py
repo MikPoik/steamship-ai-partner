@@ -11,20 +11,21 @@ import logging
 
 
 
-class SelfieTool(Tool):
+class send_picture(Tool):
     """Tool to generate images from text using"""
 
     rewrite_prompt = SELFIE_TEMPLATE_PRE+"{subject}"+SELFIE_TEMPLATE_POST 
 
-    name: str = "SelfieTool"
-    human_description: str = "Generates images from text with Kandinsky."
-    agent_description = (
-        "Used to generate images from text prompts. Only use if the user has asked directly for an image. "
+    name: str = "send_picture"
+    human_description =( "Used to generate images from text prompts. Only utilize this tool when the user explicitly requests an image. "
         "When using this tool, the input should be a plain text string that describes,"
         "in detail, the desired image."
     )
+    agent_description = (
+        "Useful if you need to generate a picture or selfie of you. Use if the user has asked for a picture response. The input is the text describing in detail the image with comma separated keywords. The output is the generated picture."
+    )
     generator_plugin_handle: str = "replicate-kandinsky"
-    generator_plugin_config: dict = {"replicate_api_key" : "your-api-key"}
+    generator_plugin_config: dict = {"replicate_api_key" : ""}
 
 
     def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "",api_key="") -> Union[List[Block], Task[Any]]:
@@ -46,10 +47,10 @@ class SelfieTool(Tool):
             text=prompt,
             make_output_public=True,
             append_output_to_file=True,                
-            options={"num_inference_steps" : 75,
-                     "num_steps_prior":25,
-                     "height":1024,
-                     "width": 768
+            options={"num_inference_steps" : 1, #75
+                     "num_steps_prior":1, #25
+                     "height":384, #1024
+                     "width": 384 #768
                      }                
         )           
         task.wait()

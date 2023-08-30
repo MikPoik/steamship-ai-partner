@@ -10,67 +10,53 @@ from steamship.agents.tools.image_generation.stable_diffusion import StableDiffu
 from steamship.utils.repl import ToolREPL
 from steamship import File, Tag,DocTag
 from tools.active_persona import *
+#NSFW_SELFIE_TEMPLATE_PRE =""
 
 
-NEGATIVE_PROMPT ="disfigured, cartoon, blurry"
+#NSFW_SELFIE_TEMPLATE_POST = ""
 
-class SelfieNSFWTool(ImageGeneratorTool):
+class send_image(ImageGeneratorTool):
 
-    name: str = "SelfieTool"
+    name: str = "send_image"
     human_description: str = "Generates a selfie-style image from text with getimg.ai"
     agent_description = (
-        "Used to generate a image from text, that describes the scene setting of the image."
-        "Only use if the user has asked for a image "
-        "Input: Imagine the photo scene of the image where it is taken, use comma separated list of keywords"
-        "Output: the generated image"
+        "Used to generate a images from short text prompts, that describes how you look. Only use if the user has asked for a image "
+        "When using this tool, the input should be a short plain text string of comma separated words that describes how you look."
     )
 
-    generator_plugin_handle: str = ""
-    generator_plugin_config: dict = {"n": 1,
-                                     "inference_steps": 25
-                                     }
+    generator_plugin_handle: str = "getimg-ai"
+    generator_plugin_config: dict = {"api_key": "key-"}
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
-    access_token = ""  # Replace this with your actual access token
 
     def run(
         self, tool_input: List[Block], context: AgentContext,api_key:str =""
     ) -> Union[List[Block], Task[Any]]:
-        if api_key != "":
-            self.access_token = api_key
 
 
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
-        }
-
-        data = {
-            "model": "realistic-vision-v3",
-            "prompt": NSFW_SELFIE_TEMPLATE_PRE + tool_input[0].text + NSFW_SELFIE_TEMPLATE_POST,
-            "negative_prompt": NEGATIVE_PROMPT,
+        image_generator = context.client.use_plugin(
+                    plugin_handle=self.generator_plugin_handle, config=self.generator_plugin_config
+                )
+        options={
             "width": 768,
             "height": 1024,
             "steps": 25,
             "guidance": 7.5,
-            "scheduler": "dpmsolver++",
-            "output_format": "png"
         }
-
-        response = requests.post(self.url, headers=headers, json=data)
-        response_json = response.json()
-        if response.status_code == 200:
-            encoded_image = response_json["image"]
-            decoded_image = base64.b64decode(encoded_image)
-
-            png_file = File.create(context.client,content=decoded_image,mime_type=MimeTypes.PNG)                    
-            block = Block(content_url=png_file.raw_data_url,mime_type=MimeTypes.PNG,url=png_file.raw_data_url)    
-            png_file.set_public_data(True)
-            return [block]
-
-        else:
-            print(f"API call failed with status code: {response.status_code}")
-            print(response.json())
-
+        prompt = tool_input[0].text.replace(NAME,"") #don't add name
+        prompt = prompt.replace("selfie","") #selfie doesn't work for current picture size
+        task = image_generator.generate(
+                    text=NSFW_SELFIE_TEMPLATE_PRE+tool_input[0].text.replace(NAME,"")+NSFW_SELFIE_TEMPLATE_POST,
+                    make_output_public=True,
+                    append_output_to_file=True,
+                    options=options,
+                )
+        task.wait()
+        blocks = task.output.blocks
+        output_blocks = []
+        for block in blocks:
+            output_blocks.append(block)
+        return output_blocks        
+ 
 if __name__ == "__main__":
     print("Try running with an input like 'penguin'")
-    ToolREPL(SelfieNSFWTool()).run()
+    ToolREPL(send_image()).run()
