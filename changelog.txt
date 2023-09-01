@@ -1,3 +1,6 @@
+1.9.2023
+-tweaked react prompt,parser and getimgtool prompt
+
 30.8.2023
 - refactored api.py, removed Dolly added Llama as agent
 - Updated Steamship version

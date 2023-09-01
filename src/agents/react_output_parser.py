@@ -16,13 +16,14 @@ class ReACTOutputParser(OutputParser):
         super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
 
     def parse(self, text: str, context: AgentContext) -> Action:
+        #logging.warning(text)
         if text.endswith("No"):
             raise RuntimeError(f"Could not parse LLM output: `{text}`")
 
         if NAME+":" in text:
             if not "Action:" in text:
                 return FinishAction(
-                    output=ReACTOutputParser._blocks_from_text(context.client, text.replace("Block(UUID for the block)","")), context=context
+                    output=ReACTOutputParser._blocks_from_text(context.client, text), context=context
                 )
 
         regex = r"Action: (.*?)[\n]*Action Input: (.*)"
@@ -68,7 +69,7 @@ class ReACTOutputParser(OutputParser):
             else:
                 result_blocks.append(Block(text=remaining_text))
                 remaining_text = ""
-
+        
         return result_blocks
 
     @staticmethod

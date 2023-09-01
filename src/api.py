@@ -33,7 +33,7 @@ GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 
-#TelegramTransport config
+#config
 class MyAssistantConfig(Config):
     bot_token: str = Field(":",description="Telegram bot token, obtained via @BotFather")
     payment_provider_token: Optional[str] = Field(":TEST:",description="Payment provider token, obtained via @BotFather")
@@ -43,7 +43,7 @@ class MyAssistantConfig(Config):
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
     llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
-    aws_api_url:Optional[str] = Field("",description="AWS api url")
+    aws_api_url:Optional[str] = Field("https://",description="AWS api url")
     llama_api_key:Optional[str] = Field("LL-",description="Llama api key")
 
 
@@ -69,10 +69,6 @@ class MyAssistant(AgentService):
         for func in context.emit_funcs:
             func(action.output, context.metadata)
 
-    def contains_send_with_keywords(self,text:str):
-        pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
-        return bool(re.search(pattern, text, re.IGNORECASE))
-    
         
     def send_buy_options(self,chat_id):
         requests.post(
@@ -169,7 +165,7 @@ class MyAssistant(AgentService):
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
                 FunctionsBasedAgent(tools=[send_picture()],
-                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),               
+                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.9,top_p=0.6,max_tokens=200),               
             )
             )
         if "Llama2" in self.config.llm_model:
@@ -406,7 +402,7 @@ class MyAssistant(AgentService):
     
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="partner-ai-dev3-ws")
+    client = Steamship(workspace="partner-ai-dev-ws")
     context_id=uuid.uuid4()
     #context_id="89f3946d-4bf3-4177-9abe-3a9024c5428c"
     print("chat id "+str(context_id))

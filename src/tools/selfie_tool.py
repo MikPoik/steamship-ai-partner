@@ -25,7 +25,7 @@ class send_picture(Tool):
         "Useful if you need to generate a picture or selfie of you. Use if the user has asked for a picture response. The input is the text describing in detail the image with comma separated keywords. The output is the generated picture."
     )
     generator_plugin_handle: str = "replicate-kandinsky"
-    generator_plugin_config: dict = {"replicate_api_key" : ""}
+    generator_plugin_config: dict = {"replicate_api_key" : "r8"}
 
 
     def run(self, tool_input: List[Block], context: AgentContext,context_id:str = "",api_key="") -> Union[List[Block], Task[Any]]:

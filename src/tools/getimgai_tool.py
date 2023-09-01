@@ -20,8 +20,7 @@ class send_image(ImageGeneratorTool):
     name: str = "send_image"
     human_description: str = "Generates a selfie-style image from text with getimg.ai"
     agent_description = (
-        "Used to generate a images from short text prompts, that describes how you look. Only use if the user has asked for a image "
-        "When using this tool, the input should be a short plain text string of comma separated words that describes how you look."
+        "This tool generates and sends an image based on a maximum of 5 comma-separated keywords describing your appearance. Use only upon user request for an image. The input should be a detailed plain text string."
     )
 
     generator_plugin_handle: str = "getimg-ai"
@@ -37,15 +36,19 @@ class send_image(ImageGeneratorTool):
                     plugin_handle=self.generator_plugin_handle, config=self.generator_plugin_config
                 )
         options={
-            "width": 768,
+            "negative_prompt": "disfigured, cartoon, blurry",
+            "width": 512,
             "height": 1024,
             "steps": 25,
             "guidance": 7.5,
         }
-        prompt = tool_input[0].text.replace(NAME,"") #don't add name
-        prompt = prompt.replace("selfie","") #selfie doesn't work for current picture size
+        prompt = tool_input[0].text.replace(NAME+",","")
+        prompt = prompt.replace(NAME,"")
+        prompt = prompt.replace('"',"")
+        prompt = prompt.replace("'","")
+        prompt = NSFW_SELFIE_TEMPLATE_PRE+prompt+NSFW_SELFIE_TEMPLATE_POST        
         task = image_generator.generate(
-                    text=NSFW_SELFIE_TEMPLATE_PRE+tool_input[0].text.replace(NAME,"")+NSFW_SELFIE_TEMPLATE_POST,
+                    text=prompt,
                     make_output_public=True,
                     append_output_to_file=True,
                     options=options,

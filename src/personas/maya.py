@@ -11,7 +11,7 @@ SELFIE_TEMPLATE_PRE = "Beautiful adult woman"
 SELFIE_TEMPLATE_POST ="brown hair,brown eyes,hyper realistic, curly middle part haircut, eyecandy, hdr,4k,8k,hips,waist"
 
 #NSFW selfie template pre and post parts
-NSFW_SELFIE_TEMPLATE_PRE = "gorgeus full body, young, beautiful,lips, medium hair, looking at viewer,"
+NSFW_SELFIE_TEMPLATE_PRE = "gorgeus body, young,brown hair,eye makeup, beautiful,lips, medium hair,"
 NSFW_SELFIE_TEMPLATE_POST =", jewelry, cleavage, necklace, large breasts, open mouth, ass, panties, bra"
  
 

@@ -87,7 +87,7 @@ class ChatLlama(ChatLLM, Llama):
             for tool in tools:
                 functions.append(tool.as_openai_function())
             options["functions"] = functions
-            print(functions)
+            #print(functions)
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
