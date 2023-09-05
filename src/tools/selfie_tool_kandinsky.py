@@ -11,7 +11,7 @@ import logging
 
 
 
-class send_picture(Tool):
+class SelfieToolKandinsky(Tool):
     """Tool to generate images from text using"""
 
     rewrite_prompt = SELFIE_TEMPLATE_PRE+"{subject}"+SELFIE_TEMPLATE_POST 

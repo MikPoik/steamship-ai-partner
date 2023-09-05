@@ -11,7 +11,7 @@ from tools.active_persona import SELFIE_TEMPLATE
 
 NEGATIVE_PROMPT ="bad anatomy, bad composition, ugly, abnormal, unrealistic, double, contorted, disfigured, malformed, amateur, extra, duplicate,2 heads,2 faces"
 
-class SelfieTool(ImageGeneratorTool):
+class SelfieToolSD(ImageGeneratorTool):
     """Tool to generate a selfie image.
 
     This example illustrates wrapping a tool (StableDiffusionTool) with a fixed prompt template that is combined with user input.

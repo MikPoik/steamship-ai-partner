@@ -15,12 +15,14 @@ from tools.active_persona import *
 
 #NSFW_SELFIE_TEMPLATE_POST = ""
 
-class send_image(ImageGeneratorTool):
+class SelfieTool(ImageGeneratorTool):
 
-    name: str = "send_image"
+    name: str = "SelfieTool"
     human_description: str = "Generates a selfie-style image from text with getimg.ai"
     agent_description = (
-        "This tool generates and sends an image based on a maximum of 5 comma-separated keywords describing your appearance. Use only upon user request for an image. The input should be a detailed plain text string."
+        "Used to generate and send images from text prompts. Only use if the user has asked directly for an image, selfie or picture. "
+        "When using this tool, the input should be a plain text string that describes, "
+        "in detail, the desired image."
     )
 
     generator_plugin_handle: str = "getimg-ai"
@@ -36,9 +38,8 @@ class send_image(ImageGeneratorTool):
                     plugin_handle=self.generator_plugin_handle, config=self.generator_plugin_config
                 )
         options={
-            "negative_prompt": "disfigured, cartoon, blurry",
-            "width": 512,
-            "height": 1024,
+            "width": 384,
+            "height": 512,
             "steps": 25,
             "guidance": 7.5,
         }
@@ -55,11 +56,15 @@ class send_image(ImageGeneratorTool):
                 )
         task.wait()
         blocks = task.output.blocks
+        #output_blocks = [Block(text="You successfully sent the image. Do not describe the image, just respond to user.")]
         output_blocks = []
+        #for func in context.emit_funcs:
+        #    func(blocks, context.metadata)
+
         for block in blocks:
             output_blocks.append(block)
         return output_blocks        
  
 if __name__ == "__main__":
     print("Try running with an input like 'penguin'")
-    ToolREPL(send_image()).run()
+    ToolREPL(SelfieTool()).run()

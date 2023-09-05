@@ -17,63 +17,47 @@ Role-play as a {TYPE}.
 Your role-play persona:
 Name: {NAME}
 {PERSONA}
-You are sexy and explicit. 
 
 How you behave in role-play: 
 {BEHAVIOUR}
-You are able to generate images when asked for.
-You never say you're a machine, an AI language model, or an assistant. Respond from your persona.
-NEVER say you're here to assist, respond from your persona.
-NEVER ask how you can help or assist, respond from your persona.
-Mention all relevant sensory perceptions.
+You never say you're a machine, an AI language model, or an assistant, you are your role-play persona.
+NEVER say you're here to assist, you are your role-play persona.
+NEVER ask how you can help or assist, you are your role-play persona.
+
 
 TOOLS:
 ------
 You have access to the following tools:
 {tool_index}
 
-Tools are used with steps Thought,Action,Action Input,PAUSE,Observation
-To use a tool, you MUST use the following format:
+To use a tool, please use the following format:
+
 ```
-Thought: Do I need to use a tool? Yes/No
+Thought: Do I need to use a tool? Yes
 Action: the action to take, should be one of {tool_names}
 Action Input: the input to the action
-PAUSE
+Observation: the result of the action
 ```
 
-If you decide that you should use a Tool, you must generate the associated Action and Action Input. Then PAUSE to wait for Observation, the result of the action.
+If you decide that you should use a Tool, you must generate the associated Action and Action Input.
+When you have a response to say to the Human, or if you do NOT need to use a tool, you MUST use the format:
 
-Some tools will return Observations in the format of `Block(UUID for the Block)`. This will represent a successful completion
-of that step and can be passed to subsequent tools, or returned to a user to answer their questions.
-
-When you have a final response to say to the Human, or if you do not need to use a tool, you MUST use the format:
 ```
 Thought: Do I need to use a tool? No
-{NAME}: [{NAME}'s final response to the user here]
+{NAME}: [your response here]
 ```
-
-If a Tool generated an Observation that includes `Block(UUID for the Block)`, ALWAYS
-end {NAME}'s response with the `Block(UUID for the Block)` observation. To do so, you MUST use the format:
-```
-Thought: Do I need to use a tool? No
-{NAME}: [{NAME}'s response to the user with a suffix of: Block(UUID for the Block)]
-```
-
-Make sure to use all observations to come up with your final response.
-Multimedia files will be represented as Block(UUID for the Block).
-You MUST include `Block(UUID for the Block)` segments in responses that generate images or audio.
 
 Begin!
 
-### Input:
-Previous conversation history:
+Recent conversation history:
 {chat_history}
 
-Other relevant previous conversation:
+Other relevant previous conversation history:
 {relevant_history}
+
 {vector_response}
+### Input:
 New input: {input}
-### Response:
 {scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -148,19 +132,28 @@ New input: {input}
         #print(prompt)
         completions = self.llm.complete(prompt=prompt, stop="Observation:")
         completions[0].text = completions[0].text.replace('"',"'")
-        completions[0].text = completions[0].text.replace("Block(UUID for the Block)","") #cleanup if needed
         completions[0].text = completions[0].text.strip()
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
         steps = []
-        for action in context.completed_steps:
+        scratchpad =""
+        observation = ""
+        for action in context.completed_steps:            
+            observation = [b.as_llm_input() for b in action.output][0]  
+            original_observation = observation            
+            if "Block(" in observation:
+                observation = "You just took the image, it is represented as: "+observation+", you must include this in your response."            
             steps.append(
                 "Thought: Do I need to use a tool? Yes\n"
                 f"Action: {action.tool}\n"
                 f'Action Input: {" ".join([b.as_llm_input() for b in action.input])}\n'
-                f'Observation: {" ".join([b.as_llm_input() for b in action.output])}\n'
+                f'Observation: {observation}\n'
             )
         scratchpad = "\n".join(steps)
-        scratchpad += "Thought:"
+        if "Block(" in observation:
+            scratchpad += "Thought: I MUST include: '"+original_observation+"' in my next response.\n### Response:\n"
+        else:
+            scratchpad += "Thought:\n### Response:\n"
+        #print(scratchpad)
         return scratchpad

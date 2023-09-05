@@ -15,8 +15,8 @@ from typing import List, Optional
 from pydantic import Field
 from typing import Type
 import requests
-from tools.selfie_tool import send_picture
-from tools.getimgai_tool import send_image
+from tools.selfie_tool_kandinsky import SelfieToolKandinsky
+from tools.selfie_tool_getimgai import SelfieTool
 from tools.voice_tool_ogg import VoiceToolOGG
 from tools.voice_tool_mp3 import VoiceToolMP3
 from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
@@ -33,8 +33,9 @@ GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 
-#config
+#TelegramTransport config
 class MyAssistantConfig(Config):
+    api_base: Optional[str] = Field("https://api.telegram.org/bot", description="The root API for Telegram")
     bot_token: str = Field(":",description="Telegram bot token, obtained via @BotFather")
     payment_provider_token: Optional[str] = Field(":TEST:",description="Payment provider token, obtained via @BotFather")
     n_free_messages: Optional[int] = Field(10, description="Number of free messages assigned to new users.")
@@ -164,13 +165,13 @@ class MyAssistant(AgentService):
         
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
-                FunctionsBasedAgent(tools=[send_picture()],
-                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.9,top_p=0.6,max_tokens=200),               
+                FunctionsBasedAgent(tools=[SelfieToolKandinsky()],
+                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),               
             )
             )
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
-            ReACTAgent(tools=[send_image()],
+            ReACTAgent(tools=[SelfieTool()],
                 llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),
             )
             )

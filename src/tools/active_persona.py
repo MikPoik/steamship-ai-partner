@@ -1,5 +1,5 @@
 #import the used persona below from personas folder
-from personas.maya import *
+from personas.lilith import *
 
 NAME = NAME
 TYPE = TYPE
