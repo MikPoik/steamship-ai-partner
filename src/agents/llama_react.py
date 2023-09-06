@@ -146,7 +146,7 @@ New input: {input}
             chat_history=llama_chat_history,
             relevant_history=llama_related_history,
         )
-        print(prompt)
+        #print(prompt)
         completions = self.llm.complete(prompt=prompt, stop="Observation:",max_retries=2)
         completions[0].text = completions[0].text.replace('"',"'")
         completions[0].text = completions[0].text.strip()
