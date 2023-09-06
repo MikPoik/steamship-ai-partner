@@ -27,6 +27,7 @@ from tools.active_persona import *
 from utils import send_file_from_local
 from agents.llama_llm import ChatLlama
 from agents.llama_react import ReACTAgent
+from steamship.agents.tools.search import SearchTool
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613" 
@@ -166,13 +167,13 @@ class MyAssistant(AgentService):
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
                 FunctionsBasedAgent(tools=[SelfieToolKandinsky()],
-                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),               
+                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=256),               
             )
             )
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
-            ReACTAgent(tools=[SelfieTool()],
-                llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=200),
+            ReACTAgent(tools=[SelfieTool(),SearchTool()],
+                llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=256),
             )
             )
 

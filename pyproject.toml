@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "steamship-ai-partner"
+version = "0.1.0"
+description = ""
+authors = ["Replit user <<>>"]
+readme = "README.md"
+packages = []
+
+[tool.poetry.dependencies]
+python = "^3.10"
+steamship = "2.17.25"
+termcolor = "2.3.0"
+pytransloadit = "0.2.1"
+pydantic = "1.10.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

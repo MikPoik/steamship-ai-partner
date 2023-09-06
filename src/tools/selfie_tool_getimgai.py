@@ -20,7 +20,7 @@ class SelfieTool(ImageGeneratorTool):
     name: str = "SelfieTool"
     human_description: str = "Generates a selfie-style image from text with getimg.ai"
     agent_description = (
-        "Used to generate and send images from text prompts. Only use if the user has asked directly for an image, selfie or picture. "
+        "Used to generate images from text prompts. Only use if the user has asked for an image, selfie or picture. "
         "When using this tool, the input should be a plain text string that describes, "
         "in detail, the desired image."
     )
@@ -38,8 +38,8 @@ class SelfieTool(ImageGeneratorTool):
                     plugin_handle=self.generator_plugin_handle, config=self.generator_plugin_config
                 )
         options={
-            "width": 384,
-            "height": 512,
+            "width": 512,
+            "height": 768,
             "steps": 25,
             "guidance": 7.5,
         }
