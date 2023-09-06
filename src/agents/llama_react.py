@@ -147,7 +147,7 @@ New input: {input}
             relevant_history=llama_related_history,
         )
         print(prompt)
-        completions = self.llm.complete(prompt=prompt, stop="Observation:")
+        completions = self.llm.complete(prompt=prompt, stop="Observation:",max_retries=2)
         completions[0].text = completions[0].text.replace('"',"'")
         completions[0].text = completions[0].text.strip()
         return self.output_parser.parse(completions[0].text, context)
