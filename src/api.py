@@ -46,7 +46,7 @@ class MyAssistantConfig(Config):
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
-    llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
+    llm_model:str = Field(GPT3,description="llm model to use")
     aws_api_url:Optional[str] = Field("https://",description="AWS api url")
     llama_api_key:Optional[str] = Field("LL-",description="Llama api key")
 
@@ -168,8 +168,8 @@ class MyAssistant(AgentService):
         
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
-                FunctionsBasedAgent(tools=[SelfieToolKandinsky()],
-                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=256),    
+                FunctionsBasedAgent(tools=[SelfieTool()],
+                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=256,moderate_output=False),    
                 conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT)           
             )
             )
