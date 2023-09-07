@@ -1,9 +1,9 @@
 import logging
 import re
 from typing import Dict, List, Optional
-from tools.active_persona import *
-from steamship import Block, Steamship
-from steamship.agents.schema import Action, AgentContext, FinishAction, OutputParser, Tool
+from tools.active_companion import * #upm package(steamship)
+from steamship import Block, Steamship #upm package(steamship)
+from steamship.agents.schema import Action, AgentContext, FinishAction, OutputParser, Tool #upm package(steamship)
 
 
 class ReACTOutputParser(OutputParser):

@@ -1,13 +1,13 @@
 #Test react template
 from typing import List
-from agents.react_output_parser import ReACTOutputParser
-from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool
-from steamship.agents.schema.message_selectors import MessageWindowMessageSelector
-from steamship.data.tags.tag_constants import RoleTag
-from tools.active_persona import *
-from message_history_limit import *
+from agents.react_output_parser import ReACTOutputParser #upm package(steamship)
+from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool #upm package(steamship)
+from steamship.agents.schema.message_selectors import MessageWindowMessageSelector #upm package(steamship)
+from steamship.data.tags.tag_constants import RoleTag #upm package(steamship)
+from tools.active_companion import * #upm package(steamship)
+from message_history_limit import * #upm package(steamship)
 import datetime
-from tools.vector_search_response_tool import VectorSearchResponseTool
+from tools.vector_search_response_tool import VectorSearchResponseTool #upm package(steamship)
 
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
@@ -147,7 +147,7 @@ New input: {input}
             relevant_history=llama_related_history,
         )
         #print(prompt)
-        completions = self.llm.complete(prompt=prompt, stop="Observation:",max_retries=2)
+        completions = self.llm.complete(prompt=prompt, stop="Observation:",max_retries=1)
         completions[0].text = completions[0].text.replace('"',"'")
         completions[0].text = completions[0].text.strip()
         return self.output_parser.parse(completions[0].text, context)

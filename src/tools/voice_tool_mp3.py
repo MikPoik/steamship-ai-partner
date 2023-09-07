@@ -1,13 +1,13 @@
 """Tool for generating images."""
-from steamship import Steamship
-from steamship.agents.llms import OpenAI
-from steamship.agents.tools.speech_generation import GenerateSpeechTool
-from steamship.agents.utils import with_llm
-from steamship.utils.repl import ToolREPL
-from typing import Any, List, Union
-from steamship import Block, Task
-from steamship.agents.schema import AgentContext
-from tools.active_persona import VOICE_ID
+from steamship import Steamship #upm package(steamship)
+from steamship.agents.llms import OpenAI #upm package(steamship)
+from steamship.agents.tools.speech_generation import GenerateSpeechTool #upm package(steamship)
+from steamship.agents.utils import with_llm #upm package(steamship)
+from steamship.utils.repl import ToolREPL #upm package(steamship)
+from typing import Any, List, Union 
+from steamship import Block, Task #upm package(steamship)
+from steamship.agents.schema import AgentContext #upm package(steamship)
+from tools.active_companion import VOICE_ID #upm package(steamship)
 
 
 

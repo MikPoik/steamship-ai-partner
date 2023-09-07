@@ -3,16 +3,16 @@ import tempfile
 from typing import Any, Dict, List, Optional, Callable
 import json
 import requests
-from steamship.agents.llms import OpenAI
-from steamship import Block, Steamship, SteamshipError
+from steamship.agents.llms import OpenAI #upm package(steamship)
+from steamship import Block, Steamship, SteamshipError #upm package(steamship)
 #from steamship.agents.mixins.transports.telegram import TelegramTransportConfig
-from steamship.agents.mixins.transports.transport import Transport
-from steamship.agents.schema import Agent, AgentContext, EmitFunc, Metadata
-from steamship.agents.service.agent_service import AgentService
-from steamship.agents.utils import with_llm
-from steamship.invocable import Config, InvocableResponse, InvocationContext, post
+from steamship.agents.mixins.transports.transport import Transport #upm package(steamship)
+from steamship.agents.schema import Agent, AgentContext, EmitFunc, Metadata #upm package(steamship)
+from steamship.agents.service.agent_service import AgentService #upm package(steamship)
+from steamship.agents.utils import with_llm #upm package(steamship)
+from steamship.invocable import Config, InvocableResponse, InvocationContext, post #upm package(steamship)
 from pydantic import Field
-from steamship.utils.kv_store import KeyValueStore
+from steamship.utils.kv_store import KeyValueStore #upm package(steamship)
 
 
 

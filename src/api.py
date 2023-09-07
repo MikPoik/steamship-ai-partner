@@ -1,33 +1,35 @@
-from agents.gpt_functions_based import FunctionsBasedAgent
-from steamship.agents.logging import AgentLogging
-from steamship.agents.service.agent_service import AgentService
-from steamship.invocable import Config, post
-from steamship import Block,Task,MimeTypes, Steamship
-from steamship.agents.llms.openai import ChatOpenAI
-from steamship.utils.repl import AgentREPL
-from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport
-from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
-from usage_tracking import UsageTracker
+from agents.gpt_functions_based import FunctionsBasedAgent #upm package(steamship)
+from steamship.agents.logging import AgentLogging #upm package(steamship)
+from steamship.agents.service.agent_service import AgentService #upm package(steamship)
+from steamship.invocable import Config, post #upm package(steamship)
+from steamship import Block,Task,MimeTypes, Steamship #upm package(steamship)
+from steamship.agents.llms.openai import ChatOpenAI #upm package(steamship)
+from steamship.utils.repl import AgentREPL #upm package(steamship)
+from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport #upm package(steamship)
+from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig #upm package(steamship)
+from usage_tracking import UsageTracker #upm package(steamship)
 import uuid,os,re,logging
-from steamship import File,Tag,DocTag
-from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction
+from steamship import File,Tag,DocTag #upm package(steamship)
+from steamship.agents.schema import AgentContext, Metadata,Agent,FinishAction #upm package(steamship)
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
 import requests
-from tools.selfie_tool_kandinsky import SelfieToolKandinsky
-from tools.selfie_tool_getimgai import SelfieTool
-from tools.voice_tool_ogg import VoiceToolOGG
-from tools.voice_tool_mp3 import VoiceToolMP3
-from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin
-from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin
-from steamship.invocable.mixins.indexer_mixin import IndexerMixin
-from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin
-from tools.active_persona import *
-from utils import send_file_from_local
-from agents.llama_llm import ChatLlama
-from agents.llama_react import ReACTAgent
-from steamship.agents.tools.search import SearchTool
+from tools.selfie_tool_kandinsky import SelfieToolKandinsky #upm package(steamship)
+from tools.selfie_tool_getimgai import SelfieTool #upm package(steamship)
+from tools.voice_tool_ogg import VoiceToolOGG #upm package(steamship)
+from tools.voice_tool_mp3 import VoiceToolMP3 #upm package(steamship)
+from steamship.invocable.mixins.blockifier_mixin import BlockifierMixin #upm package(steamship)
+from steamship.invocable.mixins.file_importer_mixin import FileImporterMixin #upm package(steamship)
+from steamship.invocable.mixins.indexer_mixin import IndexerMixin #upm package(steamship)
+from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin #upm package(steamship)
+from tools.active_companion import * #upm package(steamship)
+from utils import send_file_from_local #upm package(steamship)
+from agents.llama_llm import ChatLlama #upm package(steamship)
+from agents.llama_react import ReACTAgent #upm package(steamship)
+from steamship.agents.tools.search import SearchTool #upm package(steamship)
+from message_history_limit import * #upm package(steamship)
+from steamship.agents.schema.message_selectors import MessageWindowMessageSelector #upm package(steamship)
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613" 
@@ -167,13 +169,15 @@ class MyAssistant(AgentService):
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
                 FunctionsBasedAgent(tools=[SelfieToolKandinsky()],
-                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=256),               
+                llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=256),    
+                conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT)           
             )
             )
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
             ReACTAgent(tools=[SelfieTool(),SearchTool()],
-                llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=256),
+                llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=256,max_retries=1),
+                conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT)
             )
             )
 

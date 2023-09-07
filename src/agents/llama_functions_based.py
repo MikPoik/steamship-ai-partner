@@ -1,13 +1,13 @@
 from typing import List
 import datetime
 
-from steamship import Block
-from steamship.agents.functional.output_parser import FunctionsBasedOutputParser
-from steamship.agents.schema import Action, AgentContext, ChatAgent, ChatLLM,Tool
-from steamship.data.tags.tag_constants import RoleTag
-from tools.vector_search_response_tool import VectorSearchResponseTool
-from tools.active_persona import *
-from message_history_limit import *
+from steamship import Block #upm package(steamship)
+from steamship.agents.functional.output_parser import FunctionsBasedOutputParser #upm package(steamship)
+from steamship.agents.schema import Action, AgentContext, ChatAgent, ChatLLM,Tool #upm package(steamship)
+from steamship.data.tags.tag_constants import RoleTag #upm package(steamship)
+from tools.vector_search_response_tool import VectorSearchResponseTool #upm package(steamship)
+from tools.active_companion import * #upm package(steamship)
+from message_history_limit import * #upm package(steamship)
 
 
 

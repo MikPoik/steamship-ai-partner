@@ -1,15 +1,10 @@
 """Tool for generating images. Moved from tools folder because template import issues"""
 from typing import List, Union, Any
-import sys,base64
-import requests
-from steamship import Block, Task, MimeTypes
-from steamship.data.block import BlockUploadType
-from steamship.agents.schema import AgentContext
-from steamship.agents.tools.base_tools import ImageGeneratorTool
-from steamship.agents.tools.image_generation.stable_diffusion import StableDiffusionTool
-from steamship.utils.repl import ToolREPL
-from steamship import File, Tag,DocTag
-from tools.active_persona import *
+from steamship.agents.schema import AgentContext #upm package(steamship)
+from steamship.agents.tools.base_tools import ImageGeneratorTool #upm package(steamship)
+from steamship.utils.repl import ToolREPL #upm package(steamship)
+from tools.active_companion import * #upm package(steamship)
+from steamship import Block, Steamship, Task #upm package(steamship)
 #NSFW_SELFIE_TEMPLATE_PRE =""
 
 

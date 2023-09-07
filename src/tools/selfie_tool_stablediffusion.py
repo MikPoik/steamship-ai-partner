@@ -1,12 +1,12 @@
 """STABLE DIFFUSION Tool for generating images. Moved from tools folder because template import issues"""
 from typing import List, Union, Any
 import sys
-from steamship import Block, Task
-from steamship.agents.schema import AgentContext
-from steamship.agents.tools.base_tools import ImageGeneratorTool
-from steamship.agents.tools.image_generation.stable_diffusion import StableDiffusionTool
-from steamship.utils.repl import ToolREPL
-from tools.active_persona import SELFIE_TEMPLATE
+from steamship import Block, Task #upm package(steamship)
+from steamship.agents.schema import AgentContext #upm package(steamship)
+from steamship.agents.tools.base_tools import ImageGeneratorTool #upm package(steamship)
+from steamship.agents.tools.image_generation.stable_diffusion import StableDiffusionTool #upm package(steamship)
+from steamship.utils.repl import ToolREPL #upm package(steamship)
+from tools.active_companion import SELFIE_TEMPLATE #upm package(steamship)
 
 
 NEGATIVE_PROMPT ="bad anatomy, bad composition, ugly, abnormal, unrealistic, double, contorted, disfigured, malformed, amateur, extra, duplicate,2 heads,2 faces"
@@ -69,4 +69,4 @@ class SelfieToolSD(ImageGeneratorTool):
 
 if __name__ == "__main__":
     print("Try running with an input like 'penguin'")
-    ToolREPL(SelfieTool()).run()
+    ToolREPL(SelfieToolSD()).run()

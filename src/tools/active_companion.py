@@ -1,5 +1,5 @@
 #import the used persona below from personas folder
-from personas.lilith import *
+from companions.lilith import NAME,TYPE,PERSONA,BEHAVIOUR,SELFIE_TEMPLATE_POST,SELFIE_TEMPLATE_PRE,NSFW_SELFIE_TEMPLATE_POST,NSFW_SELFIE_TEMPLATE_PRE,VOICE_ID,MOOD_KEYWORDS #upm package(steamship)
 
 NAME = NAME
 TYPE = TYPE

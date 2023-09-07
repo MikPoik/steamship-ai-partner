@@ -1,12 +1,12 @@
 """Tool for generating text with Dolly."""
 from typing import Any, List, Optional, Union
 
-from steamship import Block, Steamship, Task
-from steamship.agents.llms import OpenAI
-from steamship.agents.schema import AgentContext,Tool
-from steamship.agents.utils import with_llm
-from steamship.utils.repl import ToolREPL
-from tools.active_persona import *
+from steamship import Block, Steamship, Task #upm package(steamship)
+from steamship.agents.llms import OpenAI #upm package(steamship)
+from steamship.agents.schema import AgentContext,Tool #upm package(steamship)
+from steamship.agents.utils import with_llm #upm package(steamship)
+from steamship.utils.repl import ToolREPL #upm package(steamship)
+from tools.active_companion import * #upm package(steamship)
 import logging
 
 
@@ -64,7 +64,7 @@ class SelfieToolKandinsky(Tool):
 
 
 if __name__ == "__main__":
-    tool = SelfieTool()
+    tool = SelfieToolKandinsky()
     client = Steamship(workspace="partner-ai-dev2-ws")
     context_id="test-uuuid-5"
     #with Steamship.temporary_workspace() as client:

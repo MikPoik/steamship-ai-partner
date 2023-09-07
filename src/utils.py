@@ -2,10 +2,10 @@ import logging
 import re
 import uuid
 from typing import List
-from steamship.agents.schema import AgentContext
-from steamship import Block, Steamship, MimeTypes, File, Tag,DocTag
-from steamship.data.workspace import SignedUrl
-from steamship.utils.signed_urls import upload_to_signed_url
+from steamship.agents.schema import AgentContext #upm package(steamship)
+from steamship import Block, Steamship, MimeTypes, File, Tag,DocTag #upm package(steamship)
+from steamship.data.workspace import SignedUrl #upm package(steamship)
+from steamship.utils.signed_urls import upload_to_signed_url #upm package(steamship)
 from termcolor import colored
 import requests
 import os

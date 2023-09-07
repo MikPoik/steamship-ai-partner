@@ -1,5 +1,5 @@
-from steamship import Steamship
-from steamship.utils.kv_store import KeyValueStore
+from steamship import Steamship #upm package(steamship)
+from steamship.utils.kv_store import KeyValueStore #upm package(steamship)
 import json
 
 if __name__ == "__main__":

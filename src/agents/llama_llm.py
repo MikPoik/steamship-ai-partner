@@ -1,7 +1,7 @@
 from typing import List, Optional
 
-from steamship import Block, File, PluginInstance, Steamship
-from steamship.agents.schema import LLM, ChatLLM, Tool
+from steamship import Block, File, PluginInstance, Steamship #upm package(steamship)
+from steamship.agents.schema import LLM, ChatLLM, Tool #upm package(steamship)
 
 PLUGIN_HANDLE = "llama-api"
 DEFAULT_MAX_TOKENS = 256
@@ -10,8 +10,8 @@ DEFAULT_MAX_TOKENS = 256
 class Llama(LLM):
     """LLM that uses Steamship's LLama plugin to generate completions.
 
-    NOTE: By default, this LLM uses the `gpt-3.5-turbo` model. Valid model
-    choices are `gpt-3.5-turbo` and `gpt-4`.
+    NOTE: By default, Valid model
+    choices are
     """
 
     generator: PluginInstance
@@ -51,7 +51,8 @@ class Llama(LLM):
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
-
+        if "max_retries" in kwargs:
+            options["max_retries"] = kwargs["max_retries"]
         action_task = self.generator.generate(text=prompt, options=options)
         action_task.wait()
         return action_task.output.blocks
@@ -64,8 +65,7 @@ class ChatLlama(ChatLLM, Llama):
         """Create a new instance.
 
         Valid model names are:
-         - gpt-4
-         - gpt-4-0613
+
 
         Supported kwargs include:
         - `max_tokens` (controls the size of LLM responses)
@@ -91,6 +91,8 @@ class ChatLlama(ChatLLM, Llama):
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
+        if "max_retries" in kwargs:
+            options["max_retries"] = kwargs["max_retries"]
 
         tool_selection_task = self.generator.generate(input_file_id=temp_file.id, options=options)
         tool_selection_task.wait()

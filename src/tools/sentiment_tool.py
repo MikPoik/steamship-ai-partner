@@ -1,14 +1,14 @@
-from steamship import Steamship
-from steamship.agents.llms import OpenAI
-from steamship.agents.utils import with_llm
-from steamship.utils.repl import ToolREPL
-from typing import Any, List, Union
-from steamship import Block, Task
-from steamship.agents.schema import AgentContext, Tool
-from steamship.agents.utils import get_llm, with_llm
-from steamship.utils.kv_store import KeyValueStore
+from steamship import Steamship #upm package(steamship)
+from steamship.agents.llms import OpenAI #upm package(steamship)
+from steamship.agents.utils import with_llm #upm package(steamship)
+from steamship.utils.repl import ToolREPL #upm package(steamship)
+from typing import Any, List, Union 
+from steamship import Block, Task #upm package(steamship)
+from steamship.agents.schema import AgentContext, Tool #upm package(steamship)
+from steamship.agents.utils import get_llm, with_llm #upm package(steamship)
+from steamship.utils.kv_store import KeyValueStore #upm package(steamship)
 import time
-from tools.active_persona import MOOD_KEYWORDS
+from tools.active_companion import MOOD_KEYWORDS #upm package(steamship)
 import re
 
 
