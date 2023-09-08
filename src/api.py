@@ -2,7 +2,7 @@ from agents.gpt_functions_based import FunctionsBasedAgent #upm package(steamshi
 from steamship.agents.logging import AgentLogging #upm package(steamship)
 from steamship.agents.service.agent_service import AgentService #upm package(steamship)
 from steamship.invocable import Config, post #upm package(steamship)
-from steamship import Block,Task,MimeTypes, Steamship #upm package(steamship)
+from steamship import Block,Task,MimeTypes, Steamship,SteamshipError #upm package(steamship)
 from steamship.agents.llms.openai import ChatOpenAI #upm package(steamship)
 from steamship.utils.repl import AgentREPL #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport #upm package(steamship)
@@ -46,7 +46,7 @@ class MyAssistantConfig(Config):
     transloadit_api_key:str = Field("",description="Transloadit.com api key for OGG encoding")
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
-    llm_model:str = Field(GPT3,description="llm model to use")
+    llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
     aws_api_url:Optional[str] = Field("https://",description="AWS api url")
     llama_api_key:Optional[str] = Field("LL-",description="Llama api key")
 
@@ -168,14 +168,14 @@ class MyAssistant(AgentService):
         
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
-                FunctionsBasedAgent(tools=[SelfieTool()],
+                FunctionsBasedAgent(tools=[SelfieToolKandinsky()],
                 llm=ChatOpenAI(self.client,model_name=self.config.llm_model,temperature=0.4,max_tokens=256,moderate_output=False),    
                 conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT)           
             )
             )
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
-            ReACTAgent(tools=[SelfieTool(),SearchTool()],
+            ReACTAgent(tools=[SelfieTool()],
                 llm=ChatLlama(self.client,api_key=self.config.llama_api_key,model_name=self.config.llm_model,temperature=0.4,max_tokens=256,max_retries=1),
                 conversation_memory=MessageWindowMessageSelector(k=MESSAGE_COUNT)
             )
@@ -198,6 +198,7 @@ class MyAssistant(AgentService):
                 config=TelegramTransportConfig(bot_token=self.config.bot_token),
                 agent_service=self,
                 set_payment_plan=self.set_payment_plan
+            
             )
         )
         self.usage = UsageTracker(self.client, n_free_messages=self.config.n_free_messages,usd_balance=self.config.usd_balance)
@@ -210,7 +211,7 @@ class MyAssistant(AgentService):
             chat_id = msg_chat_id #Telegram chat
         else:
             chat_id = context.id #repl or webchat
-        print(chat_id)
+        #print(chat_id)
         last_message = context.chat_history.last_user_message.text.lower()
 
 
@@ -295,9 +296,13 @@ class MyAssistant(AgentService):
         )
 
         while not isinstance(action, FinishAction):
-            self.run_action(agent=agent, action=action, context=context)
-            action = self.next_action(agent=agent, input_blocks=action.output, context=context)
 
+
+            self.run_action(agent=agent, action=action, context=context)
+
+            if isinstance(action, FinishAction):
+                break
+            action = self.next_action(agent=agent, input_blocks=action.output, context=context)
             # TODO: Arrive at a solid design for the details of this structured log object
             logging.info(
                 f"Next Tool: {action.tool}",
@@ -307,11 +312,14 @@ class MyAssistant(AgentService):
                     AgentLogging.MESSAGE_TYPE: AgentLogging.ACTION,
                     AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
                 },
-            )
+            )                                    
 
         context.completed_steps.append(action)
         #add message to history
-        context.chat_history.append_assistant_message(text=action.output[0].text)
+        try:
+            context.chat_history.append_assistant_message(text=action.output[0].text)
+        except Exception as e:
+            logging.warning("failed to save assistant message")
 
         output_text_length = 0
         if action.output is not None:
@@ -341,38 +349,7 @@ class MyAssistant(AgentService):
 
 
     
-    @post("prompt")
-    def prompt(self, prompt: str,context_id: Optional[uuid.UUID] = None) -> str:
-        """ Prompt Agent with text input """
-        if not context_id:
-            context_id = uuid.uuid4()
 
-        #print(context_id)
-        context = self.build_default_context(context_id=context_id)
-        context.chat_history.append_user_message(prompt)
-        
-        
-        #add context        
-        output = ""
-
-        def sync_emit(blocks: List[Block], meta: Metadata):
-            nonlocal output
-            for block in blocks:
-                if not block.is_text():
-                    block.set_public_data(True)
-                    output += f"({block.mime_type}: {block.raw_data_url})\n"
-                    if block.mime_type == MimeTypes.PNG:
-                        print("Image url for console:" +str(block.content_url))
-                    if block.mime_type == MimeTypes.OGG_AUDIO:
-                        print("audio url for console: " +str(block.content_url))                        
-                else:
-                    output += f"{block.text}\n"
-        
-        context.emit_funcs.append(sync_emit)
-        self.run_agent(self.get_default_agent(), context,msg_chat_id=context_id)
-
-       
-        return output
     
     @post("initial_index")
     def initial_index(self,chat_id:str =""):

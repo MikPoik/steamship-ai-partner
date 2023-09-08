@@ -21,10 +21,9 @@ class ReACTOutputParser(OutputParser):
             raise RuntimeError(f"Could not parse LLM output: `{text}`")
 
         if NAME+":" in text:
-            if not "Action:" in text:
-                return FinishAction(
-                    output=ReACTOutputParser._blocks_from_text(context.client, text), context=context
-                )
+            return FinishAction(
+                output=ReACTOutputParser._blocks_from_text(context.client, text), context=context
+            )
 
         regex = r"Action: (.*?)[\n]*Action Input: (.*)"
         match = re.search(regex, text)

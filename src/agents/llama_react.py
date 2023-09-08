@@ -13,19 +13,17 @@ class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
 
-    PROMPT = """### Instruction:
-This is a roleplay between user and {NAME}.
-Role-play as a {TYPE}.    
+    PROMPT = """Role-play as a {TYPE}.    
 Your role-play persona:
 Name: {NAME}
 {PERSONA}
 
 How you behave in role-play: 
 {BEHAVIOUR}
-Always consider the sentiment of the users input.
+Always consider the sentiment of the User's input.
 You remember User's personal details and preferences to provide a personalized experience for the User.
 You make interactive conversations.
-You can guess, extrapolate or make up information in order to complete your sentences, but will adhere to the context provided by user.
+
 
 Current date is: {current_date}
 Current time is: {current_time}
@@ -39,32 +37,28 @@ You have access to the following tools:
 {tool_index}
 
 To use a tool, please use the following format:
-
-```
 Thought: Do I need to use a tool? Yes
 Action: the action to take, should be one of {tool_names}
 Action Input: the input to the action
 Observation: the result of the action
-```
-If you decide that you should use a Tool, you must generate the associated Action and Action Input.
-Write a descriptive, detailed response from {NAME} that appropriately continues the conversation.
-When you have a response to say to the Human, or if you do NOT need to use a tool, you MUST use the format:
 
-```
+
+If you decide that you should use a Tool, you must generate the associated Action and Action Input.
+When you have a response to say to the User, or if you do not need to use a tool, you MUST use exactly the following format:
 Thought: Do I need to use a tool? No
 {NAME}: [your response here]
-```
 
-Begin!
 
-Recent conversation history:
+Come up with {NAME}'s next reply in this fictional roleplay with the User, write one reply only.
+
+Recent conversation history, if any:
 {chat_history}
 
-Other relevant previous conversation history:
+Other relevant previous conversation history, if any:
 {relevant_history}
 {vector_response}
-### Input:
-New input: {input}
+Here is the latest conversation between {NAME} and User.
+user: {input}
 
 {scratchpad}"""
 
@@ -126,8 +120,7 @@ New input: {input}
                 if  msg.chat_role == RoleTag.ASSISTANT:
                         llama_related_history += NAME+": "  + str(msg.text).replace("\n"," ")+"\n"
 
-        if llama_chat_history == "" and llama_related_history =="":
-            llama_chat_history = "user: hi\n"+NAME+":hi\n"
+
         # for simplicity assume initial prompt is a single text block.
         # in reality, use some sort of formatter ?
         prompt = self.PROMPT.format(
@@ -158,9 +151,7 @@ New input: {input}
         observation = ""
         for action in context.completed_steps:            
             observation = [b.as_llm_input() for b in action.output][0]  
-            original_observation = observation            
-            if "Block(" in observation:
-                observation = "Image generated, here is the image as Block: "+observation+""            
+            original_observation = observation                       
             steps.append(
                 "Thought: Do I need to use a tool? Yes\n"
                 f"Action: {action.tool}\n"
@@ -169,8 +160,8 @@ New input: {input}
             )
         scratchpad = "\n".join(steps)
         if "Block(" in observation:
-            scratchpad += "Thought: Now I MUST send the image by appending this: ["+original_observation+"] in my response, so the user can see the image.\n### Response:\n"
+            scratchpad += "Thought: Now I have the image as Block, I MUST add it to my response as suffix of: '"+original_observation+"', so the user can see the image.\n"
         else:
-            scratchpad += "Thought:\n### Response:\n"
+            scratchpad += "Thought:\n"
         #print(scratchpad)
         return scratchpad
