@@ -31,8 +31,6 @@ Current day is: {current_day}
 Consider current date and time when answering.
 
 
-TOOLS:
-------
 You have access to the following tools:
 {tool_index}
 
@@ -57,8 +55,7 @@ Recent conversation history, if any:
 Other relevant previous conversation history, if any:
 {relevant_history}
 {vector_response}
-Here is the latest conversation between {NAME} and User.
-user: {input}
+New input: {input}
 
 {scratchpad}"""
 

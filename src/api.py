@@ -47,7 +47,7 @@ class MyAssistantConfig(Config):
     transloadit_api_secret:str = Field("",description="Transloadit.com api secret")    
     use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none") 
     llm_model:str = Field(LLAMA2_HERMES,description="llm model to use")
-    aws_api_url:Optional[str] = Field("https://",description="AWS api url")
+    aws_api_url:Optional[str] = Field("https://d",description="AWS api url")
     llama_api_key:Optional[str] = Field("LL-",description="Llama api key")
 
 
