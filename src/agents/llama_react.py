@@ -153,7 +153,7 @@ human: {input}
         chat_history=llama_chat_history,
         relevant_history=llama_related_history,
     )
-    print(prompt)
+    #print(prompt)
     completions = self.llm.complete(prompt=prompt,
                                     stop="Observation:",
                                     max_retries=1)
@@ -181,5 +181,5 @@ human: {input}
       scratchpad += "Thought: Now I have the image as Block, I MUST add it to my response as suffix of: " + original_observation + ", so the human can see the image.\n### Response:\n"
     else:
       scratchpad += "Thought:\n### Response:\n"
-    print(scratchpad)
+    #print(scratchpad)
     return scratchpad
