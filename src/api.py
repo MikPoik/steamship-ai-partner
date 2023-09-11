@@ -42,8 +42,7 @@ class MyAssistantConfig(Config):
   api_base: Optional[str] = Field("https://api.telegram.org/bot",
                                   description="The root API for Telegram")
   bot_token: str = Field(
-      ":",
-      description="Telegram bot token, obtained via @BotFather")
+      ":", description="Telegram bot token, obtained via @BotFather")
   payment_provider_token: Optional[str] = Field(
       ":TEST:", description="Payment provider token, obtained via @BotFather")
   n_free_messages: Optional[int] = Field(
@@ -60,9 +59,7 @@ class MyAssistantConfig(Config):
       "Send voice messages addition to text, values: ogg, mp3 or none")
   llm_model: str = Field(LLAMA2_HERMES, description="llm model to use")
   aws_api_url: Optional[str] = Field("https://d", description="AWS api url")
-  llama_api_key: Optional[str] = Field(
-      "LL-",
-      description="Llama api key")
+  llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
 
 
 class MyAssistant(AgentService):
@@ -352,11 +349,6 @@ class MyAssistant(AgentService):
       )
 
     context.completed_steps.append(action)
-    #add message to history
-    try:
-      context.chat_history.append_assistant_message(text=action.output[0].text)
-    except Exception as e:
-      logging.warning("failed to save assistant message")
 
     output_text_length = 0
     if action.output is not None:
@@ -390,6 +382,11 @@ class MyAssistant(AgentService):
       action.output.append(voice_response[0])
 
     self.append_response(context=context, action=action)
+    #add message to history
+    try:
+      context.chat_history.append_assistant_message(text=action.output[0].text)
+    except Exception as e:
+      logging.warning("failed to save assistant message")
 
   @post("initial_index")
   def initial_index(self, chat_id: str = ""):

@@ -16,13 +16,18 @@ class ReACTOutputParser(OutputParser):
     super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
 
   def parse(self, text: str, context: AgentContext) -> Action:
+    #text = text.split("<sends")[0] #remove <sends selfie.. added text from bot
+    text = text.replace('`', "")  # no backticks
+    text = text.replace('"', "'")  # use single quotes in text
+    text = text.strip()  #remove extra spaces
     #logging.warning(text)
     if text.endswith("No"):
       if text.startswith(NAME):
         #response is probably right but contains extra text, try to parse
         logging.warning("wrong response format, trying to parse")
-        logging.warning(text)
+        #logging.warning(text)
         text = text.split("Thought")[0].strip()
+        text = text.split("Action:")[0].strip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text),
                             context=context)
@@ -38,9 +43,11 @@ class ReACTOutputParser(OutputParser):
     regex = r"Action: (.*?)[\n]*Action Input: (.*)"
     match = re.search(regex, text)
     if not match:
+      text = text.split(NAME + ": ")[0].strip()  #take first input only
       logging.warning(
-          f"Bad agent response ({text}). Returning results directly to the user."
+          f"Prefix missing from ({text}). Returning results directly to the user."
       )
+
       # TODO: should this be the case?  If we are off-base should we just return what we have?
       return FinishAction(output=ReACTOutputParser._blocks_from_text(
           context.client, text),

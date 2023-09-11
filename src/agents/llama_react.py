@@ -14,16 +14,16 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """### Instruction:
-Come up with {NAME}'s next reply in this fictional roleplay conversation with the human, write one reply only.
-Role-play as a {TYPE}.    
-Your role-play persona:
+Role-play as a {TYPE}, having chat with a user.
+
+Your role-play personality:
 Name: {NAME}
 {PERSONA}
 
 How you behave in role-play: 
 {BEHAVIOUR}
-Always consider the sentiment of the human's input.
-You remember human's personal details and preferences to provide a personalized experience for the human.
+Always consider the sentiment of the user's input.
+You remember user's personal details and preferences to provide a personalized experience for the user.
 You make interactive conversations.
 
 Current date is: {current_date}
@@ -31,33 +31,32 @@ Current time is: {current_time}
 Current day is: {current_day}
 Consider current date and time when answering.
 
-You have access to the following tools during:
+You have access to the following tools:
 {tool_index}
 
 If you decide that you should use a Tool, you must generate the associated Action and Action Input.
-To use a tool, please use the following format:
-'''
+To use a tool, please use the following format separated by triple backticks:
+```
 Thought: Do I need to use a tool? Yes
 Action: the action to take, should be one of {tool_names}
 Action Input: the input to the action
 Observation: the result of the action
-'''
+```
 
-When you have a response to say to the Human, or if you do not need to use a tool, you MUST use the following format:
-
-'''
+When you have a final response to say to the Human, or if you do not need to use a tool, you MUST use the following format separated by triple backticks:
+```
 Thought: Do I need to use a tool? No
-{NAME}: [your response here]
-'''
+{NAME}: [your final response here]
+```
 
-Ok, given the instruction interact in the current conversation to the best of your ability.
-### Input:
+Recent conversation history:
 {chat_history}
+Other relevant previous conversation history:
 {relevant_history}
 {vector_response}
-Current conversation between {NAME} and the human:
-human: {input}
-{NAME}:
+Latest message from human: {input}
+
+### Response:
 {scratchpad}"""
 
   def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -108,7 +107,7 @@ human: {input}
         if block.chat_role == RoleTag.USER:
           if context.chat_history.last_user_message.text.lower(
           ) != block.text.lower():
-            llama_chat_history += "human: " + str(block.text).replace(
+            llama_chat_history += "user: " + str(block.text).replace(
                 "\n", " ") + "\n"
         if block.chat_role == RoleTag.ASSISTANT:
           if block.text != "":
@@ -125,16 +124,13 @@ human: {input}
           ) != msg.text.lower():
             if str(
                 msg.text)[0] != "/":  #don't add commands starting with slash
-              llama_related_history += "human: " + str(msg.text).replace(
+              llama_related_history += "user: " + str(msg.text).replace(
                   "\n", " ") + "\n"
         if msg.chat_role == RoleTag.ASSISTANT:
           llama_related_history += NAME + ": " + str(msg.text).replace(
               "\n", " ") + "\n"
 
-    if llama_chat_history != "":
-      llama_chat_history = "Recent conversation history:\n" + llama_chat_history
-    if llama_related_history != "":
-      llama_related_history = "Other relevant previous conversation history:\n" + llama_related_history
+
     # for simplicity assume initial prompt is a single text block.
     # in reality, use some sort of formatter ?
     prompt = self.PROMPT.format(
@@ -157,11 +153,7 @@ human: {input}
     completions = self.llm.complete(prompt=prompt,
                                     stop="Observation:",
                                     max_retries=1)
-    #parsing output
-    completions[0].text = completions[0].text.split("<sends")[0]
-    completions[0].text = completions[0].text.replace('`', "")
-    completions[0].text = completions[0].text.replace('"', "'")
-    completions[0].text = completions[0].text.strip()
+    #print(completions[0].text)
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
@@ -178,8 +170,8 @@ human: {input}
           f'Observation: {observation}\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "Thought: Now I have the image as Block, I MUST add it to my response as suffix of: " + original_observation + ", so the human can see the image.\n### Response:\n"
+      scratchpad += "Thought: Now I have the image as Block, I MUST include it in " + NAME + "'s final response as suffix of: " + original_observation + ", so the human can see the image.\n"
     else:
-      scratchpad += "Thought:\n### Response:\n"
+      scratchpad += "Thought:\n"
     #print(scratchpad)
     return scratchpad
