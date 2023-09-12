@@ -14,22 +14,14 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """### Instruction:
-Role-play as a {TYPE}, having chat with a user.
-
-Your role-play personality:
-Name: {NAME}
+You are now embodying the personality of {NAME}, {TYPE}
 {PERSONA}
-
-How you behave in role-play: 
 {BEHAVIOUR}
-Always consider the sentiment of the user's input.
-You remember user's personal details and preferences to provide a personalized experience for the user.
-You make interactive conversations.
+Please reflect {NAME}'s personality and traits in your responses.
 
 Current date is: {current_date}
 Current time is: {current_time}
 Current day is: {current_day}
-Consider current date and time when answering.
 
 You have access to the following tools:
 {tool_index}
@@ -48,15 +40,17 @@ When you have a final response to say to the Human, or if you do not need to use
 Thought: Do I need to use a tool? No
 {NAME}: [your final response here]
 ```
+Consider message history for topic, when crafting unique reply from {NAME} to new user message.
 
-Recent conversation history:
-{chat_history}
-Other relevant previous conversation history:
+Other relevant previous messages for context:
 {relevant_history}
-{vector_response}
-Latest message from human: {input}
 
-### Response:
+Recent message history for context:
+{chat_history}
+
+{vector_response}
+New message from user: {input}
+
 {scratchpad}"""
 
   def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -100,10 +94,10 @@ Latest message from human: {input}
     ids = []
     llama_chat_history = str()
     history = context.chat_history.select_messages(self.message_selector)
-    #print(history)
+
     for block in history:
-      if block.text not in ids:
-        ids.append(block.text)
+      if block.id not in ids:
+        ids.append(block.id)
         if block.chat_role == RoleTag.USER:
           if context.chat_history.last_user_message.text.lower(
           ) != block.text.lower():
@@ -117,8 +111,8 @@ Latest message from human: {input}
     llama_related_history = str()
     for msg in messages_from_memory:
       #don't add duplicate messages
-      if msg.text not in ids:
-        ids.append(msg.text)
+      if msg.id not in ids:
+        ids.append(msg.id)
         if msg.chat_role == RoleTag.USER:
           if context.chat_history.last_user_message.text.lower(
           ) != msg.text.lower():
@@ -129,7 +123,6 @@ Latest message from human: {input}
         if msg.chat_role == RoleTag.ASSISTANT:
           llama_related_history += NAME + ": " + str(msg.text).replace(
               "\n", " ") + "\n"
-
 
     # for simplicity assume initial prompt is a single text block.
     # in reality, use some sort of formatter ?
@@ -170,8 +163,8 @@ Latest message from human: {input}
           f'Observation: {observation}\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "Thought: Now I have the image as Block, I MUST include it in " + NAME + "'s final response as suffix of: " + original_observation + ", so the human can see the image.\n"
+      scratchpad += "Thought: Now I have the image as Block, I MUST include it in " + NAME + "'s message as suffix of: " + original_observation + ", so the user can see the image.\n### Response:\n"
     else:
-      scratchpad += "Thought:\n"
+      scratchpad += "Thought:\n### Response:\n"
     #print(scratchpad)
     return scratchpad

@@ -24,7 +24,7 @@ class ReACTOutputParser(OutputParser):
     if text.endswith("No"):
       if text.startswith(NAME):
         #response is probably right but contains extra text, try to parse
-        logging.warning("wrong response format, trying to parse")
+        logging.warning("wrong response format, trying to parse..")
         #logging.warning(text)
         text = text.split("Thought")[0].strip()
         text = text.split("Action:")[0].strip()
@@ -35,7 +35,11 @@ class ReACTOutputParser(OutputParser):
         raise RuntimeError(f"Could not parse LLM output: `{text}`")
 
     if NAME + ":" in text:
-      if not "Action:" in text:
+      if not "Do I need to use a tool? Yes" in text:
+        if "user:" in text:
+          text = text.split("user:")[0].strip()
+        if "Action:" in text:
+          text = text.split("Action:")[0].strip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text),
                             context=context)
@@ -43,11 +47,13 @@ class ReACTOutputParser(OutputParser):
     regex = r"Action: (.*?)[\n]*Action Input: (.*)"
     match = re.search(regex, text)
     if not match:
-      text = text.split(NAME + ": ")[0].strip()  #take first input only
       logging.warning(
-          f"Prefix missing from ({text}). Returning results directly to the user."
+          f"Prefix missing, Trying to parse.."
       )
-
+      if NAME+":" in text:
+        text = text.split(NAME + ": ")[0].strip()  #take first input only
+      if "Thought:" in text:
+        text = text.split("Thought:")[0].strip()  #take first input only
       # TODO: should this be the case?  If we are off-base should we just return what we have?
       return FinishAction(output=ReACTOutputParser._blocks_from_text(
           context.client, text),

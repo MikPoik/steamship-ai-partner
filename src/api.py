@@ -5,6 +5,7 @@ from steamship.invocable import Config, post  #upm package(steamship)
 from steamship import Block, Task, MimeTypes, Steamship, SteamshipError  #upm package(steamship)
 from steamship.agents.llms.openai import ChatOpenAI  #upm package(steamship)
 from steamship.utils.repl import AgentREPL  #upm package(steamship)
+from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
 from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig  #upm package(steamship)
 from usage_tracking import UsageTracker  #upm package(steamship)
@@ -27,7 +28,7 @@ from tools.active_companion import *  #upm package(steamship)
 from utils import send_file_from_local  #upm package(steamship)
 from agents.llama_llm import ChatLlama  #upm package(steamship)
 from agents.llama_react import ReACTAgent  #upm package(steamship)
-from steamship.agents.tools.search import SearchTool  #upm package(steamship)
+from tools.duckduckgo_tool import DuckDuckGoTool  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 
@@ -46,7 +47,7 @@ class MyAssistantConfig(Config):
   payment_provider_token: Optional[str] = Field(
       ":TEST:", description="Payment provider token, obtained via @BotFather")
   n_free_messages: Optional[int] = Field(
-      10, description="Number of free messages assigned to new users.")
+      20, description="Number of free messages assigned to new users.")
   usd_balance: Optional[float] = Field(1,
                                        description="USD balance for new users")
   transloadit_api_key: str = Field(
@@ -199,13 +200,13 @@ class MyAssistant(AgentService):
     if "Llama2" in self.config.llm_model:
       self.set_default_agent(
           ReACTAgent(
-              tools=[SelfieTool()],
+              tools=[SelfieTool(), DuckDuckGoTool()],
               llm=ChatLlama(self.client,
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
                             temperature=0.4,
                             max_tokens=256,
-                            max_retries=1),
+                            max_retries=2),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
 
     # This Mixin provides HTTP endpoints that connects this agent to a web client
@@ -384,9 +385,45 @@ class MyAssistant(AgentService):
     self.append_response(context=context, action=action)
     #add message to history
     try:
-      context.chat_history.append_assistant_message(text=action.output[0].text)
+      action.output[0].set_public_data(True)
+      context.chat_history.append_assistant_message(
+          text=action.output[0].text,
+          tags=action.output[0].tags,
+          url=action.output[0].raw_data_url or action.output[0].url
+          or action.output[0].content_url,
+          mime_type=action.output[0].mime_type,
+      )
     except Exception as e:
+      logging.warning(e)
       logging.warning("failed to save assistant message")
+
+  @post("prompt")
+  def prompt(self,
+             prompt: Optional[str] = None,
+             context_id: Optional[str] = None,
+             **kwargs) -> List[Block]:
+    """Run an agent with the provided text as the input."""
+    prompt = prompt or kwargs.get("question")
+
+    context = self.build_default_context(context_id, **kwargs)
+    context.chat_history.append_user_message(prompt)
+
+
+    output_blocks = []
+
+    def sync_emit(blocks: List[Block], meta: Metadata):
+      nonlocal output_blocks
+      output_blocks.extend(blocks)
+
+    context.emit_funcs.append(sync_emit)
+
+    # Get the agent
+
+    self.run_agent(self.get_default_agent(), context)
+
+
+    # Return the response as a set of multi-modal blocks.
+    return output_blocks
 
   @post("initial_index")
   def initial_index(self, chat_id: str = ""):
