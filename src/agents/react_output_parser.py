@@ -23,8 +23,9 @@ class ReACTOutputParser(OutputParser):
     if text.endswith("No"):
       if text.startswith(NAME):
         #response is probably right but contains extra text, try to parse
-        logging.warning("wrong response format, trying to parse..")
-        #logging.warning(text)
+        logging.warning(
+          f"Wrong response format, {text}, trying to parse.."
+        )
         text = text.split("Thought")[0].strip()
         text = text.split("Action:")[0].strip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
@@ -55,7 +56,7 @@ class ReACTOutputParser(OutputParser):
         text = text.split("Thought:")[0].strip()  #take first input only
       if "### Response:" in text:
         text = text.split("### Response:")[0].strip()
-      if len(text) > 1:
+      if len(text) < 1:
         text = "I'm sorry I got a bit distracted, can you repeat."
       # TODO: should this be the case?  If we are off-base should we just return what we have?
       return FinishAction(output=ReACTOutputParser._blocks_from_text(

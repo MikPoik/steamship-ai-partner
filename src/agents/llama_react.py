@@ -17,21 +17,20 @@ class ReACTAgent(LLMAgent):
 You are now embodying the personality of {NAME}, who is {TYPE}
 {PERSONA}
 {BEHAVIOUR}
-Please reflect {NAME}'s personality,behaviour and traits in your responses.
 
 Today's date is: {current_date}
 The current time is: {current_time}
 Today is: {current_day}
 
-You have the following tools at your disposal:
+You have access to the following tools:
 {tool_index}
 
 If you decide to use a Tool, generate the associated Action and Action Input. Use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? Yes
-Action: [the action to take, should be one of {tool_names}]
-Action Input: [Provide the input to the action]
-Observation: [the result of the action]
+Action: the action to take, should be one of {tool_names}
+Action Input: the input to the action
+Observation: the result of the action
 ```
 
 If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
@@ -40,7 +39,7 @@ Thought: Do I need to use a tool? No
 {NAME}: [insert your final response here]
 ```
 
-When crafting a unique reply from {NAME} to the new user message, consider the message history for context. However, avoid directly repeating previous messages.
+When crafting a unique reply from {NAME} to the new user message, consider the message history for topic. However, avoid directly repeating previous messages.
 
 Here are some previous messages for context:
 {relevant_history}
@@ -142,7 +141,7 @@ New message from user: {input}
         chat_history=llama_chat_history,
         relevant_history=llama_related_history,
     )
-    print(prompt)
+    #print(prompt)
     completions = self.llm.complete(prompt=prompt,
                                     stop="Observation:",
                                     max_retries=1)
