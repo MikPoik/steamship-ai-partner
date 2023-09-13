@@ -59,8 +59,9 @@ class MyAssistantConfig(Config):
       description=
       "Send voice messages addition to text, values: ogg, mp3 or none")
   llm_model: str = Field(LLAMA2_HERMES, description="llm model to use")
-  aws_api_url: Optional[str] = Field("https://d", description="AWS api url")
-  llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
+  llama_api_key: Optional[str] = Field(
+      "LL-",
+      description="Llama api key")
 
 
 class MyAssistant(AgentService):
@@ -200,7 +201,7 @@ class MyAssistant(AgentService):
     if "Llama2" in self.config.llm_model:
       self.set_default_agent(
           ReACTAgent(
-              tools=[SelfieTool(), DuckDuckGoTool()],
+              tools=[SelfieTool()],
               llm=ChatLlama(self.client,
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
@@ -408,7 +409,6 @@ class MyAssistant(AgentService):
     context = self.build_default_context(context_id, **kwargs)
     context.chat_history.append_user_message(prompt)
 
-
     output_blocks = []
 
     def sync_emit(blocks: List[Block], meta: Metadata):
@@ -421,6 +421,16 @@ class MyAssistant(AgentService):
 
     self.run_agent(self.get_default_agent(), context)
 
+    #for output_block in output_blocks:
+    # Need to make the output blocks public here so that they can be copied to the chat history.
+    # They generally need to be public anyway for the REPL to be able to show a clickable link.
+    #output_block.set_public_data(True)
+    #context.chat_history.append_assistant_message(
+    #text=output_block.text,
+    #tags=output_block.tags,
+    #url=output_block.raw_data_url or output_block.url or output_block.content_url,
+    #mime_type=output_block.mime_type,
+    #)
 
     # Return the response as a set of multi-modal blocks.
     return output_blocks

@@ -14,38 +14,38 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """### Instruction:
-You are now embodying the personality of {NAME}, {TYPE}
+You are now embodying the personality of {NAME}, who is {TYPE}
 {PERSONA}
 {BEHAVIOUR}
-Please reflect {NAME}'s personality and traits in your responses.
+Please reflect {NAME}'s personality,behaviour and traits in your responses.
 
-Current date is: {current_date}
-Current time is: {current_time}
-Current day is: {current_day}
+Today's date is: {current_date}
+The current time is: {current_time}
+Today is: {current_day}
 
-You have access to the following tools:
+You have the following tools at your disposal:
 {tool_index}
 
-If you decide that you should use a Tool, you must generate the associated Action and Action Input.
-To use a tool, please use the following format separated by triple backticks:
+If you decide to use a Tool, generate the associated Action and Action Input. Use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? Yes
-Action: the action to take, should be one of {tool_names}
-Action Input: the input to the action
-Observation: the result of the action
+Action: [the action to take, should be one of {tool_names}]
+Action Input: [Provide the input to the action]
+Observation: [the result of the action]
 ```
 
-When you have a final response to say to the Human, or if you do not need to use a tool, you MUST use the following format separated by triple backticks:
+If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? No
-{NAME}: [your final response here]
+{NAME}: [insert your final response here]
 ```
-Consider message history for topic, when crafting unique reply from {NAME} to new user message.
 
-Other relevant previous messages for context:
+When crafting a unique reply from {NAME} to the new user message, consider the message history for context. However, avoid directly repeating previous messages.
+
+Here are some previous messages for context:
 {relevant_history}
 
-Recent message history for context:
+Here is the recent message history for context:
 {chat_history}
 
 {vector_response}
@@ -142,11 +142,11 @@ New message from user: {input}
         chat_history=llama_chat_history,
         relevant_history=llama_related_history,
     )
-    #print(prompt)
+    print(prompt)
     completions = self.llm.complete(prompt=prompt,
                                     stop="Observation:",
                                     max_retries=1)
-    #print(completions[0].text)
+    #print(completions[0].text+"\n")
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
@@ -156,6 +156,8 @@ New message from user: {input}
     for action in context.completed_steps:
       observation = [b.as_llm_input() for b in action.output][0]
       original_observation = observation
+      if "Block(" in observation:
+        observation = "The "+action.tool+" has generated an image represented by the "+original_observation
       steps.append(
           "Thought: Do I need to use a tool? Yes\n"
           f"Action: {action.tool}\n"
@@ -163,7 +165,7 @@ New message from user: {input}
           f'Observation: {observation}\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "Thought: Now I have the image as Block, I MUST include it in " + NAME + "'s message as suffix of: " + original_observation + ", so the user can see the image.\n### Response:\n"
+      scratchpad += "Thought: Now that I have the image as Block, I need to include it in " + NAME + "'s final response as a suffix of [" + original_observation + "] so the user can view the image.\n### Response:\n"
     else:
       scratchpad += "Thought:\n### Response:\n"
     #print(scratchpad)

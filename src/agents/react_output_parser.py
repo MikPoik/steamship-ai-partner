@@ -16,7 +16,6 @@ class ReACTOutputParser(OutputParser):
     super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
 
   def parse(self, text: str, context: AgentContext) -> Action:
-    #text = text.split("<sends")[0] #remove <sends selfie.. added text from bot
     text = text.replace('`', "")  # no backticks
     text = text.replace('"', "'")  # use single quotes in text
     text = text.strip()  #remove extra spaces
@@ -48,12 +47,16 @@ class ReACTOutputParser(OutputParser):
     match = re.search(regex, text)
     if not match:
       logging.warning(
-          f"Prefix missing, Trying to parse.."
+          f"Prefix missing, {text} trying to parse.."
       )
       if NAME+":" in text:
         text = text.split(NAME + ": ")[0].strip()  #take first input only
       if "Thought:" in text:
         text = text.split("Thought:")[0].strip()  #take first input only
+      if "### Response:" in text:
+        text = text.split("### Response:")[0].strip()
+      if len(text) > 1:
+        text = "I'm sorry I got a bit distracted, can you repeat."
       # TODO: should this be the case?  If we are off-base should we just return what we have?
       return FinishAction(output=ReACTOutputParser._blocks_from_text(
           context.client, text),
