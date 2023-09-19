@@ -21,7 +21,7 @@ class ReACTOutputParser(OutputParser):
     text = text.strip()  #remove extra spaces
     #logging.warning(text)
     if text.endswith("No"):
-      if text.startswith(NAME):
+      if text.startswith("You"):
         #response is probably right but contains extra text, try to parse
         logging.warning(
           f"Wrong response format, {text}, trying to parse.."
@@ -34,12 +34,14 @@ class ReACTOutputParser(OutputParser):
       else:
         raise RuntimeError(f"Could not parse LLM output: `{text}`")
 
-    if NAME + ":" in text:
+    if "You:" in text:
       if not "Do I need to use a tool? Yes" in text:
         if "user:" in text:
           text = text.split("user:")[0].strip()
         if "Action:" in text:
           text = text.split("Action:")[0].strip()
+        if "Observation:" in text:
+          text = text.split("Observation:")[0].strip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text),
                             context=context)
@@ -50,8 +52,8 @@ class ReACTOutputParser(OutputParser):
       logging.warning(
           f"Prefix missing, {text} trying to parse.."
       )
-      if NAME+":" in text:
-        text = text.split(NAME + ": ")[0].strip()  #take first input only
+      if "You:" in text:
+        text = text.split("You: ")[0].strip()  #take first input only
       if "Thought:" in text:
         text = text.split("Thought:")[0].strip()  #take first input only
       if "### Response:" in text:
@@ -77,7 +79,7 @@ class ReACTOutputParser(OutputParser):
 
   @staticmethod
   def _blocks_from_text(client: Steamship, text: str) -> List[Block]:
-    last_response = text.split(NAME + ":")[-1].strip()
+    last_response = text.split("You:")[-1].strip()
 
     block_id_regex = r"(?:(?:\[|\()?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)))?"
     remaining_text = last_response

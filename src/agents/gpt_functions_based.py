@@ -68,12 +68,20 @@ Begin!
         vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
         #logging.warning(vector_response)
 
+        current_name = NAME
+        current_personality = PERSONA
+        override_name = context.metadata.get("instruction", {}).get("name", None)
+        override_personality = context.metadata.get("instruction", {}).get("personality", None)
+        if override_personality is not None:
+            current_personality = override_personality
+        if override_name is not None:
+            current_name = override_name
 
         # get system messsage
         system_message = Block(text=self.PROMPT.format(
             TYPE=TYPE,
-            NAME=NAME,
-            PERSONA=PERSONA,            
+            NAME=current_name,
+            PERSONA=current_personality,            
             BEHAVIOUR=BEHAVIOUR,
             current_time=current_time,
             current_date=current_date,

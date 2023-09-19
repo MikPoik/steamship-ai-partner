@@ -4,9 +4,10 @@ from agents.react_output_parser import ReACTOutputParser  #upm package(steamship
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
-from tools.active_companion import *  #upm package(steamship)
+from tools.active_companion import NAME,PERSONA,BEHAVIOUR,TYPE  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 import datetime
+import logging
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
 
 
@@ -36,7 +37,7 @@ Observation: the result of the action
 If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? No
-{NAME}: [insert your final response here]
+You: [insert your final response here]
 ```
 
 When crafting a unique reply from {NAME} to the new user message, consider the message history for topic. However, avoid directly repeating previous messages.
@@ -104,7 +105,7 @@ New message from user: {input}
                 "\n", " ") + "\n"
         if block.chat_role == RoleTag.ASSISTANT:
           if block.text != "":
-            llama_chat_history += NAME + ": " + str(block.text).replace(
+            llama_chat_history += "You: " + str(block.text).replace(
                 "\n", " ") + "\n"
 
     llama_related_history = str()
@@ -120,14 +121,22 @@ New message from user: {input}
               llama_related_history += "user: " + str(msg.text).replace(
                   "\n", " ") + "\n"
         if msg.chat_role == RoleTag.ASSISTANT:
-          llama_related_history += NAME + ": " + str(msg.text).replace(
+          llama_related_history += "You: " + str(msg.text).replace(
               "\n", " ") + "\n"
 
-    # for simplicity assume initial prompt is a single text block.
-    # in reality, use some sort of formatter ?
+    current_name = NAME
+    current_personality = PERSONA
+    override_name = context.metadata.get("instruction", {}).get("name", None)
+    override_personality = context.metadata.get("instruction", {}).get("personality", None)
+    if override_personality is not None:
+      current_personality = override_personality
+    if override_name is not None:
+      current_name = override_name
+
+    
     prompt = self.PROMPT.format(
-        NAME=NAME,
-        PERSONA=PERSONA,
+        NAME=current_name,
+        PERSONA=current_personality,
         BEHAVIOUR=BEHAVIOUR,
         TYPE=TYPE,
         vector_response=vector_response,
@@ -164,7 +173,7 @@ New message from user: {input}
           f'Observation: {observation}\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "Thought: Now that I have the image as Block, I need to include it in " + NAME + "'s final response as a suffix of [" + original_observation + "] so the user can view the image.\n### Response:\n"
+      scratchpad += "Thought: Now that I have the image as Block, I need to include it in my final response as a suffix of [" + original_observation + "] so the user can view the image.\n### Response:\n"
     else:
       scratchpad += "Thought:\n### Response:\n"
     #print(scratchpad)

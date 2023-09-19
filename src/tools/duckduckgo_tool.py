@@ -1,6 +1,6 @@
 from steamship import Steamship #upm package(steamship)
 from steamship.agents.llms import OpenAI #upm package(steamship)
-from steamship.agents.utils import with_llm
+from steamship.agents.utils import with_llm #upm package(steamship)
 from steamship.base.mime_types import MimeTypes #upm package(steamship)
 from steamship.utils.repl import ToolREPL #upm package(steamship)
 from typing import Any, List, Union

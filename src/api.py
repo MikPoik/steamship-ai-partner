@@ -402,12 +402,21 @@ class MyAssistant(AgentService):
   def prompt(self,
              prompt: Optional[str] = None,
              context_id: Optional[str] = None,
+             name: Optional[str] = None,
+             instructions: Optional[str] = None,
+
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
     prompt = prompt or kwargs.get("question")
 
     context = self.build_default_context(context_id, **kwargs)
     context.chat_history.append_user_message(prompt)
+    if instructions is not None or name is not None:
+      context.metadata["instruction"] = {
+          "name": name,
+          "personality": instructions,
+          # You can add more personality attributes here if needed
+      }      
 
     output_blocks = []
 
@@ -421,16 +430,6 @@ class MyAssistant(AgentService):
 
     self.run_agent(self.get_default_agent(), context)
 
-    #for output_block in output_blocks:
-    # Need to make the output blocks public here so that they can be copied to the chat history.
-    # They generally need to be public anyway for the REPL to be able to show a clickable link.
-    #output_block.set_public_data(True)
-    #context.chat_history.append_assistant_message(
-    #text=output_block.text,
-    #tags=output_block.tags,
-    #url=output_block.raw_data_url or output_block.url or output_block.content_url,
-    #mime_type=output_block.mime_type,
-    #)
 
     # Return the response as a set of multi-modal blocks.
     return output_blocks
