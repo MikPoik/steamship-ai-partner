@@ -5,6 +5,7 @@ from steamship.agents.tools.base_tools import ImageGeneratorTool  #upm package(s
 from steamship.utils.repl import ToolREPL  #upm package(steamship)
 from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship, Task  #upm package(steamship)
+import logging
 #NSFW_SELFIE_TEMPLATE_PRE =""
 
 #NSFW_SELFIE_TEMPLATE_POST = ""
@@ -38,11 +39,30 @@ class SelfieTool(ImageGeneratorTool):
         "steps": 25,
         "guidance": 7.5,
     }
+    
+    current_name = NAME
+    meta_name = context.metadata.get("instruction", {}).get("name")
+    if meta_name is not None:
+        current_name = meta_name
+
     prompt = tool_input[0].text.replace(NAME + ",", "")
-    prompt = prompt.replace(NAME, "")
+    prompt = prompt.replace(current_name, "")
     prompt = prompt.replace('"', "")
     prompt = prompt.replace("'", "")
-    prompt = NSFW_SELFIE_TEMPLATE_PRE + prompt + NSFW_SELFIE_TEMPLATE_POST
+
+    pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
+    post_prompt = NSFW_SELFIE_TEMPLATE_POST
+
+    meta_pre_prompt = context.metadata.get("instruction", {}).get("selfie_pre")
+    if meta_pre_prompt is not None:
+        pre_prompt = meta_pre_prompt
+
+    meta_post_prompt = context.metadata.get("instruction", {}).get("selfie_post")
+    if meta_post_prompt is not None:
+        pre_prompt = meta_post_prompt    
+
+    prompt = pre_prompt + prompt + post_prompt
+    #logging.warning("Getimg prompt: "+prompt)
     task = image_generator.generate(
         text=prompt,
         make_output_public=True,

@@ -90,7 +90,7 @@ class UsageTracker:
 
     def usage_exceeded(self, chat_id: str):
         usage_entry = self.kv_store.get(chat_id)
-        if usage_entry["message_count"] >= usage_entry["message_limit"] and self.get_balance(chat_id=chat_id) <= 0:
+        if usage_entry["message_count"] > usage_entry["message_limit"] and self.get_balance(chat_id=chat_id) <= 0:
             return True
         else:
             return False

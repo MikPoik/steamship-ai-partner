@@ -19,22 +19,29 @@ class ReACTOutputParser(OutputParser):
     text = text.replace('`', "")  # no backticks
     text = text.replace('"', "'")  # use single quotes in text
     text = text.strip()  #remove extra spaces
+
+    current_name = NAME
+    meta_name = context.metadata.get("instruction", {}).get("name")
+    if meta_name is not None:
+        current_name = meta_name
+
     #logging.warning(text)
     if text.endswith("No"):
-      if text.startswith("You"):
+      if text.startswith(current_name+":"):
         #response is probably right but contains extra text, try to parse
         logging.warning(
           f"Wrong response format, {text}, trying to parse.."
         )
         text = text.split("Thought")[0].strip()
         text = text.split("Action:")[0].strip()
+        text = text.split("Observation:")[0].strip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text),
                             context=context)
       else:
         raise RuntimeError(f"Could not parse LLM output: `{text}`")
 
-    if "You:" in text:
+    if current_name+":" in text:
       if not "Do I need to use a tool? Yes" in text:
         if "user:" in text:
           text = text.split("user:")[0].strip()
@@ -53,7 +60,7 @@ class ReACTOutputParser(OutputParser):
           f"Prefix missing, {text} trying to parse.."
       )
       if "You:" in text:
-        text = text.split("You: ")[0].strip()  #take first input only
+        text = text.split(current_name+": ")[0].strip()  #take first input only
       if "Thought:" in text:
         text = text.split("Thought:")[0].strip()  #take first input only
       if "### Response:" in text:
@@ -78,8 +85,12 @@ class ReACTOutputParser(OutputParser):
     )
 
   @staticmethod
-  def _blocks_from_text(client: Steamship, text: str) -> List[Block]:
-    last_response = text.split("You:")[-1].strip()
+  def _blocks_from_text(client: Steamship, text: str, current_name:str = "") -> List[Block]:
+    
+    if current_name == "":
+      current_name == NAME
+
+    last_response = text.split(current_name+":")[-1].strip()
 
     block_id_regex = r"(?:(?:\[|\()?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)))?"
     remaining_text = last_response

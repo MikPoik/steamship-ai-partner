@@ -42,22 +42,13 @@ LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 class MyAssistantConfig(Config):
   api_base: Optional[str] = Field("https://api.telegram.org/bot",
                                   description="The root API for Telegram")
-  bot_token: str = Field(
-      ":", description="Telegram bot token, obtained via @BotFather")
-  payment_provider_token: Optional[str] = Field(
-      ":TEST:", description="Payment provider token, obtained via @BotFather")
-  n_free_messages: Optional[int] = Field(
-      20, description="Number of free messages assigned to new users.")
-  usd_balance: Optional[float] = Field(1,
-                                       description="USD balance for new users")
-  transloadit_api_key: str = Field(
-      "", description="Transloadit.com api key for OGG encoding")
-  transloadit_api_secret: str = Field("",
-                                      description="Transloadit.com api secret")
-  use_voice: str = Field(
-      "none",
-      description=
-      "Send voice messages addition to text, values: ogg, mp3 or none")
+  bot_token: str = Field(":", description="Telegram bot token, obtained via @BotFather")
+  payment_provider_token: Optional[str] = Field(":TEST:", description="Payment provider token, obtained via @BotFather")
+  n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
+  usd_balance: Optional[float] = Field(0,description="USD balance for new users")
+  transloadit_api_key: str = Field("", description="Transloadit.com api key for OGG encoding")
+  transloadit_api_secret: str = Field("", description="Transloadit.com api secret")
+  use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none")
   llm_model: str = Field(LLAMA2_HERMES, description="llm model to use")
   llama_api_key: Optional[str] = Field(
       "LL-",
@@ -364,7 +355,8 @@ class MyAssistant(AgentService):
     if self.config.n_free_messages > 0:
       self.usage.increase_message_count(str(chat_id))
     #increase used tokens and reduce balance
-    self.usage.increase_token_count(action.output,
+    if self.config.usd_balance > 0:
+      self.usage.increase_token_count(action.output,
                                     chat_id=str(chat_id),
                                     use_voice=self.config.use_voice)
 
@@ -403,21 +395,28 @@ class MyAssistant(AgentService):
              prompt: Optional[str] = None,
              context_id: Optional[str] = None,
              name: Optional[str] = None,
-             instructions: Optional[str] = None,
-
+             personality: Optional[str] = None,
+             description: Optional[str] = None,
+             behaviour: Optional[str] = None,
+             selfie_pre: Optional[str] = None,
+             selfie_post: Optional[str] = None,
+             seed: Optional[str] = None,
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
     prompt = prompt or kwargs.get("question")
 
     context = self.build_default_context(context_id, **kwargs)
     context.chat_history.append_user_message(prompt)
-    if instructions is not None or name is not None:
-      context.metadata["instruction"] = {
-          "name": name,
-          "personality": instructions,
-          # You can add more personality attributes here if needed
+    context.metadata["instruction"] = {
+          "name": name or None,
+          "personality": personality or None,
+          "type": description or None,
+          "behaviour": behaviour or None,
+          "selfie_pre": selfie_pre or None,
+          "selfie_post": selfie_post or None,
+          "seed": seed or None
       }      
-
+    #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
     output_blocks = []
 
     def sync_emit(blocks: List[Block], meta: Metadata):

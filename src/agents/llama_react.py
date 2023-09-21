@@ -15,7 +15,7 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """### Instruction:
-You are now embodying the personality of {NAME}, who is {TYPE}
+You are now embodying the personality of {NAME}, {TYPE}
 {PERSONA}
 {BEHAVIOUR}
 
@@ -37,7 +37,7 @@ Observation: the result of the action
 If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? No
-You: [insert your final response here]
+{NAME}: [insert your final response here]
 ```
 
 When crafting a unique reply from {NAME} to the new user message, consider the message history for topic. However, avoid directly repeating previous messages.
@@ -66,6 +66,12 @@ New message from user: {input}
     current_time = datetime.datetime.now().strftime("%X")
     current_day = datetime.datetime.now().strftime("%A")
 
+    current_name = NAME      
+    meta_name = context.metadata.get("instruction", {}).get("name")
+    if meta_name is not None:
+      current_name = meta_name 
+
+
     tool_names = [t.name for t in self.tools]
 
     tool_index_parts = [
@@ -75,12 +81,12 @@ New message from user: {input}
 
     #Searh response hints for role-play character from vectorDB, if any related text is indexed
     vector_response = ""
+    raw_vector_response = ""
     vector_response_tool = VectorSearchResponseTool()
-    vector_response = vector_response_tool.run(
-        [context.chat_history.last_user_message], context=context)[0].text
     raw_vector_response = vector_response_tool.run(
         [context.chat_history.last_user_message], context=context)[0].text
     if len(raw_vector_response) > 1:
+      vector_response = raw_vector_response
       vector_response = "Use following pieces of memory to answer:\n ```" + vector_response + "\n```\n"
     #logging.warning(vector_response)
 
@@ -105,8 +111,13 @@ New message from user: {input}
                 "\n", " ") + "\n"
         if block.chat_role == RoleTag.ASSISTANT:
           if block.text != "":
-            llama_chat_history += "You: " + str(block.text).replace(
+            llama_chat_history += current_name+": " + str(block.text).replace(
                 "\n", " ") + "\n"
+
+    meta_seed = context.metadata.get("instruction", {}).get("seed")
+    if meta_seed is not None and llama_chat_history == "":
+      llama_chat_history += current_name+": " + meta_seed
+      context.chat_history.append_assistant_message(meta_seed)
 
     llama_related_history = str()
     for msg in messages_from_memory:
@@ -121,24 +132,37 @@ New message from user: {input}
               llama_related_history += "user: " + str(msg.text).replace(
                   "\n", " ") + "\n"
         if msg.chat_role == RoleTag.ASSISTANT:
-          llama_related_history += "You: " + str(msg.text).replace(
+          llama_related_history += current_name+": " + str(msg.text).replace(
               "\n", " ") + "\n"
 
-    current_name = NAME
-    current_personality = PERSONA
-    override_name = context.metadata.get("instruction", {}).get("name", None)
-    override_personality = context.metadata.get("instruction", {}).get("personality", None)
-    if override_personality is not None:
-      current_personality = override_personality
-    if override_name is not None:
-      current_name = override_name
+     
+    current_persona = PERSONA
+    current_behaviour = BEHAVIOUR
+    current_type = TYPE  
 
+    meta_name = context.metadata.get("instruction", {}).get("name")
+    if meta_name is not None:
+      current_name = meta_name 
+
+    meta_persona = context.metadata.get("instruction", {}).get("personality")
+    if meta_persona is not None:
+      current_persona = meta_persona
+
+    meta_behaviour =  context.metadata.get("instruction", {}).get("behaviour")
+    if meta_behaviour is not None:
+      current_behaviour = meta_behaviour
+
+    meta_type =  context.metadata.get("instruction", {}).get("type")
+    if meta_type is not None:
+      current_type = meta_type
     
+    #logging.warning("Dynamic personality :"+current_name+"\n"+current_persona +"\n"+current_type+"\n"+current_behaviour)
+
     prompt = self.PROMPT.format(
         NAME=current_name,
-        PERSONA=current_personality,
-        BEHAVIOUR=BEHAVIOUR,
-        TYPE=TYPE,
+        PERSONA=current_persona,
+        BEHAVIOUR=current_behaviour,
+        TYPE=current_type,
         vector_response=vector_response,
         input=context.chat_history.last_user_message.text,
         current_date=current_date,
@@ -173,7 +197,7 @@ New message from user: {input}
           f'Observation: {observation}\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "Thought: Now that I have the image as Block, I need to include it in my final response as a suffix of [" + original_observation + "] so the user can view the image.\n### Response:\n"
+      scratchpad += "Thought: Now that I have the image as Block, I MUST to include it in my final response as a suffix square brackets [" + original_observation + "] so the user can view the image.\n### Response:\n"
     else:
       scratchpad += "Thought:\n### Response:\n"
     #print(scratchpad)
