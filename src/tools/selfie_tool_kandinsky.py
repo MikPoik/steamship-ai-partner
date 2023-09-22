@@ -16,7 +16,7 @@ class SelfieToolKandinsky(Tool):
 
     rewrite_prompt = SELFIE_TEMPLATE_PRE+"{subject}"+SELFIE_TEMPLATE_POST 
 
-    name: str = "send_picture"
+    name: str = "generate_image"
     human_description =( "Used to generate images from text prompts. Only utilize this tool when the user explicitly requests an image. "
         "When using this tool, the input should be a plain text string that describes,"
         "in detail, the desired image."

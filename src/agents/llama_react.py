@@ -83,8 +83,7 @@ New message from user: {input}
     vector_response = ""
     raw_vector_response = ""
     vector_response_tool = VectorSearchResponseTool()
-    raw_vector_response = vector_response_tool.run(
-        [context.chat_history.last_user_message], context=context)[0].text
+    raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message], context=context)
     if len(raw_vector_response) > 1:
       vector_response = raw_vector_response
       vector_response = "Use following pieces of memory to answer:\n ```" + vector_response + "\n```\n"
@@ -177,7 +176,7 @@ New message from user: {input}
     #print(prompt)
     completions = self.llm.complete(prompt=prompt,
                                     stop="Observation:",
-                                    max_retries=1)
+                                    max_retries=4)
     #print(completions[0].text+"\n")
     return self.output_parser.parse(completions[0].text, context)
 
@@ -197,8 +196,8 @@ New message from user: {input}
           f'Observation: {observation}\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "Thought: Now that I have the image as Block, I MUST to include it in my final response as a suffix square brackets [" + original_observation + "] so the user can view the image.\n### Response:\n"
+      scratchpad += "Thought: Now that I have the image as Block, I MUST to include it in my final response as a suffix of [" + original_observation + "] so the image is visible.\n### Response:\n"
     else:
       scratchpad += "Thought:\n### Response:\n"
-    #print(scratchpad)
+    print(scratchpad)
     return scratchpad

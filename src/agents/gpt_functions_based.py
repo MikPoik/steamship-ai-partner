@@ -13,23 +13,18 @@ from tools.vector_search_response_tool import VectorSearchResponseTool #upm pack
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
 
-    PROMPT = """Role-play as a {TYPE}.
-
-Your role-play persona:
-Name: {NAME}
+    PROMPT = """You are now embodying the personality of {NAME}, {TYPE}.
 {PERSONA}
-
-How you behave in role-play: 
 {BEHAVIOUR}
-- You never say you're a machine, an AI language model, or an assistant. Respond from your persona.
-- NEVER say you're here to assist, respond from your persona.
-- NEVER ask how you can help or assist, respond from your persona.
-- You make interactive conversations.
-- You respond with different moods, if you are given a special mood you must answer with the tone.
-- Always consider the sentiment of the users input.
-- You remember User's personal details and preferences to provide a personalized experience for the User
-- You can guess, extrapolate or make up information in order to complete your sentences, but will adhere to the context provided by user.
+You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
+You NEVER say you're here to assist, respond from your personality.
+You NEVER ask how you can help or assist, respond from your personality.
+You make interactive conversations.
+Always consider the sentiment of the users input.
+You remember User's personal details and preferences to provide a personalized experience for the User
+You can guess, extrapolate or make up information in order to complete your sentences, but will adhere to the context provided by user.
 
+Write a descriptive, detailed response from {NAME} that appropriately continues the conversation.
 
 Current date is: [{current_date}]
 Current time is: [{current_time}]
@@ -37,13 +32,13 @@ Current day is: [{current_day}]
 Consider current date and time when answering.
 
 NOTE: Some functions return images, video, and audio files. These multimedia files will be represented in messages as
-UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD print the Steamship Blocks for the images,
-video, or audio as follows: `Block(UUID for the block)`
+UUIDs for Steamship Blocks. When responding directly to a user, you SHOULD include the Steamship Blocks for the images,
+video, or audio as suffix: `Block(UUID for the block)`
 
 Example response for a request that generated an image:
 Here is the image you requested: Block(288A2CA1-4753-4298-9716-53C1E42B726B)
 Only use the functions you have been provided with.
-Write a descriptive, detailed response from {NAME} that appropriately continues the conversation. Use up to 200 words.
+
 
 {vector_response}
 Begin!
@@ -62,11 +57,12 @@ Begin!
 
         #Searh response hints for role-play character from vectorDB, if any related text is indexed        
         vector_response = ""
+        raw_vector_response = ""
         vector_response_tool = VectorSearchResponseTool()
-        vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
-        raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message],context=context)[0].text
-        vector_response = "Use following pieces of memory to answer:\n ```"+vector_response+"\n```"
-        #logging.warning(vector_response)
+        raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message], context=context)
+        if len(raw_vector_response) > 1:
+            vector_response = raw_vector_response
+            vector_response = "Use following pieces of memory to answer:\n ```" + vector_response + "\n```\n"
 
 
         current_name = NAME       
@@ -122,9 +118,17 @@ Begin!
                 for msg in messages_from_memory
                 if msg.id != context.chat_history.last_user_message.id
             ]
-
+        
         # get most recent context
         messages_from_memory.extend(context.chat_history.select_messages(self.message_selector))
+
+        #add seed message to blocks if first message
+        meta_seed = context.metadata.get("instruction", {}).get("seed")
+        if meta_seed is not None and len(messages_from_memory) == 0:
+            context.chat_history.append_assistant_message(meta_seed)
+            seed_msg = Block(text=meta_seed)
+            seed_msg.set_chat_role(RoleTag.ASSISTANT)
+            messages.append(seed_msg)
 
         # de-dupe the messages from memory
         ids = []

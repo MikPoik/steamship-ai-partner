@@ -13,10 +13,9 @@ import logging
 
 class SelfieTool(ImageGeneratorTool):
 
-  name: str = "SelfieTool"
+  name: str = "generate_image"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
-  agent_description = (
-      "This tool transforms text prompts into images. It should be employed only when the user requests an image, selfie, picture, etc. The input should be a detailed, plain text string describing the desired image.")
+  agent_description = ("Used to generate images from text prompts. Only use if the user has asked for a image, selfie, picture, etc. The input should be a detailed, plain text string describing the desired image.")
 
   generator_plugin_handle: str = "getimg-ai"
   generator_plugin_config: dict = {
@@ -30,14 +29,25 @@ class SelfieTool(ImageGeneratorTool):
           context: AgentContext,
           api_key: str = "") -> Union[List[Block], Task[Any]]:
 
+    current_model = "realistic-vision-v3"
+    current_negative_prompt = "disfigured, cartoon, blurry"
+    meta_model = context.metadata.get("instruction", {}).get("model")
+    if meta_model is not None:
+        if "gpt" in meta_model:
+            current_model = "realistic-vision-v3" #nsfw safe model here?
+            current_negative_prompt = current_negative_prompt #,nude,nsfw
+
     image_generator = context.client.use_plugin(
         plugin_handle=self.generator_plugin_handle,
-        config=self.generator_plugin_config)
+        config=self.generator_plugin_config,
+        version="0.0.7")
     options = {
+        "model":current_model,
         "width": 384,
         "height": 512,
         "steps": 25,
         "guidance": 7.5,
+        "negative_prompt": current_negative_prompt
     }
     
     current_name = NAME
@@ -45,7 +55,7 @@ class SelfieTool(ImageGeneratorTool):
     if meta_name is not None:
         current_name = meta_name
 
-    prompt = tool_input[0].text.replace(NAME + ",", "")
+    prompt = tool_input[0].text.replace(current_name + ",", "")
     prompt = prompt.replace(current_name, "")
     prompt = prompt.replace('"', "")
     prompt = prompt.replace("'", "")

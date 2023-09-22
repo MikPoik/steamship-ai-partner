@@ -49,7 +49,7 @@ class MyAssistantConfig(Config):
   transloadit_api_key: str = Field("", description="Transloadit.com api key for OGG encoding")
   transloadit_api_secret: str = Field("", description="Transloadit.com api secret")
   use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none")
-  llm_model: str = Field(LLAMA2_HERMES, description="llm model to use")
+  llm_model: Optional[str] = Field(LLAMA2_HERMES, description="llm model to use")
   llama_api_key: Optional[str] = Field(
       "LL-",
       description="Llama api key")
@@ -182,7 +182,7 @@ class MyAssistant(AgentService):
     if "gpt" in self.config.llm_model:
       self.set_default_agent(
           FunctionsBasedAgent(
-              tools=[SelfieToolKandinsky()],
+              tools=[SelfieTool()],
               llm=ChatOpenAI(self.client,
                              model_name=self.config.llm_model,
                              temperature=0.4,
@@ -198,7 +198,7 @@ class MyAssistant(AgentService):
                             model_name=self.config.llm_model,
                             temperature=0.4,
                             max_tokens=256,
-                            max_retries=2),
+                            max_retries=4),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
 
     # This Mixin provides HTTP endpoints that connects this agent to a web client
@@ -389,6 +389,12 @@ class MyAssistant(AgentService):
     except Exception as e:
       logging.warning(e)
       logging.warning("failed to save assistant message")
+  
+  @post("clear_history")
+  def clear_history(self,context_id: Optional[str] = None):
+    context = self.build_default_context(context_id)
+    context.chat_history.clear()
+    return "OK"
 
   @post("prompt")
   def prompt(self,
@@ -401,6 +407,7 @@ class MyAssistant(AgentService):
              selfie_pre: Optional[str] = None,
              selfie_post: Optional[str] = None,
              seed: Optional[str] = None,
+             model: Optional[str] = None,
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
     prompt = prompt or kwargs.get("question")
@@ -414,7 +421,8 @@ class MyAssistant(AgentService):
           "behaviour": behaviour or None,
           "selfie_pre": selfie_pre or None,
           "selfie_post": selfie_post or None,
-          "seed": seed or None
+          "seed": seed or None,
+          "model": model or None
       }      
     #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
     output_blocks = []
