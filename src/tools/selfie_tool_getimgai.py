@@ -13,9 +13,9 @@ import logging
 
 class SelfieTool(ImageGeneratorTool):
 
-  name: str = "generate_image"
+  name: str = "generate_selfie"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
-  agent_description = ("Used to generate images from text prompts. Only use if the user has asked for a image, selfie, picture, etc. The input should be a detailed, plain text string describing the desired image.")
+  agent_description = ("Used to generate images from text prompts. Only use if the user has requested for a image, selfie, picture, etc. The input should be a plain text string, that describes in detail, the desired image.")
 
   generator_plugin_handle: str = "getimg-ai"
   generator_plugin_config: dict = {
@@ -35,7 +35,7 @@ class SelfieTool(ImageGeneratorTool):
     if meta_model is not None:
         if "gpt" in meta_model:
             current_model = "realistic-vision-v3" #nsfw safe model here?
-            current_negative_prompt = current_negative_prompt #,nude,nsfw
+            current_negative_prompt = current_negative_prompt #,nude,nsfw?
 
     image_generator = context.client.use_plugin(
         plugin_handle=self.generator_plugin_handle,

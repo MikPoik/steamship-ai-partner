@@ -15,8 +15,10 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """### Instruction:
-You are now embodying the personality of {NAME}, {TYPE}
+You are now embodying the personality of {NAME}, who is {TYPE}
+{NAME}'s personality can be described as:
 {PERSONA}
+{NAME}'s behaviour can be described as:
 {BEHAVIOUR}
 
 Today's date is: {current_date}
@@ -34,6 +36,7 @@ Action Input: the input to the action
 Observation: the result of the action
 ```
 
+Consider observations when responding.
 If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? No
@@ -199,5 +202,5 @@ New message from user: {input}
       scratchpad += "Thought: Now that I have the image as Block, I MUST to include it in my final response as a suffix of [" + original_observation + "] so the image is visible.\n### Response:\n"
     else:
       scratchpad += "Thought:\n### Response:\n"
-    print(scratchpad)
+    #print(scratchpad)
     return scratchpad

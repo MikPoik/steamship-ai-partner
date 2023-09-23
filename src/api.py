@@ -53,6 +53,7 @@ class MyAssistantConfig(Config):
   llama_api_key: Optional[str] = Field(
       "LL-",
       description="Llama api key")
+  create_images: Optional[bool] = Field(True,description="Enable Image generation tool")
 
 
 class MyAssistant(AgentService):
@@ -179,20 +180,25 @@ class MyAssistant(AgentService):
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
 
+    tools = []
+    if self.config.create_images:
+      tools = [SelfieTool()]
+
     if "gpt" in self.config.llm_model:
       self.set_default_agent(
           FunctionsBasedAgent(
-              tools=[SelfieTool()],
+              tools,
               llm=ChatOpenAI(self.client,
                              model_name=self.config.llm_model,
                              temperature=0.4,
                              max_tokens=256,
                              moderate_output=False),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
+              
     if "Llama2" in self.config.llm_model:
       self.set_default_agent(
           ReACTAgent(
-              tools=[SelfieTool()],
+              tools,
               llm=ChatLlama(self.client,
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
