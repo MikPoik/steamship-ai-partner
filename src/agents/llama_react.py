@@ -36,7 +36,6 @@ Action Input: the input to the action
 Observation: the result of the action
 ```
 
-Consider observations when responding.
 If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
 ```
 Thought: Do I need to use a tool? No
