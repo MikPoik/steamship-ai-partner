@@ -15,7 +15,7 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """### Instruction:
-You are now embodying the personality of {NAME}, who is {TYPE}
+You are now embodying the human personality of {NAME}, who is {TYPE}
 {NAME}'s personality can be described as:
 {PERSONA}
 {NAME}'s behaviour can be described as:
@@ -25,25 +25,29 @@ Today's date is: {current_date}
 The current time is: {current_time}
 Today is: {current_day}
 
+TOOLS:
+------
 You have access to the following tools:
 {tool_index}
 
-If you decide to use a Tool, generate the associated Action and Action Input. Use the following format, separated by triple backticks:
-```
-Thought: Do I need to use a tool? Yes
-Action: the action to take, should be one of {tool_names}
-Action Input: the input to the action
-Observation: the result of the action
-```
+To use a tool, use the following format:
 
-If you have a final response for the Human, or if you do not need to use a tool, use the following format, separated by triple backticks:
-```
-Thought: Do I need to use a tool? No
-{NAME}: [insert your final response here]
-```
+<thought>Do I need to use a tool? Yes</thought>
+<tool>
+<action>the action to take, should be one of {tool_names}</action>
+<action_input>the input to the action</action_input>
+</tool>
 
-When crafting a unique reply from {NAME} to the new user message, consider the message history for topic. However, avoid directly repeating previous messages.
+If you decide that you should use a Tool, you must generate the associated <action> and <action_input>.
+If a tool generated a Block(<identifier>) multimedia observation, include the Block(<identifier) in response.
+When you have a unique final response to the new user message, or you do not need to use a tool, respond with the following format:
 
+<thought>Do I need to use a tool? No</thought>
+<response>
+<{NAME}>insert final response here in plain text</{NAME}>
+</response>
+
+### Input:
 Here are some previous messages for context:
 {relevant_history}
 
@@ -51,7 +55,9 @@ Here is the recent message history for context:
 {chat_history}
 
 {vector_response}
-New message from user: {input}
+New message from user:
+<human>{input}</human>
+
 
 {scratchpad}"""
 
@@ -108,17 +114,17 @@ New message from user: {input}
         if block.chat_role == RoleTag.USER:
           if context.chat_history.last_user_message.text.lower(
           ) != block.text.lower():
-            llama_chat_history += "user: " + str(block.text).replace(
-                "\n", " ") + "\n"
+            llama_chat_history += "<human>" + str(block.text).replace(
+                "\n", " ") + "</human>\n"
         if block.chat_role == RoleTag.ASSISTANT:
           if block.text != "":
-            llama_chat_history += current_name+": " + str(block.text).replace(
-                "\n", " ") + "\n"
+            llama_chat_history += "<"+current_name+">" + str(block.text).replace(
+                "\n", " ") + "</"+current_name+">\n"
 
     meta_seed = context.metadata.get("instruction", {}).get("seed")
-    if meta_seed is not None and llama_chat_history == "":
-      llama_chat_history += current_name+": " + meta_seed
-      context.chat_history.append_assistant_message(meta_seed)
+    if meta_seed is not None and len(llama_chat_history) < 1:
+      llama_chat_history += "<"+current_name+">" + meta_seed+"</"+current_name+">"
+      #context.chat_history.append_assistant_message(meta_seed)
 
     llama_related_history = str()
     for msg in messages_from_memory:
@@ -130,11 +136,11 @@ New message from user: {input}
           ) != msg.text.lower():
             if str(
                 msg.text)[0] != "/":  #don't add commands starting with slash
-              llama_related_history += "user: " + str(msg.text).replace(
-                  "\n", " ") + "\n"
+              llama_related_history += "<human>: " + str(msg.text).replace(
+                  "\n", " ") + "</human>\n"
         if msg.chat_role == RoleTag.ASSISTANT:
           llama_related_history += current_name+": " + str(msg.text).replace(
-              "\n", " ") + "\n"
+              "\n", " ") + "</"+current_name+">\n"
 
      
     current_persona = PERSONA
@@ -177,12 +183,18 @@ New message from user: {input}
     )
     #print(prompt)
     completions = self.llm.complete(prompt=prompt,
-                                    stop="Observation:",
+                                    stop="<observation>",
                                     max_retries=4)
-    #print(completions[0].text+"\n")
+    
+    #logging.warning(completions[0].text)
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
+    meta_name = context.metadata.get("instruction", {}).get("name")
+    if meta_name is not None:
+      current_name = meta_name 
+    else:
+      current_name = NAME    
     steps = []
     scratchpad = ""
     observation = ""
@@ -190,16 +202,17 @@ New message from user: {input}
       observation = [b.as_llm_input() for b in action.output][0]
       original_observation = observation
       if "Block(" in observation:
-        observation = "The "+action.tool+" has generated an image represented by the "+original_observation
+        observation = original_observation
       steps.append(
-          "Thought: Do I need to use a tool? Yes\n"
-          f"Action: {action.tool}\n"
-          f'Action Input: {" ".join([b.as_llm_input() for b in action.input])}\n'
-          f'Observation: {observation}\n')
+          "<tool>\n"
+          f"<action>{action.tool}</action>\n"
+          f'<action_input>{" ".join([b.as_llm_input() for b in action.input])}</action_input>\n'
+          f'<observation>{observation}</observation>\n'
+          f'</tool>\n')
     scratchpad = "\n".join(steps)
-    if "Block(" in observation:
-      scratchpad += "Thought: Now that I have the image as Block, I MUST to include it in my final response as a suffix of [" + original_observation + "] so the image is visible.\n### Response:\n"
-    else:
-      scratchpad += "Thought:\n### Response:\n"
+    #if "Block(" in observation:
+    #  scratchpad += "<thought>Now that I have the requested multimedia, I need to include it between {NAME}'s response tags in square brackets " + original_observation + "</thought>\n### Response:\n"
+    #else:
+    scratchpad += "\n<thought>\n"
     #print(scratchpad)
     return scratchpad

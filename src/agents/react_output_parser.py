@@ -7,7 +7,7 @@ from steamship.agents.schema import Action, AgentContext, FinishAction, OutputPa
 
 
 class ReACTOutputParser(OutputParser):
-  """Parse LLM output expecting structure matching ReACTAgent default prompt."""
+  'Parse LLM output expecting structure matching ReACTAgent default prompt'
 
   tools_lookup_dict: Optional[Dict[str, Tool]] = None
 
@@ -26,50 +26,25 @@ class ReACTOutputParser(OutputParser):
         current_name = meta_name
 
     #logging.warning(text)
-    if text.endswith("No"):
-      if text.startswith(current_name+":"):
-        #response is probably right but contains extra text, try to parse
-        logging.warning(
-          f"Wrong response format, {text}, trying to parse.."
-        )
-        text = text.split("Thought")[0].strip()
-        text = text.split("Action:")[0].strip()
-        text = text.split("Observation:")[0].strip()
-        return FinishAction(output=ReACTOutputParser._blocks_from_text(
-            context.client, text),
-                            context=context)
-      else:
-        raise RuntimeError(f"Could not parse LLM output: `{text}`")
 
-    if current_name+":" in text:
-      if not "Do I need to use a tool? Yes" in text:
-        if "user:" in text:
-          text = text.split("user:")[0].strip()
-        if "Action:" in text:
-          text = text.split("Action:")[0].strip()
-        if "Observation:" in text:
-          text = text.split("Observation:")[0].strip()
+    if "<"+current_name+">" in text:
+      if not "<action>" in text:
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
-            context.client, text),
+            context.client, text,context),
                             context=context)
 
-    regex = r"Action: (.*?)[\n]*Action Input: (.*)"
+    regex = r"<action>(.*?)<\/action>\s*<action_input>(.*?)<\/action_input>"
     match = re.search(regex, text)
+    
     if not match:
       logging.warning(
-          f"Prefix missing, {text} trying to parse.."
-      )
-      if "You:" in text:
-        text = text.split(current_name+": ")[0].strip()  #take first input only
-      if "Thought:" in text:
-        text = text.split("Thought:")[0].strip()  #take first input only
-      if "### Response:" in text:
-        text = text.split("### Response:")[0].strip()
-      if len(text) < 1:
-        text = "I'm sorry I got a bit distracted, can you repeat."
+          f"Prefix missing, {text} send output to user.."
+      )    
       # TODO: should this be the case?  If we are off-base should we just return what we have?
+      if "<observation>" in text:
+        text = text.split("<observation>")[0].strip()
       return FinishAction(output=ReACTOutputParser._blocks_from_text(
-          context.client, text),
+          context.client, text,context),
                           context=context)
     action = match.group(1)
     action_input = match.group(2).strip()
@@ -85,30 +60,51 @@ class ReACTOutputParser(OutputParser):
     )
 
   @staticmethod
-  def _blocks_from_text(client: Steamship, text: str, current_name:str = "") -> List[Block]:
-    
-    if current_name == "":
-      current_name == NAME
+  def _blocks_from_text(client: Steamship, text: str, context: AgentContext) -> List[Block]:
+    current_name = NAME
+    meta_name = context.metadata.get("instruction", {}).get("name")
+    if meta_name is not None:
+        current_name = meta_name
 
-    last_response = text.split(current_name+":")[-1].strip()
-
-    block_id_regex = r"(?:(?:\[|\()?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)))?"
-    remaining_text = last_response
+    message = text.split("<"+current_name+">")[-1].strip()
+    message = message.split("</"+current_name+">")[0].strip()
     result_blocks: List[Block] = []
-    while remaining_text is not None and len(remaining_text) > 0:
-      match = re.search(block_id_regex, remaining_text)
-      if match:
-        pre_block_text = ReACTOutputParser._remove_block_prefix(
-            candidate=remaining_text[0:match.start()])
-        if len(pre_block_text) > 0:
-          result_blocks.append(Block(text=pre_block_text))
-        result_blocks.append(Block.get(client, _id=match.group(1)))
-        remaining_text = ReACTOutputParser._remove_block_suffix(
-            remaining_text[match.end():])
-      else:
-        result_blocks.append(Block(text=remaining_text))
-        remaining_text = ""
+    result_blocks.append(Block(text=message))
+    block_found = 0    
+    if "<observation>" in text:
+      last_response = text.split("<observation>")[-1].strip()
+      last_response = last_response.split("</observation>")[0].strip()
+      block_id_regex = r"(?:(?:\[|\()?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)))?"
+      remaining_text = last_response
 
+      while remaining_text is not None and len(remaining_text) > 0:
+        match = re.search(block_id_regex, remaining_text)
+        match = None
+        if match:
+          print("match")
+          block_found = 1
+          pre_block_text = ReACTOutputParser._remove_block_prefix(
+              candidate=remaining_text[0:match.start()]
+          )
+          if len(pre_block_text) > 0:
+            result_blocks.append(Block(text=pre_block_text))
+          result_blocks.append(Block.get(client, _id=match.group(1)))
+          remaining_text = ReACTOutputParser._remove_block_suffix(
+              remaining_text[match.end():]
+          )
+        else:
+          if block_found == 0:
+            saved_block = context.metadata.get("blocks", {}).get("image")
+            if saved_block is not None:
+              result_blocks.append(Block.get(client, _id=saved_block))
+              context.metadata['blocks'] = None          
+          remaining_text = ""
+    else:
+      if block_found == 0:
+        saved_block = context.metadata.get("blocks", {}).get("image")
+        if saved_block is not None:          
+          result_blocks.append(Block.get(client, _id=saved_block))
+          context.metadata['blocks'] = None 
     return result_blocks
 
   @staticmethod

@@ -15,7 +15,7 @@ class SelfieTool(ImageGeneratorTool):
 
   name: str = "generate_selfie"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
-  agent_description = ("Used to generate images from text prompts. Only use if the user has requested for a image, selfie, picture, etc. The input should be a plain text string, that describes in detail, the desired image.")
+  agent_description = ("Used to generate images from text prompts. Only use if the user has requested for a selfie or image or picture, etc. The input should be a plain text string, that describes in detail, the desired image.")
 
   generator_plugin_handle: str = "getimg-ai"
   generator_plugin_config: dict = {
@@ -85,6 +85,10 @@ class SelfieTool(ImageGeneratorTool):
 
     for block in blocks:
       output_blocks.append(block)
+      context.metadata['blocks'] = {
+        "image": block.id or None
+        }
+      #print(context.metadata.get("blocks", {}).get("image"))
     return output_blocks
 
 

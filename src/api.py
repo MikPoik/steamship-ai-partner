@@ -42,7 +42,7 @@ LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 class MyAssistantConfig(Config):
   api_base: Optional[str] = Field("https://api.telegram.org/bot",
                                   description="The root API for Telegram")
-  bot_token: str = Field(":", description="Telegram bot token, obtained via @BotFather")
+  bot_token: str = Field("", description="Telegram bot token, obtained via @BotFather")
   payment_provider_token: Optional[str] = Field(":TEST:", description="Payment provider token, obtained via @BotFather")
   n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
   usd_balance: Optional[float] = Field(0,description="USD balance for new users")
@@ -59,8 +59,9 @@ class MyAssistantConfig(Config):
 class MyAssistant(AgentService):
 
   USED_MIXIN_CLASSES = [
-      IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, IndexerMixin,
-      ExtendedTelegramTransport, SteamshipWidgetTransport
+      IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, 
+      IndexerMixin, ExtendedTelegramTransport
+      #, SteamshipWidgetTransport  #Uncomment to enable webwidget support
   ]
 
   config: MyAssistantConfig
@@ -208,20 +209,23 @@ class MyAssistant(AgentService):
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
 
     # This Mixin provides HTTP endpoints that connects this agent to a web client
-    self.add_mixin(
-        SteamshipWidgetTransport(client=self.client, agent_service=self))
+    # Uncomment to enable webwidget chat
+    #self.add_mixin(
+    #    SteamshipWidgetTransport(client=self.client, agent_service=self))
 
     #IndexerMixin
     self.indexer_mixin = IndexerPipelineMixin(self.client, self)
     self.add_mixin(self.indexer_mixin)
 
-    # This Mixin provides support for Telegram bots
-    self.add_mixin(
-        ExtendedTelegramTransport(
-            client=self.client,
-            config=TelegramTransportConfig(bot_token=self.config.bot_token),
-            agent_service=self,
-            set_payment_plan=self.set_payment_plan))
+    #This Mixin provides support for Telegram bots
+    if self.config.bot_token != "":
+      self.add_mixin(
+          ExtendedTelegramTransport(
+              client=self.client,
+              config=TelegramTransportConfig(bot_token=self.config.bot_token),
+              agent_service=self,
+              set_payment_plan=self.set_payment_plan))
+    
     self.usage = UsageTracker(self.client,
                               n_free_messages=self.config.n_free_messages,
                               usd_balance=self.config.usd_balance)
@@ -232,6 +236,7 @@ class MyAssistant(AgentService):
                 context: AgentContext,
                 msg_chat_id: str = "",
                 callback_args: dict = None):
+
     context.completed_steps = []
     chat_id = ""
     if msg_chat_id != "":
@@ -487,7 +492,7 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
   #your workspace name
-  client = Steamship(workspace="partner-ai-dev-ws")
+  client = Steamship(workspace="partner-ai-dev3-ws")
   context_id = uuid.uuid4()
   #context_id="89f3946d-4bf3-4177-9abe-3a9024c5428c"
   print("chat id " + str(context_id))
