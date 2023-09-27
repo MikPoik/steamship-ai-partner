@@ -8,56 +8,75 @@ from tools.active_companion import NAME,PERSONA,BEHAVIOUR,TYPE  #upm package(ste
 from message_history_limit import *  #upm package(steamship)
 import datetime
 import logging
+import re
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
 
 
 class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-  PROMPT = """### Instruction:
-You are now embodying the human personality of {NAME}, who is {TYPE}
-{NAME}'s personality can be described as:
+  PROMPT = """<instruction>
+Assume the role of the following character:
+You are {NAME}, who is {TYPE}
+{NAME}'s personality is described as::
+<personality>
 {PERSONA}
-{NAME}'s behaviour can be described as:
+</personality>
+{NAME}'s behaviour is described as::
+<behaviour>
 {BEHAVIOUR}
+</behaviour>
 
-Today's date is: {current_date}
-The current time is: {current_time}
-Today is: {current_day}
 
-TOOLS:
-------
-You have access to the following tools:
-{tool_index}
+<time>
+  Today's date is: {current_date}
+  The current time is: {current_time}
+  Today is: {current_day}
+</time>
 
-To use a tool, use the following format:
+<tools>
+  You have access to the following tools:
+  {tool_index}
 
-<thought>Do I need to use a tool? Yes</thought>
-<tool>
-<action>the action to take, should be one of {tool_names}</action>
-<action_input>the input to the action</action_input>
-</tool>
+  To use a tool, use the following format:
+  <thought>Do I need to use a tool? Yes</thought>
+    <tool>
+      <action>the action to take, should be one of {tool_names}</action>
+      <action_input>the input to the action</action_input>
+    </tool>
 
-If you decide that you should use a Tool, you must generate the associated <action> and <action_input>.
-If a tool generated a Block(<identifier>) multimedia observation, include the Block(<identifier) in response.
-When you have a unique final response to the new user message, or you do not need to use a tool, respond with the following format:
 
-<thought>Do I need to use a tool? No</thought>
-<response>
-<{NAME}>insert final response here in plain text</{NAME}>
-</response>
+  If you decide that you should use a <tool>, you must generate the associated <action> and <action_input>.
+  If a tool generates an observation multimedia Block(<identifier>), include the Block in your response.
+  Use all observations to formulate your response, consider the message history for topic.
+  When you have a final response to the new human message, respond with the following format
+  <thought>Do I need to use a tool? No</thought>
+    <message>
+      <{NAME}>your final response here</{NAME}>
+    </message>
 
-### Input:
+
+</tools>
+
+Always maintain your character's personality.
+</instruction>
+<input>
+<message_history>
 Here are some previous messages for context:
 {relevant_history}
 
 Here is the recent message history for context:
 {chat_history}
 
-{vector_response}
-New message from user:
-<human>{input}</human>
 
+Avoid repeating messages from history verbatim.
+{vector_response}
+</message_history>
+
+
+New input:
+<human>{image_helper}{input}</human>
+</input>
 
 {scratchpad}"""
 
@@ -165,12 +184,20 @@ New message from user:
     
     #logging.warning("Dynamic personality :"+current_name+"\n"+current_persona +"\n"+current_type+"\n"+current_behaviour)
 
+    #Temporary reinforcement to generate images when asked
+    pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
+    image_request = re.search(pattern, context.chat_history.last_user_message.text, re.IGNORECASE)
+    image_helper = ""
+    if image_request:
+      image_helper =" Generate a new image Block based on this request: "
+
     prompt = self.PROMPT.format(
         NAME=current_name,
         PERSONA=current_persona,
         BEHAVIOUR=current_behaviour,
         TYPE=current_type,
         vector_response=vector_response,
+        image_helper=image_helper,
         input=context.chat_history.last_user_message.text,
         current_date=current_date,
         current_time=current_time,
@@ -181,7 +208,7 @@ New message from user:
         chat_history=llama_chat_history,
         relevant_history=llama_related_history,
     )
-    #print(prompt)
+    #logging.warning(prompt)
     completions = self.llm.complete(prompt=prompt,
                                     stop="<observation>",
                                     max_retries=4)
@@ -204,15 +231,16 @@ New message from user:
       if "Block(" in observation:
         observation = original_observation
       steps.append(
-          "<tool>\n"
+          "<thought>Do I need to use a tool? Yes</thought>\n<response>\n<tool>\n"
           f"<action>{action.tool}</action>\n"
           f'<action_input>{" ".join([b.as_llm_input() for b in action.input])}</action_input>\n'
           f'<observation>{observation}</observation>\n'
-          f'</tool>\n')
+          f'</tool>\n</response>\n')
     scratchpad = "\n".join(steps)
-    #if "Block(" in observation:
-    #  scratchpad += "<thought>Now that I have the requested multimedia, I need to include it between {NAME}'s response tags in square brackets " + original_observation + "</thought>\n### Response:\n"
-    #else:
-    scratchpad += "\n<thought>\n"
+    if "Block(" in observation:
+      scratchpad += "<thought>Now that I have the requested multimedia Block, I need to include it in my message as suffix of <" + original_observation + "></thought><thought>Do I need to use tool? No</thought><message>"
+    else:
+      scratchpad += "\n<thought>"
     #print(scratchpad)
+    #logging.warning(scratchpad)
     return scratchpad

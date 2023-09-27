@@ -203,7 +203,7 @@ class MyAssistant(AgentService):
               llm=ChatLlama(self.client,
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
-                            temperature=0.4,
+                            temperature=0.3,
                             max_tokens=256,
                             max_retries=4),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))

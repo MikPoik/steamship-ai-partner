@@ -15,7 +15,7 @@ class SelfieTool(ImageGeneratorTool):
 
   name: str = "generate_selfie"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
-  agent_description = ("Used to generate images from text prompts. Only use if the user has requested for a selfie or image or picture, etc. The input should be a plain text string, that describes in detail, the desired image.")
+  agent_description = ("Used to generate images from text prompts. Only use if the human is currently requesting for a selfie or image or picture, etc. The input should be a plain text string, that describes in detail, you in the image.")
 
   generator_plugin_handle: str = "getimg-ai"
   generator_plugin_config: dict = {
@@ -69,7 +69,7 @@ class SelfieTool(ImageGeneratorTool):
 
     meta_post_prompt = context.metadata.get("instruction", {}).get("selfie_post")
     if meta_post_prompt is not None:
-        pre_prompt = meta_post_prompt    
+        post_prompt = meta_post_prompt    
 
     prompt = pre_prompt + prompt + post_prompt
     #logging.warning("Getimg prompt: "+prompt)
