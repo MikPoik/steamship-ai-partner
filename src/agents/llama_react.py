@@ -15,68 +15,51 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-  PROMPT = """<instruction>
-Assume the role of the following character:
+  PROMPT = """Role-play as the following character:
 You are {NAME}, who is {TYPE}
-{NAME}'s personality is described as::
-<personality>
+{NAME}'s personality is described as:
 {PERSONA}
-</personality>
-{NAME}'s behaviour is described as::
-<behaviour>
+
+{NAME}'s behaviour is described as:
 {BEHAVIOUR}
-</behaviour>
 
 
-<time>
-  Today's date is: {current_date}
-  The current time is: {current_time}
-  Today is: {current_day}
-</time>
-
-<tools>
-  You have access to the following tools:
-  {tool_index}
-
-  To use a tool, use the following format:
-  <thought>Do I need to use a tool? Yes</thought>
-    <tool>
-      <action>the action to take, should be one of {tool_names}</action>
-      <action_input>the input to the action</action_input>
-    </tool>
+Today's date is: {current_date}
+The current time is: {current_time}
+Today is: {current_day}
 
 
-  If you decide that you should use a <tool>, you must generate the associated <action> and <action_input>.
-  If a tool generates an observation multimedia Block(<identifier>), include the Block in your response.
-  Use all observations to formulate your response, consider the message history for topic.
-  When you have a final response to the new human message, respond with the following format
-  <thought>Do I need to use a tool? No</thought>
-    <message>
-      <{NAME}>your final response here</{NAME}>
-    </message>
+You have access to the following tools:
+{tool_index}
+
+If you decide to use a tool, use the following format:
+<thought>Do I need to use a tool? Yes</thought>
+  <tool>
+    <action>the action to take, should be one of {tool_names}</action>
+    <action_input>the input to the action</action_input>
+  </tool>
 
 
-</tools>
+If a tool generates an observation multimedia Block(<identifier>), include the Block in your response.
+If you have a final response for the human, use the following format:
+<thought>Do I need to use a tool? No</thought>
+  <message>
+    <{NAME}>your final response here</{NAME}>
+  </message>
 
-Always maintain your character's personality.
-</instruction>
-<input>
-<message_history>
-Here are some previous messages for context:
+
+Here are some previous messages:
 {relevant_history}
 
-Here is the recent message history for context:
+Here is the recent message history:
 {chat_history}
 
-
-Avoid repeating messages from history verbatim.
 {vector_response}
-</message_history>
 
+Always maintain your character's personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
+Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final response to the human's message below.
 
-New input:
 <human>{image_helper}{input}</human>
-</input>
 
 {scratchpad}"""
 
@@ -110,10 +93,10 @@ New input:
     vector_response = ""
     raw_vector_response = ""
     vector_response_tool = VectorSearchResponseTool()
-    raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message], context=context)
-    if len(raw_vector_response) > 1:
-      vector_response = raw_vector_response
-      vector_response = "Use following pieces of memory to answer:\n ```" + vector_response + "\n```\n"
+    #raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message], context=context)
+    #if len(raw_vector_response) > 1:
+    #  vector_response = raw_vector_response
+    #  vector_response = "Use following pieces of memory to answer:\n ```" + vector_response + "\n```\n"
     #logging.warning(vector_response)
 
     messages_from_memory = []
@@ -189,7 +172,7 @@ New input:
     image_request = re.search(pattern, context.chat_history.last_user_message.text, re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper =" Generate a new image Block based on this request: "
+      image_helper ="Generate a new image Block based on this request: "
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -213,7 +196,7 @@ New input:
                                     stop="<observation>",
                                     max_retries=4)
     
-    #logging.warning(completions[0].text)
+    logging.warning(completions[0].text)
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
@@ -238,9 +221,8 @@ New input:
           f'</tool>\n</response>\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "<thought>Now that I have the requested multimedia Block, I need to include it in my message as suffix of <" + original_observation + "></thought><thought>Do I need to use tool? No</thought><message>"
+      scratchpad += "<thought>Now that I have the requested multimedia Block, I need to include it in my message in format <" + original_observation + "> so the human can view it but I should not describe the image. I should respond appropriately and say here's the image for you.</thought><thought>Do I need to use tool? No</thought><message>"
     else:
       scratchpad += "\n<thought>"
-    #print(scratchpad)
-    #logging.warning(scratchpad)
+    logging.warning(scratchpad)
     return scratchpad
