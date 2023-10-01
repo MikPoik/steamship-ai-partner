@@ -4,7 +4,7 @@ from agents.react_output_parser import ReACTOutputParser  #upm package(steamship
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
-from tools.active_companion import NAME,PERSONA,BEHAVIOUR,TYPE  #upm package(steamship)
+from tools.active_companion import NAME,PERSONA,BEHAVIOUR,TYPE,SEED  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 import datetime
 import logging
@@ -15,51 +15,57 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-  PROMPT = """Role-play as the following character:
-You are {NAME}, who is {TYPE}
+  PROMPT = """### Instruction:
+Assume the personality of {NAME}, who is {TYPE}
 {NAME}'s personality is described as:
 {PERSONA}
 
 {NAME}'s behaviour is described as:
 {BEHAVIOUR}
 
+Always maintain {NAME}'s personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
+{NAME} can guess, extrapolate or make up information in order to complete its sentences, but within the context provided by the human.
+{NAME} does not assist or help.
 
 Today's date is: {current_date}
 The current time is: {current_time}
 Today is: {current_day}
 
 
-You have access to the following tools:
+{NAME} has access to the following tools:
 {tool_index}
 
-If you decide to use a tool, use the following format:
+To use a tool, use the following format:
 <thought>Do I need to use a tool? Yes</thought>
-  <tool>
-    <action>the action to take, should be one of {tool_names}</action>
+<tool>
+    <action>the action name to take, should be one of {tool_names}</action>
     <action_input>the input to the action</action_input>
-  </tool>
+</tool>
 
 
-If a tool generates an observation multimedia Block(<identifier>), include the Block in your response.
-If you have a final response for the human, use the following format:
+If {NAME} decides to use a tool, {NAME} must generate the associated <action_name> and <action_input>.
+If a tool generates an observation multimedia Block(<identifier>), include the Block in {NAME}'s message.
+Use all observations to formulate {NAME}'s response.
+When {NAME} has a final reponse to say, use the following format:
 <thought>Do I need to use a tool? No</thought>
   <message>
-    <{NAME}>your final response here</{NAME}>
+    <{NAME}>{NAME}'s response here</{NAME}>
   </message>
 
-
-Here are some previous messages:
+{vector_response}
+Other relevant previous messages:
 {relevant_history}
 
-Here is the recent message history:
+Latest messages:
 {chat_history}
 
-{vector_response}
 
-Always maintain your character's personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
-Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final response to the human's message below.
 
-<human>{image_helper}{input}</human>
+Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative reply to the human's new message, extrapolate to create unique text.
+
+### Input:
+<message><human>{image_helper}{input}</human></message>
+
 
 {scratchpad}"""
 
@@ -123,11 +129,15 @@ Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final res
             llama_chat_history += "<"+current_name+">" + str(block.text).replace(
                 "\n", " ") + "</"+current_name+">\n"
 
+    current_seed = SEED
     meta_seed = context.metadata.get("instruction", {}).get("seed")
-    if meta_seed is not None and len(llama_chat_history) < 1:
-      llama_chat_history += "<"+current_name+">" + meta_seed+"</"+current_name+">"
-      #context.chat_history.append_assistant_message(meta_seed)
-
+    if len(llama_chat_history) == 0:
+      if meta_seed is not None:
+        current_seed = meta_seed
+      if not current_seed in llama_chat_history:
+        llama_chat_history += "<"+current_name+">" + current_seed+"</"+current_name+">"
+        context.chat_history.append_assistant_message(current_seed)
+    
     llama_related_history = str()
     for msg in messages_from_memory:
       #don't add duplicate messages
@@ -141,13 +151,13 @@ Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final res
               llama_related_history += "<human>: " + str(msg.text).replace(
                   "\n", " ") + "</human>\n"
         if msg.chat_role == RoleTag.ASSISTANT:
-          llama_related_history += current_name+": " + str(msg.text).replace(
+          llama_related_history += "<"+current_name+"> " + str(msg.text).replace(
               "\n", " ") + "</"+current_name+">\n"
-
      
     current_persona = PERSONA
     current_behaviour = BEHAVIOUR
     current_type = TYPE  
+
 
     meta_name = context.metadata.get("instruction", {}).get("name")
     if meta_name is not None:
@@ -165,14 +175,13 @@ Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final res
     if meta_type is not None:
       current_type = meta_type
     
-    #logging.warning("Dynamic personality :"+current_name+"\n"+current_persona +"\n"+current_type+"\n"+current_behaviour)
 
     #Temporary reinforcement to generate images when asked
     pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
     image_request = re.search(pattern, context.chat_history.last_user_message.text, re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper ="Generate a new image Block based on this request: "
+      image_helper ="I am requesting a selfie, you MUST generate_selfie for this request: "
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -193,10 +202,10 @@ Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final res
     )
     #logging.warning(prompt)
     completions = self.llm.complete(prompt=prompt,
-                                    stop="<observation>",
+                                    stop="</thought>",
                                     max_retries=4)
     
-    logging.warning(completions[0].text)
+    logging.warning("\n\nOutput form Llama: "+completions[0].text)
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
@@ -214,15 +223,15 @@ Formulate {NAME}'s engaging, natural, authentic, descriptive, creative final res
       if "Block(" in observation:
         observation = original_observation
       steps.append(
-          "<thought>Do I need to use a tool? Yes</thought>\n<response>\n<tool>\n"
-          f"<action>{action.tool}</action>\n"
+          "<thought>Do I need to use a tool? Yes\n<action>"
+          f"<action_name>{action.tool}</action_name>\n"
           f'<action_input>{" ".join([b.as_llm_input() for b in action.input])}</action_input>\n'
           f'<observation>{observation}</observation>\n'
-          f'</tool>\n</response>\n')
+          f'</action>\n<message>\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "<thought>Now that I have the requested multimedia Block, I need to include it in my message in format <" + original_observation + "> so the human can view it but I should not describe the image. I should respond appropriately and say here's the image for you.</thought><thought>Do I need to use tool? No</thought><message>"
+      scratchpad += "<thought>Now that I have the requested multimedia Block, I need to include it in my message in format <" + original_observation + "> so the human can view it.\n\nDo I need to use tool? No</thought>\n### Response:\n<message>\n"
     else:
-      scratchpad += "\n<thought>"
-    logging.warning(scratchpad)
+      scratchpad += "\n### Response:\n<thought>\n"
+    logging.warning("\n\nAgent scratchpad: "+scratchpad)
     return scratchpad

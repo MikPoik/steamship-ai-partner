@@ -1,3 +1,3 @@
 #how many messages to keep in context
-MESSAGE_COUNT = 15
-RELEVANT_MESSAGES = 5
+MESSAGE_COUNT = 6
+RELEVANT_MESSAGES = 4

@@ -93,7 +93,9 @@ class ReACTOutputParser(OutputParser):
           saved_block = context.metadata.get("blocks", {}).get("image")
           if saved_block is not None:
             result_blocks.append(Block.get(client, _id=saved_block))
-            context.metadata['blocks'] = None          
+            context.metadata['blocks'] = None   
+        else:
+          result_blocks.append(Block(text=remaining_text))       
         remaining_text = ""
     return result_blocks
 
