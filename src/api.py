@@ -42,25 +42,34 @@ LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 class MyAssistantConfig(Config):
   api_base: Optional[str] = Field("https://api.telegram.org/bot",
                                   description="The root API for Telegram")
-  bot_token: str = Field("", description="Telegram bot token, obtained via @BotFather")
-  payment_provider_token: Optional[str] = Field(":TEST:", description="Payment provider token, obtained via @BotFather")
-  n_free_messages: Optional[int] = Field(0, description="Number of free messages assigned to new users.")
-  usd_balance: Optional[float] = Field(0,description="USD balance for new users")
-  transloadit_api_key: str = Field("", description="Transloadit.com api key for OGG encoding")
-  transloadit_api_secret: str = Field("", description="Transloadit.com api secret")
-  use_voice: str = Field("none", description="Send voice messages addition to text, values: ogg, mp3 or none")
-  llm_model: Optional[str] = Field(LLAMA2_HERMES, description="llm model to use")
-  llama_api_key: Optional[str] = Field(
-      "LL-",
-      description="Llama api key")
-  create_images: Optional[bool] = Field(True,description="Enable Image generation tool")
+  bot_token: str = Field(
+      "", description="Telegram bot token, obtained via @BotFather")
+  payment_provider_token: Optional[str] = Field(
+      ":TEST:", description="Payment provider token, obtained via @BotFather")
+  n_free_messages: Optional[int] = Field(
+      0, description="Number of free messages assigned to new users.")
+  usd_balance: Optional[float] = Field(0,
+                                       description="USD balance for new users")
+  transloadit_api_key: str = Field(
+      "", description="Transloadit.com api key for OGG encoding")
+  transloadit_api_secret: str = Field("",
+                                      description="Transloadit.com api secret")
+  use_voice: str = Field(
+      "none",
+      description=
+      "Send voice messages addition to text, values: ogg, mp3 or none")
+  llm_model: Optional[str] = Field(LLAMA2_HERMES,
+                                   description="llm model to use")
+  llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
+  create_images: Optional[bool] = Field(
+      True, description="Enable Image generation tool")
 
 
 class MyAssistant(AgentService):
 
   USED_MIXIN_CLASSES = [
-      IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, 
-      IndexerMixin, ExtendedTelegramTransport
+      IndexerPipelineMixin, FileImporterMixin, BlockifierMixin, IndexerMixin,
+      ExtendedTelegramTransport
       #, SteamshipWidgetTransport  #Uncomment to enable webwidget support
   ]
 
@@ -195,7 +204,7 @@ class MyAssistant(AgentService):
                              max_tokens=256,
                              moderate_output=False),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
-              
+
     if "Llama2" in self.config.llm_model:
       self.set_default_agent(
           ReACTAgent(
@@ -203,8 +212,8 @@ class MyAssistant(AgentService):
               llm=ChatLlama(self.client,
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
-                            temperature=0.4,
-                            top_p=0.9,
+                            temperature=0.8,
+                            top_p=0.7,
                             max_tokens=256,
                             max_retries=4),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
@@ -226,7 +235,7 @@ class MyAssistant(AgentService):
               config=TelegramTransportConfig(bot_token=self.config.bot_token),
               agent_service=self,
               set_payment_plan=self.set_payment_plan))
-    
+
     self.usage = UsageTracker(self.client,
                               n_free_messages=self.config.n_free_messages,
                               usd_balance=self.config.usd_balance)
@@ -369,8 +378,8 @@ class MyAssistant(AgentService):
     #increase used tokens and reduce balance
     if self.config.usd_balance > 0:
       self.usage.increase_token_count(action.output,
-                                    chat_id=str(chat_id),
-                                    use_voice=self.config.use_voice)
+                                      chat_id=str(chat_id),
+                                      use_voice=self.config.use_voice)
 
     voice_response = []
     #OPTION 3: Add voice to response
@@ -401,9 +410,9 @@ class MyAssistant(AgentService):
     except Exception as e:
       logging.warning(e)
       logging.warning("failed to save assistant message")
-  
+
   @post("clear_history")
-  def clear_history(self,context_id: Optional[str] = None):
+  def clear_history(self, context_id: Optional[str] = None):
     context = self.build_default_context(context_id)
     context.chat_history.clear()
     return "OK"
@@ -427,15 +436,15 @@ class MyAssistant(AgentService):
     context = self.build_default_context(context_id, **kwargs)
     context.chat_history.append_user_message(prompt)
     context.metadata["instruction"] = {
-          "name": name or None,
-          "personality": personality or None,
-          "type": description or None,
-          "behaviour": behaviour or None,
-          "selfie_pre": selfie_pre or None,
-          "selfie_post": selfie_post or None,
-          "seed": seed or None,
-          "model": model or None
-      }      
+        "name": name or None,
+        "personality": personality or None,
+        "type": description or None,
+        "behaviour": behaviour or None,
+        "selfie_pre": selfie_pre or None,
+        "selfie_post": selfie_post or None,
+        "seed": seed or None,
+        "model": model or None
+    }
     #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
     output_blocks = []
 
@@ -448,7 +457,6 @@ class MyAssistant(AgentService):
     # Get the agent
 
     self.run_agent(self.get_default_agent(), context)
-
 
     # Return the response as a set of multi-modal blocks.
     return output_blocks

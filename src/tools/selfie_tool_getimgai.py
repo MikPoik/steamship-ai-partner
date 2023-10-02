@@ -15,13 +15,12 @@ class SelfieTool(ImageGeneratorTool):
 
   name: str = "generate_selfie"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
-  agent_description = ("Used to generate images from text prompts. Only use if the human is requesting for a selfie,image,picture etc. The input should be a plain text string, that describes in detail, the image.")
+  agent_description = (
+      "Used to generate images from text prompts. Only use if the human is asking for a selfie, image or picture. The input should be a plain text string, that describes in detail, the image."
+  )
 
   generator_plugin_handle: str = "getimg-ai"
-  generator_plugin_config: dict = {
-      "api_key":
-      "key-"
-  }
+  generator_plugin_config: dict = {"api_key": "key-"}
   url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
   def run(self,
@@ -33,27 +32,27 @@ class SelfieTool(ImageGeneratorTool):
     current_negative_prompt = "disfigured, cartoon, blurry"
     meta_model = context.metadata.get("instruction", {}).get("model")
     if meta_model is not None:
-        if "gpt" in meta_model:
-            current_model = "realistic-vision-v3" #nsfw safe model here?
-            current_negative_prompt = current_negative_prompt #,nude,nsfw?
+      if "gpt" in meta_model:
+        current_model = "realistic-vision-v3"  #nsfw safe model here?
+        current_negative_prompt = current_negative_prompt  #,nude,nsfw?
 
     image_generator = context.client.use_plugin(
         plugin_handle=self.generator_plugin_handle,
         config=self.generator_plugin_config,
         version="0.0.7")
     options = {
-        "model":current_model,
-        "width": 512,
-        "height": 768,
+        "model": current_model,
+        "width": 384,
+        "height": 512,
         "steps": 25,
         "guidance": 7.5,
         "negative_prompt": current_negative_prompt
     }
-    
+
     current_name = NAME
     meta_name = context.metadata.get("instruction", {}).get("name")
     if meta_name is not None:
-        current_name = meta_name
+      current_name = meta_name
 
     prompt = tool_input[0].text.replace(current_name + ",", "")
     prompt = prompt.replace(current_name, "")
@@ -65,11 +64,12 @@ class SelfieTool(ImageGeneratorTool):
 
     meta_pre_prompt = context.metadata.get("instruction", {}).get("selfie_pre")
     if meta_pre_prompt is not None:
-        pre_prompt = meta_pre_prompt
+      pre_prompt = meta_pre_prompt
 
-    meta_post_prompt = context.metadata.get("instruction", {}).get("selfie_post")
+    meta_post_prompt = context.metadata.get("instruction",
+                                            {}).get("selfie_post")
     if meta_post_prompt is not None:
-        post_prompt = meta_post_prompt    
+      post_prompt = meta_post_prompt
 
     prompt = pre_prompt + prompt + post_prompt
     #logging.warning("Getimg prompt: "+prompt)
@@ -85,9 +85,7 @@ class SelfieTool(ImageGeneratorTool):
 
     for block in blocks:
       output_blocks.append(block)
-      context.metadata['blocks'] = {
-        "image": block.id or None
-        }
+      context.metadata['blocks'] = {"image": block.id or None}
       #print(context.metadata.get("blocks", {}).get("image"))
     return output_blocks
 

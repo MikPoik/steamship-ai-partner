@@ -4,7 +4,7 @@ from agents.react_output_parser import ReACTOutputParser  #upm package(steamship
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
-from tools.active_companion import NAME,PERSONA,BEHAVIOUR,TYPE,SEED  #upm package(steamship)
+from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 import datetime
 import logging
@@ -24,8 +24,11 @@ Assume the personality of {NAME}, who is {TYPE}
 {BEHAVIOUR}
 
 Always maintain {NAME}'s personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
-{NAME} can guess, extrapolate or make up information in order to complete its sentences, but within the context provided by the human.
-{NAME} does not assist or help.
+{NAME} is not AI and does not assist or help.
+{NAME} writes with a high degree of complexity and burstiness.
+{NAME} is descriptive and immersive, providing vivid details about {NAME}'s actions, emotions, and the environment.
+{NAME} has already met the human.
+
 
 Today's date is: {current_date}
 The current time is: {current_time}
@@ -35,22 +38,21 @@ Today is: {current_day}
 {NAME} has access to the following tools:
 {tool_index}
 
-To use a tool, use the following format:
+To use a tool, use exactly the following format:
 <thought>Do I need to use a tool? Yes</thought>
 <tool>
-    <action>the action name to take, should be one of {tool_names}</action>
-    <action_input>the input to the action</action_input>
+    <action>the action to take, should be one of {tool_names}</action>
+    <action_input>the input to the action, using plain text string</action_input>
 </tool>
 
 
-If {NAME} decides to use a tool, {NAME} must generate the associated <action_name> and <action_input>.
-If a tool generates an observation multimedia Block(<identifier>), include the Block in {NAME}'s message.
+If {NAME} decides to use a tool, {NAME} must generate the associated <action> and <action_input>.
+Only if a tool generates an observation multimedia Block(<identifier>), include the Block in {NAME}'s message.
 Use all observations to formulate {NAME}'s response.
-When {NAME} has a final reponse to say, use the following format:
-<thought>Do I need to use a tool? No</thought>
-  <message>
-    <{NAME}>{NAME}'s response here</{NAME}>
-  </message>
+When {NAME} has a final reponse to say, use exactly the following format:
+<thought>Do I need to use a tool? Yes</thought>
+<{NAME}>final response from {NAME} here,in plain text and emojis</{NAME}>
+
 
 {vector_response}
 Other relevant previous messages:
@@ -61,10 +63,10 @@ Latest messages:
 
 
 
-Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative reply to the human's new message, extrapolate to create unique text.
+Formulate {NAME}'s single reply to the human's new message. However, avoid repeating messages from history.
 
 ### Input:
-<message><human>{image_helper}{input}</human></message>
+<human>{image_helper}{input}</human>
 
 
 {scratchpad}"""
@@ -82,11 +84,10 @@ Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative re
     current_time = datetime.datetime.now().strftime("%X")
     current_day = datetime.datetime.now().strftime("%A")
 
-    current_name = NAME      
+    current_name = NAME
     meta_name = context.metadata.get("instruction", {}).get("name")
     if meta_name is not None:
-      current_name = meta_name 
-
+      current_name = meta_name
 
     tool_names = [t.name for t in self.tools]
 
@@ -126,8 +127,8 @@ Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative re
                 "\n", " ") + "</human>\n"
         if block.chat_role == RoleTag.ASSISTANT:
           if block.text != "":
-            llama_chat_history += "<"+current_name+">" + str(block.text).replace(
-                "\n", " ") + "</"+current_name+">\n"
+            llama_chat_history += "<" + current_name + ">" + str(
+                block.text).replace("\n", " ") + "</" + current_name + ">\n"
 
     current_seed = SEED
     meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -135,9 +136,9 @@ Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative re
       if meta_seed is not None:
         current_seed = meta_seed
       if not current_seed in llama_chat_history:
-        llama_chat_history += "<"+current_name+">" + current_seed+"</"+current_name+">"
+        llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">"
         context.chat_history.append_assistant_message(current_seed)
-    
+
     llama_related_history = str()
     for msg in messages_from_memory:
       #don't add duplicate messages
@@ -151,37 +152,37 @@ Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative re
               llama_related_history += "<human>: " + str(msg.text).replace(
                   "\n", " ") + "</human>\n"
         if msg.chat_role == RoleTag.ASSISTANT:
-          llama_related_history += "<"+current_name+"> " + str(msg.text).replace(
-              "\n", " ") + "</"+current_name+">\n"
-     
+          llama_related_history += "<" + current_name + "> " + str(
+              msg.text).replace("\n", " ") + "</" + current_name + ">\n"
+
     current_persona = PERSONA
     current_behaviour = BEHAVIOUR
-    current_type = TYPE  
-
+    current_type = TYPE
 
     meta_name = context.metadata.get("instruction", {}).get("name")
     if meta_name is not None:
-      current_name = meta_name 
+      current_name = meta_name
 
     meta_persona = context.metadata.get("instruction", {}).get("personality")
     if meta_persona is not None:
       current_persona = meta_persona
 
-    meta_behaviour =  context.metadata.get("instruction", {}).get("behaviour")
+    meta_behaviour = context.metadata.get("instruction", {}).get("behaviour")
     if meta_behaviour is not None:
       current_behaviour = meta_behaviour
 
-    meta_type =  context.metadata.get("instruction", {}).get("type")
+    meta_type = context.metadata.get("instruction", {}).get("type")
     if meta_type is not None:
       current_type = meta_type
-    
 
     #Temporary reinforcement to generate images when asked
     pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
-    image_request = re.search(pattern, context.chat_history.last_user_message.text, re.IGNORECASE)
+    image_request = re.search(pattern,
+                              context.chat_history.last_user_message.text,
+                              re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper ="I am requesting a selfie, you MUST generate_selfie for this request: "
+      image_helper = "I am requesting a selfie image, you MUST generate_selfie for this request: "
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -204,16 +205,17 @@ Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative re
     completions = self.llm.complete(prompt=prompt,
                                     stop="</thought>",
                                     max_retries=4)
-    
-    logging.warning("\n\nOutput form Llama: "+completions[0].text)
+
+    logging.warning("\n\nOutput form Llama: " + completions[0].text+"\n\n")
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
     meta_name = context.metadata.get("instruction", {}).get("name")
+    current_name = NAME
     if meta_name is not None:
-      current_name = meta_name 
+      current_name = meta_name
     else:
-      current_name = NAME    
+      current_name = NAME
     steps = []
     scratchpad = ""
     observation = ""
@@ -223,15 +225,15 @@ Formulate {NAME}'s single engaging, natural, authentic, descriptive, creative re
       if "Block(" in observation:
         observation = original_observation
       steps.append(
-          "<thought>Do I need to use a tool? Yes\n<action>"
-          f"<action_name>{action.tool}</action_name>\n"
+          "<thought>Do I need to use a tool? Yes</thought>\n<tool>\n"
+          f"<action>{action.tool}</action>\n"
           f'<action_input>{" ".join([b.as_llm_input() for b in action.input])}</action_input>\n'
           f'<observation>{observation}</observation>\n'
-          f'</action>\n<message>\n')
+          f'</tool>\n')
     scratchpad = "\n".join(steps)
     if "Block(" in observation:
-      scratchpad += "<thought>Now that I have the requested multimedia Block, I need to include it in my message in format <" + original_observation + "> so the human can view it.\n\nDo I need to use tool? No</thought>\n### Response:\n<message>\n"
+      scratchpad += "<thought>Now that I have the requested multimedia Block, my final response is '<" + current_name + ">Here is a selfie I took for you <" + original_observation + ">'\nDo I need to use tool? No</thought>\n### Response:\n"
     else:
       scratchpad += "\n### Response:\n<thought>\n"
-    logging.warning("\n\nAgent scratchpad: "+scratchpad)
+    logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
     return scratchpad
