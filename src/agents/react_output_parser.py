@@ -4,6 +4,8 @@ from typing import Dict, List, Optional
 from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship  #upm package(steamship)
 from steamship.agents.schema import Action, AgentContext, FinishAction, OutputParser, Tool  #upm package(steamship)
+from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
+import re
 
 
 class ReACTOutputParser(OutputParser):
@@ -28,12 +30,12 @@ class ReACTOutputParser(OutputParser):
     #logging.warning(text)
 
     if "<" + current_name + ">" in text or "</" + current_name + ">" in text:
-      if not "<action>" in text:
+      if not "<tool_name>" in text:
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text, context),
                             context=context)
 
-    regex = r"<action>(.*?)<\/action>\s*<action_input>(.*?)<\/action_input>"
+    regex = r"<tool_name>(.*?)<\/tool_name>\s*<tool_input>(.*?)<\/tool_input>"
     match = re.search(regex, text)
 
     if not match:
@@ -64,7 +66,7 @@ class ReACTOutputParser(OutputParser):
       current_name = meta_name
     message = text
     if "<" + current_name + ">" in message:
-      message = message.split("<" + current_name + ">",1)[-1].strip()
+      message = message.split("<" + current_name + ">", 1)[-1].strip()
     if "</" + current_name + ">" in message:
       message = message.split("</" + current_name + ">")[0].strip()
 
@@ -91,6 +93,18 @@ class ReACTOutputParser(OutputParser):
           if saved_block is not None:
             result_blocks.append(Block.get(client, _id=saved_block))
             context.metadata['blocks'] = None
+          else:
+            #Another way to check for image generation, if agent forgets to use a tool
+            pattern = r'.*\b(?:here|sent|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
+            compiled_pattern = re.compile(pattern, re.IGNORECASE)
+            if compiled_pattern.search(remaining_text):
+              check_image_block = context.metadata.get("blocks",
+                                                       {}).get("image")
+              if check_image_block is None:
+                #logging.warning("Create selfie for prompt")
+                selfie = SelfieTool()
+                image_block = selfie.run([Block(text=remaining_text)], context)
+                result_blocks.append(image_block[0])
         else:
           result_blocks.append(
               Block(text=remaining_text.replace("</message>", "")))

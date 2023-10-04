@@ -6,6 +6,7 @@ from steamship.agents.schema.message_selectors import MessageWindowMessageSelect
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
 from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
+from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 import datetime
 import logging
 import re
@@ -27,7 +28,6 @@ Always maintain {NAME}'s personality. Describe all actions in full, elaborate, e
 {NAME} is not AI and does not assist or help.
 {NAME} writes with a high degree of complexity and burstiness.
 {NAME} is descriptive and immersive, providing vivid details about {NAME}'s actions, emotions, and the environment.
-{NAME} has already met the human.
 
 
 Today's date is: {current_date}
@@ -38,35 +38,36 @@ Today is: {current_day}
 {NAME} has access to the following tools:
 {tool_index}
 
-To use a tool, use exactly the following format:
+To use a tool, use the following format,separated by triple asterisks:
+***
 <thought>Do I need to use a tool? Yes</thought>
 <tool>
-    <action>the action to take, should be one of {tool_names}</action>
-    <action_input>the input to the action, using plain text string</action_input>
-</tool>
+<tool_name>the tool name to use,between the tags, should be one of {tool_names}</tool_name>
+<tool_input>the input to the tool, using plain text string</tool_input>
+<tool>
+***
 
 
-If {NAME} decides to use a tool, {NAME} must generate the associated <action> and <action_input>.
-Only if a tool generates an observation multimedia Block(<identifier>), include the Block in {NAME}'s message.
+If {NAME} decides to use a tool, generate the associated <tool_name> and <tool_input>.
 Use all observations to formulate {NAME}'s response.
-When {NAME} has a final reponse to say, use exactly the following format:
-<thought>Do I need to use a tool? Yes</thought>
-<{NAME}>final response from {NAME} here,in plain text and emojis</{NAME}>
-
+When {NAME} has a final reponse to say, use the following format,separated by triple asterisks:
+***
+<thought>Do I need to use a tool? No</thought>
+<{NAME}>{NAME}'s response here,between the tags</{NAME}>
+***
 
 {vector_response}
 Other relevant previous messages:
 {relevant_history}
 
-Latest messages:
+Message history between {NAME} and human:
 {chat_history}
 
 
-
-Formulate {NAME}'s single reply to the human's new message. However, avoid repeating messages from history.
-
+Formulate {NAME}'s single reply to the human's new message.
+{image_helper}
 ### Input:
-<human>{image_helper}{input}</human>
+<human>{input}</human>
 
 
 {scratchpad}"""
@@ -149,10 +150,10 @@ Formulate {NAME}'s single reply to the human's new message. However, avoid repea
           ) != msg.text.lower():
             if str(
                 msg.text)[0] != "/":  #don't add commands starting with slash
-              llama_related_history += "<human>: " + str(msg.text).replace(
+              llama_related_history += "<human>" + str(msg.text).replace(
                   "\n", " ") + "</human>\n"
         if msg.chat_role == RoleTag.ASSISTANT:
-          llama_related_history += "<" + current_name + "> " + str(
+          llama_related_history += "<" + current_name + ">" + str(
               msg.text).replace("\n", " ") + "</" + current_name + ">\n"
 
     current_persona = PERSONA
@@ -182,7 +183,7 @@ Formulate {NAME}'s single reply to the human's new message. However, avoid repea
                               re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper = "I am requesting a selfie image, you MUST generate_selfie for this request: "
+      image_helper = "Generate selfie for next reply."
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -205,8 +206,8 @@ Formulate {NAME}'s single reply to the human's new message. However, avoid repea
     completions = self.llm.complete(prompt=prompt,
                                     stop="</thought>",
                                     max_retries=4)
-
-    logging.warning("\n\nOutput form Llama: " + completions[0].text+"\n\n")
+    #Log agent raw output
+    #logging.warning("\n\nOutput form Llama: " + completions[0].text + "\n\n")
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
@@ -219,21 +220,22 @@ Formulate {NAME}'s single reply to the human's new message. However, avoid repea
     steps = []
     scratchpad = ""
     observation = ""
+    original_observation = ""
     for action in context.completed_steps:
       observation = [b.as_llm_input() for b in action.output][0]
       original_observation = observation
       if "Block(" in observation:
-        observation = original_observation
+        observation = "My image is ready and will automatically be attached, I should not describe actions or image details but reply the human's message in plain text."
       steps.append(
-          "<thought>Do I need to use a tool? Yes</thought>\n<tool>\n"
-          f"<action>{action.tool}</action>\n"
-          f'<action_input>{" ".join([b.as_llm_input() for b in action.input])}</action_input>\n'
-          f'<observation>{observation}</observation>\n'
-          f'</tool>\n')
+          "<thought>Do I need to use a tool? Yes</thought>\n"
+          f"<tool_name>{action.tool}</tool_name\n"
+          f'<tool_input>{" ".join([b.as_llm_input() for b in action.input])}</tool_input>\n'
+          f'<observation>{observation}</observation>\n')
     scratchpad = "\n".join(steps)
-    if "Block(" in observation:
-      scratchpad += "<thought>Now that I have the requested multimedia Block, my final response is '<" + current_name + ">Here is a selfie I took for you <" + original_observation + ">'\nDo I need to use tool? No</thought>\n### Response:\n"
+    if "Block(" in original_observation:
+      scratchpad += "### Response:\n<thought>Do I need to use tool? No</thought>\n"
     else:
       scratchpad += "\n### Response:\n<thought>\n"
-    logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
+    #Log agent scratchpad
+    #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
     return scratchpad

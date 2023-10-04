@@ -213,7 +213,8 @@ class MyAssistant(AgentService):
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
                             temperature=0.8,
-                            top_p=0.7,
+                            top_p=0.6,
+                            presence_penalty=1.18,
                             max_tokens=256,
                             max_retries=4),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))

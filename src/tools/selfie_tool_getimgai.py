@@ -16,7 +16,7 @@ class SelfieTool(ImageGeneratorTool):
   name: str = "generate_selfie"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
   agent_description = (
-      "Used to generate images from text prompts. Only use if the human is asking for a selfie, image or picture. The input should be a plain text string, that describes in detail, the image."
+      "Used to generate images from text prompts. Only use if the human asks for a image. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
   )
 
   generator_plugin_handle: str = "getimg-ai"
@@ -42,8 +42,8 @@ class SelfieTool(ImageGeneratorTool):
         version="0.0.7")
     options = {
         "model": current_model,
-        "width": 384,
-        "height": 512,
+        "width": 512,
+        "height": 768,
         "steps": 25,
         "guidance": 7.5,
         "negative_prompt": current_negative_prompt
@@ -54,8 +54,8 @@ class SelfieTool(ImageGeneratorTool):
     if meta_name is not None:
       current_name = meta_name
 
-    prompt = tool_input[0].text.replace(current_name + ",", "")
-    prompt = prompt.replace(current_name, "")
+    prompt = tool_input[0].text  #.replace(current_name + ",", "")
+    #prompt = prompt.replace(current_name, "")
     prompt = prompt.replace('"', "")
     prompt = prompt.replace("'", "")
 
