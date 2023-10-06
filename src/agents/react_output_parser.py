@@ -30,12 +30,12 @@ class ReACTOutputParser(OutputParser):
     #logging.warning(text)
 
     if "<" + current_name + ">" in text or "</" + current_name + ">" in text:
-      if not "<tool_name>" in text:
+      if not "<tool>" in text:
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text, context),
                             context=context)
 
-    regex = r"<tool_name>(.*?)<\/tool_name>\s*<tool_input>(.*?)<\/tool_input>"
+    regex = r"<tool>(.*?)<\/tool>\s*<tool_input>(.*?)<\/tool_input>"
     match = re.search(regex, text)
 
     if not match:

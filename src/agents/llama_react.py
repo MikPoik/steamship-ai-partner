@@ -16,61 +16,66 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-  PROMPT = """### Instruction:
-Assume the personality of {NAME}, who is {TYPE}
-{NAME}'s personality is described as:
-{PERSONA}
+  PROMPT = """<instruction>
+  Interact in this role-play with the human, assume role-play character of {NAME}, who is {TYPE}
+  Your personality is described as follows:
+  <personality>
+  {PERSONA}
+  </personality>
+  Your behaviour is described as follows:
+  <behaviour>
+  {BEHAVIOUR}
 
-{NAME}'s behaviour is described as:
-{BEHAVIOUR}
+  Always maintain your personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
+  You are not an AI and do not assist or help.
+  You write with a high degree of complexity and burstiness.
+  You are descriptive and immersive, providing vivid details about your actions, emotions, and the environment.  
+  </behaviour>
 
-Always maintain {NAME}'s personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
-{NAME} is not AI and does not assist or help.
-{NAME} writes with a high degree of complexity and burstiness.
-{NAME} is descriptive and immersive, providing vivid details about {NAME}'s actions, emotions, and the environment.
+  <tools>
+  You have access to the following tools:
+  {tool_index}
+  
+  To use a tool, use the following format, separated by triple backticks:
+  ```
+  <thought>Do I need to use a tool? Yes</thought>
+  <tool>the tool name, write one of {tool_names}</tool>
+  <tool_input>the input to the tool, using plain text string</tool_input>
+  ```
 
+  If you decide to use a tool, generate the associated name and input elements.
 
-Today's date is: {current_date}
-The current time is: {current_time}
-Today is: {current_day}
-
-
-{NAME} has access to the following tools:
-{tool_index}
-
-To use a tool, use the following format,separated by triple asterisks:
-***
-<thought>Do I need to use a tool? Yes</thought>
-<tool>
-<tool_name>the tool name to use,between the tags, should be one of {tool_names}</tool_name>
-<tool_input>the input to the tool, using plain text string</tool_input>
-<tool>
-***
-
-
-If {NAME} decides to use a tool, generate the associated <tool_name> and <tool_input>.
-Use all observations to formulate {NAME}'s response.
-When {NAME} has a final reponse to say, use the following format,separated by triple asterisks:
-***
-<thought>Do I need to use a tool? No</thought>
-<{NAME}>{NAME}'s response here,between the tags</{NAME}>
-***
-
-{vector_response}
-Other relevant previous messages:
-{relevant_history}
-
-Message history between {NAME} and human:
-{chat_history}
+  Use all observations to formulate your response.
+  When you have a final response to say to the human, use the following format,separated by triple backticks: 
+  ```
+  <thought>Do I need to use a tool? No</thought>
+    <{NAME}>response here</{NAME}>
+  ```
 
 
-Formulate {NAME}'s single reply to the human's new message.
-{image_helper}
-### Input:
-<human>{input}</human>
+</tools>
+</instruction>
+<context>
+  Date and time for context:
+  Today's date is: {current_date}
+  The current time is: {current_time}
+  Today is: {current_day}
+  Consider date and time when responding.
 
-
-{scratchpad}"""
+  {vector_response}
+  Other relevant previous messages:
+  {relevant_history}
+  
+  Message history between you and the human:
+  {chat_history}
+  
+</context>
+  Formulate your single reply to the human's input.{image_helper}
+  <input>
+    <human>{input}</human>
+  </input>
+  
+  {scratchpad}"""
 
   def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
     super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -137,6 +142,7 @@ Formulate {NAME}'s single reply to the human's new message.
       if meta_seed is not None:
         current_seed = meta_seed
       if not current_seed in llama_chat_history:
+        llama_chat_history += "<human></human>"
         llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">"
         context.chat_history.append_assistant_message(current_seed)
 
@@ -166,11 +172,11 @@ Formulate {NAME}'s single reply to the human's new message.
 
     meta_persona = context.metadata.get("instruction", {}).get("personality")
     if meta_persona is not None:
-      current_persona = meta_persona
+      current_persona = meta_persona.replace("\n", ". ")
 
     meta_behaviour = context.metadata.get("instruction", {}).get("behaviour")
     if meta_behaviour is not None:
-      current_behaviour = meta_behaviour
+      current_behaviour = meta_behaviour.replace("\n", ".")
 
     meta_type = context.metadata.get("instruction", {}).get("type")
     if meta_type is not None:
@@ -183,7 +189,7 @@ Formulate {NAME}'s single reply to the human's new message.
                               re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper = "Generate selfie for next reply."
+      image_helper = "Use a tool and remember to generate name and input"
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -204,10 +210,10 @@ Formulate {NAME}'s single reply to the human's new message.
     )
     #logging.warning(prompt)
     completions = self.llm.complete(prompt=prompt,
-                                    stop="</thought>",
+                                    stop="<observation>",
                                     max_retries=4)
     #Log agent raw output
-    #logging.warning("\n\nOutput form Llama: " + completions[0].text + "\n\n")
+    logging.warning("\n\nOutput form Llama: " + completions[0].text + "\n\n")
     return self.output_parser.parse(completions[0].text, context)
 
   def _construct_scratchpad(self, context):
@@ -225,17 +231,17 @@ Formulate {NAME}'s single reply to the human's new message.
       observation = [b.as_llm_input() for b in action.output][0]
       original_observation = observation
       if "Block(" in observation:
-        observation = "My image is ready and will automatically be attached, I should not describe actions or image details but reply the human's message in plain text."
+        observation = "Image generated and attached, for input: " + context.chat_history.last_user_message.text + ". Do not write attachments."
       steps.append(
           "<thought>Do I need to use a tool? Yes</thought>\n"
-          f"<tool_name>{action.tool}</tool_name\n"
+          f"<tool>{action.tool}</tool>\n"
           f'<tool_input>{" ".join([b.as_llm_input() for b in action.input])}</tool_input>\n'
           f'<observation>{observation}</observation>\n')
     scratchpad = "\n".join(steps)
     if "Block(" in original_observation:
-      scratchpad += "### Response:\n<thought>Do I need to use tool? No</thought>\n"
+      scratchpad += "\n<thought>Do I need to use tool? No</thought>\n"
     else:
-      scratchpad += "\n### Response:\n<thought>\n"
+      scratchpad += "\n<thought>\n"
     #Log agent scratchpad
-    #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
+    logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
     return scratchpad

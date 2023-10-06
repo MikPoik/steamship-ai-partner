@@ -13,7 +13,7 @@ import logging
 
 class SelfieTool(ImageGeneratorTool):
 
-  name: str = "generate_selfie"
+  name: str = "selfie_tool"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
   agent_description = (
       "Used to generate images from text prompts. Only use if the human asks for a image. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
