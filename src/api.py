@@ -15,7 +15,7 @@ from steamship.agents.schema import AgentContext, Metadata, Agent, FinishAction 
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
-import requests
+import requests  #upm package(requests)
 from tools.selfie_tool_kandinsky import SelfieToolKandinsky  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 from tools.voice_tool_ogg import VoiceToolOGG  #upm package(steamship)
@@ -61,8 +61,8 @@ class MyAssistantConfig(Config):
   llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                    description="llm model to use")
   llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
-  create_images: Optional[bool] = Field(
-      True, description="Enable Image generation tool")
+  create_images: Optional[str] = Field(
+      "true", description="Enable Image generation tool")
 
 
 class MyAssistant(AgentService):
@@ -191,7 +191,7 @@ class MyAssistant(AgentService):
     super().__init__(**kwargs)
 
     tools = []
-    if self.config.create_images:
+    if "true" in self.config.create_images:
       tools = [SelfieTool()]
 
     if "gpt" in self.config.llm_model:
@@ -255,84 +255,85 @@ class MyAssistant(AgentService):
       chat_id = context.id  #repl or webchat
     #print(chat_id)
     last_message = context.chat_history.last_user_message.text.lower()
+    if self.config.bot_token != "":
+      #parse buy callback message
+      if callback_args:
+        #logging.info("callback args "+str(callback_args))
+        if "/buy_option_" in callback_args:
+          #parse data
+          params = callback_args.replace("/buy_option_", "").split("-")
+          #logging.info("invoice params" +str(params))
+          self.send_invoice(chat_id=chat_id, amount=params[0], price=params[1])
+          return
 
-    #parse buy callback message
-    if callback_args:
-      #logging.info("callback args "+str(callback_args))
-      if "/buy_option_" in callback_args:
-        #parse data
-        params = callback_args.replace("/buy_option_", "").split("-")
-        #logging.info("invoice params" +str(params))
-        self.send_invoice(chat_id=chat_id, amount=params[0], price=params[1])
+      #buy messages
+      if last_message == "/deposit":
+        self.send_buy_options(chat_id=chat_id)
         return
 
-    #buy messages
-    if last_message == "/deposit":
-      self.send_buy_options(chat_id=chat_id)
-      return
+      #check balance
+      if last_message == "/balance":
+        usage_entry = self.usage.get_balance(chat_id=chat_id)
+        action = FinishAction()
+        action.output = []
+        action.output.append(
+            Block(text=f"You have {usage_entry} $ balance left. "))
+        self.append_response(context=context, action=action)
+        return
 
-    #check balance
-    if last_message == "/balance":
-      usage_entry = self.usage.get_balance(chat_id=chat_id)
-      action = FinishAction()
-      action.output = []
-      action.output.append(
-          Block(text=f"You have {usage_entry} $ balance left. "))
-      self.append_response(context=context, action=action)
-      return
+      if "/help" in last_message:
+        action = FinishAction()
+        action.output = []
+        action.output.append(
+            Block(
+                text=
+                f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance \n/reset - reset message logs"
+            ))
+        self.append_response(context=context, action=action)
+        return
 
-    if "/help" in last_message:
-      action = FinishAction()
-      action.output = []
-      action.output.append(
-          Block(
-              text=
-              f"Available commands:\n/deposit - deposit to your balance \n/balance - show your available balance \n/reset - reset message logs"
-          ))
-      self.append_response(context=context, action=action)
-      return
+      if "/reset" in last_message:
+        #TODO clear chat history
+        context.chat_history.clear()
+        action = FinishAction()
+        action.output = []
+        action.output.append(Block(text=f"Conversation history cleared"))
+        self.append_response(context=context, action=action)
+        return
 
-    if "/reset" in last_message:
-      #TODO clear chat history
-      context.chat_history.clear()
-      action = FinishAction()
-      action.output = []
-      action.output.append(Block(text=f"Conversation history cleared"))
-      self.append_response(context=context, action=action)
-      return
+      #respond to telegram /start command
+      if "/start" in last_message:
 
-    #respond to telegram /start command
-    if "/start" in last_message:
+        action = FinishAction()
+        action.output = []
+        action.output.append(
+            Block(
+                text=f"Hi there! Welcome to chat with " + NAME +
+                ".\n You can see the available commands with:\n /help -command"
+            ))
 
-      action = FinishAction()
-      action.output = []
-      action.output.append(
-          Block(
-              text=f"Hi there! Welcome to chat with " + NAME +
-              ".\n You can see the available commands with:\n /help -command"))
+        #OPTION 1: send picture from url
 
-      #OPTION 1: send picture from url
+        ##send from url
+        png_file = self.indexer_mixin.importer_mixin.import_url(
+            "https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
+        png_file.set_public_data(True)
+        block = Block(content_url=png_file.raw_data_url,
+                      mime_type=MimeTypes.PNG,
+                      url=png_file.raw_data_url)
+        action.output.append(block)
 
-      ##send from url
-      png_file = self.indexer_mixin.importer_mixin.import_url(
-          "https://gcdnb.pbrd.co/images/5Ew84VbL0bv3.png")
-      png_file.set_public_data(True)
-      block = Block(content_url=png_file.raw_data_url,
-                    mime_type=MimeTypes.PNG,
-                    url=png_file.raw_data_url)
-      action.output.append(block)
+        #OPTION 2: send from local assets folder
+        ##send from local assets folder
+        #block = send_file_from_local(filename="avatar.png",folder="assets/",context=context)
+        #action.output.append(block)
 
-      #OPTION 2: send from local assets folder
-      ##send from local assets folder
-      #block = send_file_from_local(filename="avatar.png",folder="assets/",context=context)
-      #action.output.append(block)
+        self.append_response(context=context, action=action)
+        return
 
-      self.append_response(context=context, action=action)
-      return
-
-    #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
-    if not self.check_usage(chat_id=chat_id, context=context):
-      return
+      #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
+      if not self.check_usage(chat_id=chat_id, context=context):
+        return
 
     #If balance low, guide answer length (not used currently)
     words_left = self.usage.get_available_words(chat_id=str(chat_id))
@@ -429,6 +430,7 @@ class MyAssistant(AgentService):
              selfie_post: Optional[str] = None,
              seed: Optional[str] = None,
              model: Optional[str] = None,
+             image_model: Optional[str] = None,
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
     prompt = prompt or kwargs.get("question")
@@ -443,7 +445,8 @@ class MyAssistant(AgentService):
         "selfie_pre": selfie_pre or None,
         "selfie_post": selfie_post or None,
         "seed": seed or None,
-        "model": model or None
+        "model": model or None,
+        "image_model": image_model or None
     }
     #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
     output_blocks = []

@@ -7,7 +7,7 @@ from steamship.utils.repl import ToolREPL #upm package(steamship)
 from typing import Any, List, Union
 from steamship import Block, Task #upm package(steamship)
 from steamship.agents.schema import AgentContext #upm package(steamship)
-from transloadit import client as tlclient
+from transloadit import client as tlclient #upm package(pytransloadit)
 import logging
 from tools.active_companion import VOICE_ID #upm package(steamship)
 

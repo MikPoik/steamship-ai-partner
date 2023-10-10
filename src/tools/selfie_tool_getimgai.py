@@ -16,7 +16,7 @@ class SelfieTool(ImageGeneratorTool):
   name: str = "selfie_tool"
   human_description: str = "Generates a selfie-style image from text with getimg.ai"
   agent_description = (
-      "Used to generate images from text prompts. Only use if the human asks for a image. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
+      "Useful to generate images from text prompts. Only use if the human is currently requesting for a selfie or image or picture, etc. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
   )
 
   generator_plugin_handle: str = "getimg-ai"
@@ -29,12 +29,19 @@ class SelfieTool(ImageGeneratorTool):
           api_key: str = "") -> Union[List[Block], Task[Any]]:
 
     current_model = "realistic-vision-v3"
+    #current_model = "dark-sushi-mix-v2-25"
     current_negative_prompt = "disfigured, cartoon, blurry"
     meta_model = context.metadata.get("instruction", {}).get("model")
     if meta_model is not None:
       if "gpt" in meta_model:
         current_model = "realistic-vision-v3"  #nsfw safe model here?
         current_negative_prompt = current_negative_prompt  #,nude,nsfw?
+
+    meta_image_model = context.metadata.get("instruction",
+                                            {}).get("image_model")
+    if meta_image_model is not None:
+      if "anime" in meta_image_model:
+        current_model = "dark-sushi-mix-v2-25"
 
     image_generator = context.client.use_plugin(
         plugin_handle=self.generator_plugin_handle,

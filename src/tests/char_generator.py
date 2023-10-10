@@ -8,16 +8,15 @@ from steamship.data.tags.tag_constants import RoleTag
 GENERATOR_HANDLE = "llama-api"
 
 with Steamship.temporary_workspace() as steamship:
-  llama = steamship.use_plugin(
-      GENERATOR_HANDLE,
-      config={
-          "api_key":
-          "LL-",
-          "model": "NousResearch/Nous-Hermes-Llama2-13b",
-          "max_tokens": 500,
-          "temperature": 0.9,
-          "top_p": 0.6
-      })
+  llama = steamship.use_plugin(GENERATOR_HANDLE,
+                               config={
+                                   "api_key": "LL-",
+                                   "model":
+                                   "NousResearch/Nous-Hermes-Llama2-13b",
+                                   "max_tokens": 500,
+                                   "temperature": 0.9,
+                                   "top_p": 0.6
+                               })
   file = File.create(
       steamship,
       blocks=[

@@ -17,43 +17,39 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """<instruction>
-  Interact in this role-play with the human, assume role-play character of {NAME}, who is {TYPE}
-  Your personality is described as follows:
+  Engage in a role-play conversation with the human, portraying the character of {NAME}, who is {TYPE}. Develop the narrative naturally and creatively. Your character's personality and behavior are described as follows:
+  
   <personality>
   {PERSONA}
   </personality>
-  Your behaviour is described as follows:
+  
   <behaviour>
   {BEHAVIOUR}
-
-  Always maintain your personality. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.
-  You are not an AI and do not assist or help.
-  You write with a high degree of complexity and burstiness.
-  You are descriptive and immersive, providing vivid details about your actions, emotions, and the environment.  
   </behaviour>
+  
+  You are not an AI assistant, but a character in a story. Write with complexity and vividness, providing detailed descriptions of actions, emotions, and surroundings. Include all relevant sensory perceptions. Consider how to advance the plot while maintaining your character's personality. 
 
+  
   <tools>
   You have access to the following tools:
   {tool_index}
   
-  To use a tool, use the following format, separated by triple backticks:
+  If you decide that you should use a tool, use to the following format, separated by triple backticks:
   ```
   <thought>Do I need to use a tool? Yes</thought>
-  <tool>the tool name, write one of {tool_names}</tool>
+  <tool>the tool name, should be one of {tool_names}</tool>
   <tool_input>the input to the tool, using plain text string</tool_input>
   ```
-
   If you decide to use a tool, generate the associated name and input elements.
+  </tools>
 
-  Use all observations to formulate your response.
-  When you have a final response to say to the human, use the following format,separated by triple backticks: 
+
+  When responding to the human, use the following format, separated by triple backticks: 
   ```
   <thought>Do I need to use a tool? No</thought>
-    <{NAME}>response here</{NAME}>
+    <{NAME}>Your character's response here</{NAME}>
   ```
 
-
-</tools>
 </instruction>
 <context>
   Date and time for context:
@@ -61,20 +57,21 @@ class ReACTAgent(LLMAgent):
   The current time is: {current_time}
   Today is: {current_day}
   Consider date and time when responding.
-
+  
   {vector_response}
   Other relevant previous messages:
   {relevant_history}
   
-  Message history between you and the human:
-  {chat_history}
-  
-</context>
-  Formulate your single reply to the human's input.{image_helper}
+  Message history between you and the human (to provide context, avoid repetition):
+  {chat_history} 
+
+  {image_helper}
+  New message:
   <input>
     <human>{input}</human>
   </input>
-  
+</context>
+
   {scratchpad}"""
 
   def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -96,6 +93,8 @@ class ReACTAgent(LLMAgent):
       current_name = meta_name
 
     tool_names = [t.name for t in self.tools]
+    if len(tool_names) == 0:
+      toolname = ['No tools available']
 
     tool_index_parts = [
         f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -189,7 +188,7 @@ class ReACTAgent(LLMAgent):
                               re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper = "Use a tool and remember to generate name and input"
+      image_helper = "Human is requesting a picture of you, use a tool and remember to generate name and input"
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -231,7 +230,7 @@ class ReACTAgent(LLMAgent):
       observation = [b.as_llm_input() for b in action.output][0]
       original_observation = observation
       if "Block(" in observation:
-        observation = "Image generated and attached, for input: " + context.chat_history.last_user_message.text + ". Do not write attachments."
+        observation = "Image generated and attached, for input: " + context.chat_history.last_user_message.text
       steps.append(
           "<thought>Do I need to use a tool? Yes</thought>\n"
           f"<tool>{action.tool}</tool>\n"
@@ -239,7 +238,7 @@ class ReACTAgent(LLMAgent):
           f'<observation>{observation}</observation>\n')
     scratchpad = "\n".join(steps)
     if "Block(" in original_observation:
-      scratchpad += "\n<thought>Do I need to use tool? No</thought>\n"
+      scratchpad += "\nYou have generated an image of you for the human to view. Do not write attachments or actions but respond as " + current_name + ".\n<thought>Do I need to use tool? No</thought>\n"
     else:
       scratchpad += "\n<thought>\n"
     #Log agent scratchpad
