@@ -28,10 +28,9 @@ from tools.active_companion import *  #upm package(steamship)
 from utils import send_file_from_local  #upm package(steamship)
 from agents.llama_llm import ChatLlama  #upm package(steamship)
 from agents.llama_react import ReACTAgent  #upm package(steamship)
-#from tools.duckduckgo_tool import DuckDuckGoTool  #upm package(steamship)
+from tools.duckduckgo_tool import DuckDuckGoTool  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
-from tools.coqui_tool import CoquiTool  #upm package(steamship)
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
@@ -58,7 +57,7 @@ class MyAssistantConfig(Config):
   use_voice: str = Field(
       "none",
       description=
-      "Send voice messages addition to text, values: ogg, mp3,coqui or none")
+      "Send voice messages addition to text, values: ogg, mp3 or none")
   llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                    description="llm model to use")
   llama_api_key: Optional[str] = Field(
@@ -385,16 +384,9 @@ class MyAssistant(AgentService):
                                       chat_id=str(chat_id),
                                       use_voice=self.config.use_voice)
 
-    current_voice_config = self.config.use_voice
-    meta_voice_id = context.metadata.get("instruction", {}).get("voice_id")
-    if meta_voice_id is not None:
-      if meta_voice_id != "none":
-        #logging.warning("coqui voiceid: " + meta_voice_id)
-        current_voice_config = meta_voice_id
-
     voice_response = []
     #OPTION 3: Add voice to response
-    if "ogg" in current_voice_config:
+    if "ogg" in self.config.use_voice:
       voice_tool = VoiceToolOGG()
       voice_response = voice_tool.run(
           action.output,
@@ -402,12 +394,8 @@ class MyAssistant(AgentService):
           transloadit_api_key=self.config.transloadit_api_key,
           transloadit_api_secret=self.config.transloadit_api_secret)
       action.output.append(voice_response[0])
-    elif "mp3" in current_voice_config:  ## if default audio format (change voice_tool_orig.py to voice_tool.py):
+    elif "mp3" in self.config.use_voice:  ## if default audio format (change voice_tool_orig.py to voice_tool.py):
       voice_tool = VoiceToolMP3()
-      voice_response = voice_tool.run(action.output, context=context)
-      action.output.append(voice_response[0])
-    elif current_voice_config != "none":
-      voice_tool = CoquiTool()
       voice_response = voice_tool.run(action.output, context=context)
       action.output.append(voice_response[0])
 
@@ -445,7 +433,6 @@ class MyAssistant(AgentService):
              seed: Optional[str] = None,
              model: Optional[str] = None,
              image_model: Optional[str] = None,
-             voice_id: Optional[str] = None,
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
     prompt = prompt or kwargs.get("question")
@@ -461,8 +448,7 @@ class MyAssistant(AgentService):
         "selfie_post": selfie_post or None,
         "seed": seed or None,
         "model": model or None,
-        "image_model": image_model or None,
-        "voice_id": voice_id or None
+        "image_model": image_model or None
     }
     #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
     output_blocks = []
