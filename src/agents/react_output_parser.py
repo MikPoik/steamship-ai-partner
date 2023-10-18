@@ -102,9 +102,11 @@ class ReACTOutputParser(OutputParser):
                                                        {}).get("image")
               if check_image_block is None:
                 #logging.warning("Create selfie for prompt")
-                selfie = SelfieTool()
-                image_block = selfie.run([Block(text=remaining_text)], context)
-                result_blocks.append(image_block[0])
+                create_images = context.metadata.get("instruction", {}).get("create_images")
+                if create_images == "true":
+                  selfie = SelfieTool()
+                  image_block = selfie.run([Block(text=remaining_text)], context)
+                  result_blocks.append(image_block[0])
         else:
           result_blocks.append(
               Block(text=remaining_text.replace("</message>", "")))

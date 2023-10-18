@@ -61,9 +61,7 @@ class MyAssistantConfig(Config):
       "Send voice messages addition to text, values: ogg, mp3,coqui or none")
   llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                    description="llm model to use")
-  llama_api_key: Optional[str] = Field(
-      "LL-vp7ZcmJA1MUSdTBVKg1I9y7UhdtganzSY8X4YpEmbCsSCo0O93XDlcZr8Z7fPmtZ",
-      description="Llama api key")
+  llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
   create_images: Optional[str] = Field(
       "true", description="Enable Image generation tool")
 
@@ -446,6 +444,7 @@ class MyAssistant(AgentService):
              model: Optional[str] = None,
              image_model: Optional[str] = None,
              voice_id: Optional[str] = None,
+             create_images: Optional[str] = None,
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
     prompt = prompt or kwargs.get("question")
@@ -462,7 +461,8 @@ class MyAssistant(AgentService):
         "seed": seed or None,
         "model": model or None,
         "image_model": image_model or None,
-        "voice_id": voice_id or None
+        "voice_id": voice_id or None,
+        "create_images": self.config.create_images or None
     }
     #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
     output_blocks = []

@@ -25,8 +25,7 @@ class CoquiTool(Tool):
   prompt_template = ("{subject}")
   generator_plugin_handle: str = "coqui-tts"
   generator_plugin_config: dict = {
-      "coqui_api_key":
-      "YWEmkTs4lWiipl2BFOdQqRquJaskhXjRQNTWuEdEMSPHwvgjsrgNLsr2esH1hGZd",
+      "coqui_api_key": "",
       "language": "en",
       "speed": 1.2
   }

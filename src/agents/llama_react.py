@@ -94,13 +94,14 @@ class ReACTAgent(LLMAgent):
 
     tool_names = [t.name for t in self.tools]
     if len(tool_names) == 0:
-      toolname = ['No tools available']
+      tool_names = ['<No tools available>']
 
     tool_index_parts = [
         f"- {t.name}: {t.agent_description}" for t in self.tools
     ]
     tool_index = "\n".join(tool_index_parts)
-
+    if len(self.tools) == 0:
+      tool_index = "<No tools available>"
     #Searh response hints for role-play character from vectorDB, if any related text is indexed
     vector_response = ""
     raw_vector_response = ""
@@ -141,7 +142,7 @@ class ReACTAgent(LLMAgent):
       if meta_seed is not None:
         current_seed = meta_seed
       if not current_seed in llama_chat_history:
-        llama_chat_history += "<human></human>"
+        llama_chat_history += "<human></human>\n"
         llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">"
         context.chat_history.append_assistant_message(current_seed)
 
