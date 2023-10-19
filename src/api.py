@@ -407,7 +407,8 @@ class MyAssistant(AgentService):
     elif current_voice_config != "none":
       voice_tool = CoquiTool()
       voice_response = voice_tool.run(action.output, context=context)
-      action.output.append(voice_response[0])
+      for block in voice_response:
+        action.output.append(block)
 
     self.append_response(context=context, action=action)
     #add message to history

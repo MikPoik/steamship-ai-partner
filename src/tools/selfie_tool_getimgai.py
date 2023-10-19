@@ -49,8 +49,8 @@ class SelfieTool(ImageGeneratorTool):
         version="0.0.7")
     options = {
         "model": current_model,
-        "width": 768,
-        "height": 1024,
+        "width": 512,
+        "height": 768,
         "steps": 25,
         "guidance": 7.5,
         "negative_prompt": current_negative_prompt
