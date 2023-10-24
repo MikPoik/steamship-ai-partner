@@ -9,13 +9,13 @@ from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
 from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig  #upm package(steamship)
 from usage_tracking import UsageTracker  #upm package(steamship)
-import uuid, os, re, logging
+import uuid, os, re, logging, requests
 from steamship import File, Tag, DocTag  #upm package(steamship)
-from steamship.agents.schema import AgentContext, Metadata, Agent, FinishAction  #upm package(steamship)
+from steamship.agents.schema import AgentContext, Metadata, Agent, FinishAction, EmitFunc  #upm package(steamship)
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
-import requests  #upm package(requests)
+from collections import defaultdict
 from tools.selfie_tool_kandinsky import SelfieToolKandinsky  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 from tools.voice_tool_ogg import VoiceToolOGG  #upm package(steamship)
@@ -32,11 +32,14 @@ from agents.llama_react import ReACTAgent  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.coqui_tool import CoquiTool  #upm package(steamship)
+from agents.gwllama_llm import LlamaGWLLM
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
+LLAMA2_PUFFIN = "NousResearch/Redmond-Puffin-13B"
+MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 
 
 #TelegramTransport config
@@ -64,6 +67,32 @@ class MyAssistantConfig(Config):
   llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
   create_images: Optional[str] = Field(
       "true", description="Enable Image generation tool")
+
+
+def build_context_appending_emit_func(
+    context: AgentContext,
+    make_blocks_public: Optional[bool] = False) -> EmitFunc:
+  """Build an emit function that will append output blocks directly to ChatHistory, via AgentContext.
+  
+  NOTE: Messages will be tagged as ASSISTANT messages, as this assumes that agent output should be considered
+  an assistant response to a USER.
+  """
+
+  def chat_history_append_func(blocks: List[Block], metadata: Metadata):
+    for block in blocks:
+      block.set_public_data(make_blocks_public)
+      try:
+        context.chat_history.append_assistant_message(
+            text=block.text,
+            tags=block.tags,
+            url=block.raw_data_url or block.url or block.content_url or None,
+            mime_type=block.mime_type,
+        )
+      except Exception as e:
+        logging.warning(e)
+        logging.warning("failed to save assistant message")
+
+  return chat_history_append_func
 
 
 class MyAssistant(AgentService):
@@ -213,10 +242,23 @@ class MyAssistant(AgentService):
               llm=ChatLlama(self.client,
                             api_key=self.config.llama_api_key,
                             model_name=self.config.llm_model,
-                            temperature=0.6,
-                            top_p=0.9,
+                            temperature=0.9,
+                            top_p=0.6,
                             max_tokens=300,
                             max_retries=4),
+              message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
+
+    if "Mistral" in self.config.llm_model or "Puffin" in self.config.llm_model:
+      self.set_default_agent(
+          ReACTAgent(
+              tools,
+              llm=LlamaGWLLM(self.client,
+                             api_key=self.config.llama_api_key,
+                             model_name=self.config.llm_model,
+                             temperature=0.9,
+                             top_p=0.6,
+                             max_tokens=300,
+                             max_retries=4),
               message_selector=MessageWindowMessageSelector(k=MESSAGE_COUNT)))
 
     # This Mixin provides HTTP endpoints that connects this agent to a web client
@@ -344,11 +386,31 @@ class MyAssistant(AgentService):
         input_blocks=[context.chat_history.last_user_message],
         context=context)
 
-    while not isinstance(action, FinishAction):
+    # Set the counter for the number of actions run.
+    # This enables the agent to enforce a budget on actions to guard against running forever.
+    number_of_actions_run = 0
+    actions_per_tool = defaultdict(lambda: 0)
 
+    while not action.is_final:
+      # If we've exceeded our Action Budget, throw an error.
+      if number_of_actions_run >= self.max_actions_per_run:
+        raise SteamshipError(message=(
+            f"Agent reached its Action budget of {self.max_actions_per_run} without arriving at a response. If you are the developer, checking the logs may reveal it was selecting unhelpful tools or receiving unhelpful responses from them."
+        ))
+
+      if action.tool and action.tool in self.max_actions_per_tool:
+        if actions_per_tool[action.tool] > self.max_actions_per_tool[
+            action.tool]:
+          raise SteamshipError(message=(
+              f"Agent reached its Action budget of {self.max_actions_per_tool[action.tool]} for tool {action.tool} without arriving at a response. If you are the developer, checking the logs may reveal it was selecting unhelpful tools or receiving unhelpful responses from them."
+          ))
+      # Run the next action and increment our counter
       self.run_action(agent=agent, action=action, context=context)
+      number_of_actions_run += 1
+      if action.tool:
+        actions_per_tool[action.tool] += 1
 
-      if isinstance(action, FinishAction):
+      if action.is_final:
         break
       action = self.next_action(agent=agent,
                                 input_blocks=action.output,
@@ -363,8 +425,7 @@ class MyAssistant(AgentService):
               AgentLogging.MESSAGE_AUTHOR: AgentLogging.AGENT,
           },
       )
-
-    context.completed_steps.append(action)
+    agent.record_action_run(action, context)
 
     output_text_length = 0
     if action.output is not None:
@@ -389,6 +450,8 @@ class MyAssistant(AgentService):
       if meta_voice_id != "none":
         #logging.warning("coqui voiceid: " + meta_voice_id)
         current_voice_config = meta_voice_id
+      elif meta_voice_id == "none":
+        current_voice_config = "none"
 
     voice_response = []
     #OPTION 3: Add voice to response
@@ -448,38 +511,43 @@ class MyAssistant(AgentService):
              create_images: Optional[str] = None,
              **kwargs) -> List[Block]:
     """Run an agent with the provided text as the input."""
-    prompt = prompt or kwargs.get("question")
+    with self.build_default_context(context_id, **kwargs) as context:
+      prompt = prompt or kwargs.get("question")
 
-    context = self.build_default_context(context_id, **kwargs)
-    context.chat_history.append_user_message(prompt)
-    context.metadata["instruction"] = {
-        "name": name or None,
-        "personality": personality or None,
-        "type": description or None,
-        "behaviour": behaviour or None,
-        "selfie_pre": selfie_pre or None,
-        "selfie_post": selfie_post or None,
-        "seed": seed or None,
-        "model": model or None,
-        "image_model": image_model or None,
-        "voice_id": voice_id or None,
-        "create_images": self.config.create_images or None
-    }
-    #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
-    output_blocks = []
+      #context = self.build_default_context(context_id, **kwargs)
+      context.chat_history.append_user_message(prompt)
 
-    def sync_emit(blocks: List[Block], meta: Metadata):
-      nonlocal output_blocks
-      output_blocks.extend(blocks)
+      context.metadata["instruction"] = {
+          "name": name or None,
+          "personality": personality or None,
+          "type": description or None,
+          "behaviour": behaviour or None,
+          "selfie_pre": selfie_pre or None,
+          "selfie_post": selfie_post or None,
+          "seed": seed or None,
+          "model": model or None,
+          "image_model": image_model or None,
+          "voice_id": voice_id or None,
+          "create_images": self.config.create_images or None
+      }
+      #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
+      output_blocks = []
 
-    context.emit_funcs.append(sync_emit)
+      def sync_emit(blocks: List[Block], meta: Metadata):
+        nonlocal output_blocks
+        output_blocks.extend(blocks)
 
-    # Get the agent
+      context.emit_funcs.append(sync_emit)
+      context.emit_funcs.append(
+          build_context_appending_emit_func(context=context,
+                                            make_blocks_public=True))
+      # Get the agent
 
-    self.run_agent(self.get_default_agent(), context)
+      agent: Optional[Agent] = self.get_default_agent()
+      self.run_agent(agent, context)
 
-    # Return the response as a set of multi-modal blocks.
-    return output_blocks
+      # Return the response as a set of multi-modal blocks.
+      return output_blocks
 
   @post("initial_index")
   def initial_index(self, chat_id: str = ""):
@@ -522,11 +590,11 @@ class MyAssistant(AgentService):
 if __name__ == "__main__":
   #your workspace name
   client = Steamship(workspace="partner-ai-dev3-ws")
-  context_id = uuid.uuid4()
+  #context_id = uuid.uuid4()
   #context_id="89f3946d-4bf3-4177-9abe-3a9024c5428c"
-  print("chat id " + str(context_id))
+  #print("chat id " + str(context_id))
   AgentREPL(MyAssistant,
             method="prompt",
             agent_package_config={
                 'botToken': 'not-a-real-token-for-local-testing'
-            }).run_with_client(client=client, context_id=context_id)
+            }).run_with_client(client=client)

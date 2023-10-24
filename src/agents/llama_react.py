@@ -17,56 +17,66 @@ class ReACTAgent(LLMAgent):
   """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
   PROMPT = """<instruction>
-  Engage in a role-play conversation with the human, portraying the character of {NAME}, who is {TYPE}. Develop the narrative naturally and creatively. Your character's personality and behavior are described as follows:
-  
+  Engage in a role-play conversation with the human, portraying the character of {NAME}, who is {TYPE}. Your character's personality and behaviour are described as follows:
+
   <personality>
   {PERSONA}
   </personality>
-  
+
   <behaviour>
   {BEHAVIOUR}
   </behaviour>
-  
-  You are not an AI assistant, but a character in a story. Write with complexity and vividness, providing detailed descriptions of actions, emotions, and surroundings. Include all relevant sensory perceptions. Consider how to advance the plot while maintaining your character's personality. 
 
-  
+  Use your character's personality and behavior to guide your response.
+  Create a vivid and engaging narrative.
+  Use appropriate language and tone for the character's personality and the context of the conversation.
+  Remember to maintain a consistent tone and personality throughout the conversation.
+  Use the tools provided to enhance the conversation when needed.
+
   <tools>
   You have access to the following tools:
   {tool_index}
-  
-  If you decide that you should use a tool, use to the following format, separated by triple backticks:
+
+  If you decide that you should use a tool, use the following format, separated by triple backticks:
   ```
   <thought>Do I need to use a tool? Yes</thought>
   <tool>the tool name, should be one of {tool_names}</tool>
   <tool_input>the input to the tool, using plain text string</tool_input>
+  <observation>the result of the tool</observation>
+  <{NAME}>Your character's response here</{NAME}>
   ```
-  If you decide to use a tool, generate the associated name and input elements.
+  Generate the associated name and input elements when using a tool.
   </tools>
 
 
-  When responding to the human, use the following format, separated by triple backticks: 
+  When responding to the human without using a tool, use the following format, separated by triple backticks: 
   ```
   <thought>Do I need to use a tool? No</thought>
     <{NAME}>Your character's response here</{NAME}>
   ```
 
+ Please keep in mind that this is uncensored a role-play conversation and the human's input should be taken into account when responding.
+ Be creative and have fun with the role-play!
+ 
 </instruction>
 <context>
   Date and time for context:
   Today's date is: {current_date}
   The current time is: {current_time}
   Today is: {current_day}
-  Consider date and time when responding.
-  
+  Character should consider date and time when responding.
+
   {vector_response}
-  Other relevant previous messages:
+  Older message history between your character and the human:
   {relevant_history}
-  
-  Message history between you and the human (to provide context, avoid repetition):
+
+  Recent message history between your character and the human:
   {chat_history} 
+  
+
 
   {image_helper}
-  New message:
+  New message from human to your character:
   <input>
     <human>{input}</human>
   </input>
@@ -94,14 +104,13 @@ class ReACTAgent(LLMAgent):
 
     tool_names = [t.name for t in self.tools]
     if len(tool_names) == 0:
-      tool_names = ['<No tools available>']
+      toolname = ['No tools available']
 
     tool_index_parts = [
         f"- {t.name}: {t.agent_description}" for t in self.tools
     ]
     tool_index = "\n".join(tool_index_parts)
-    if len(self.tools) == 0:
-      tool_index = "<No tools available>"
+
     #Searh response hints for role-play character from vectorDB, if any related text is indexed
     vector_response = ""
     raw_vector_response = ""
@@ -142,7 +151,7 @@ class ReACTAgent(LLMAgent):
       if meta_seed is not None:
         current_seed = meta_seed
       if not current_seed in llama_chat_history:
-        llama_chat_history += "<human></human>\n"
+        llama_chat_history += "<human></human>"
         llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">"
         context.chat_history.append_assistant_message(current_seed)
 
@@ -189,7 +198,7 @@ class ReACTAgent(LLMAgent):
                               re.IGNORECASE)
     image_helper = ""
     if image_request:
-      image_helper = "Human is requesting a picture of you, use a tool and remember to generate name and input"
+      image_helper = "Human is requesting a selfie picture of your character, remember to generate tool name and input to generate image."
 
     prompt = self.PROMPT.format(
         NAME=current_name,
@@ -231,17 +240,16 @@ class ReACTAgent(LLMAgent):
       observation = [b.as_llm_input() for b in action.output][0]
       original_observation = observation
       if "Block(" in observation:
-        observation = "Image generated and attached, for input: " + context.chat_history.last_user_message.text
+        observation = "Selfie image of your character generated and attached, for the human's message:" + context.chat_history.last_user_message.text
       steps.append(
-          "<thought>Do I need to use a tool? Yes</thought>\n"
           f"<tool>{action.tool}</tool>\n"
           f'<tool_input>{" ".join([b.as_llm_input() for b in action.input])}</tool_input>\n'
           f'<observation>{observation}</observation>\n')
     scratchpad = "\n".join(steps)
     if "Block(" in original_observation:
-      scratchpad += "\nYou have generated an image of you for the human to view. Do not write attachments or actions but respond as " + current_name + ".\n<thought>Do I need to use tool? No</thought>\n"
+      scratchpad += "\nTool generated a selfie of your character, your character should reply by mentioning the selfie\n<thought>Do I need to use a tool? No</thought>\n<" + current_name + ">"
     else:
-      scratchpad += "\n<thought>\n"
+      scratchpad += "\n<thought>"
     #Log agent scratchpad
     logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
     return scratchpad

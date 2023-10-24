@@ -36,7 +36,7 @@ class ReACTOutputParser(OutputParser):
                             context=context)
 
     regex = r"<tool>(.*?)<\/tool>\s*<tool_input>(.*?)<\/tool_input>"
-    match = re.search(regex, text)
+    match = re.search(regex, text, re.DOTALL)
 
     if not match:
       logging.warning(f"Prefix missing, {text} send output to user..")
@@ -102,14 +102,26 @@ class ReACTOutputParser(OutputParser):
                                                        {}).get("image")
               if check_image_block is None:
                 #logging.warning("Create selfie for prompt")
-                create_images = context.metadata.get("instruction", {}).get("create_images")
+                create_images = context.metadata.get("instruction",
+                                                     {}).get("create_images")
                 if create_images == "true":
                   selfie = SelfieTool()
-                  image_block = selfie.run([Block(text=remaining_text)], context)
+                  image_block = selfie.run([Block(text=remaining_text)],
+                                           context)
                   result_blocks.append(image_block[0])
         else:
-          result_blocks.append(
-              Block(text=remaining_text.replace("</message>", "")))
+          #final cleanup
+          pattern = r'<thought>(.*?)</thought>'
+          remaining_text = re.findall(pattern, remaining_text)
+          remaining_text = " ".join(remaining_text)
+          pattern = r'<tool>(.*?)</tool>'
+          remaining_text = re.findall(pattern, remaining_text)
+          remaining_text = " ".join(remaining_text)
+          pattern = r'<tool_input>(.*?)</tool_input>'
+          remaining_text = re.findall(pattern, remaining_text)
+          remaining_text = " ".join(remaining_text)
+
+          result_blocks.append(Block(text=remaining_text))
         remaining_text = ""
     return result_blocks
 
