@@ -3,7 +3,7 @@ from typing import List, Optional
 from steamship import Block, Steamship, PluginInstance  #upm package(steamship)
 from steamship.agents.schema import LLM  #upm package(steamship)
 
-PLUGIN_HANDLE = "llama-hermes-small-test"
+PLUGIN_HANDLE = "llamagateway-plugin"
 DEFAULT_MAX_TOKENS = 256
 
 
@@ -14,7 +14,7 @@ class LlamaGWLLM(LLM):
   def __init__(self,
                client,
                api_key: str = "",
-               model_name: str = "NousResearch/Nous-Hermes-Llama2-7b",
+               model_name: str = "NousResearch/Nous-Hermes-Llama2-13b",
                max_tokens: int = 256,
                temperature: float = 0.4,
                presence_penalty: float = 1.18,

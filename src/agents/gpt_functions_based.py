@@ -1,14 +1,15 @@
 from typing import List
 import datetime
 
-from steamship import Block #upm package(steamship)
-from steamship.agents.functional.output_parser import FunctionsBasedOutputParser #upm package(steamship)
-from steamship.agents.schema import Action, AgentContext, ChatAgent, ChatLLM,Tool #upm package(steamship)
-from steamship.data.tags.tag_constants import RoleTag #upm package(steamship)
-from tools.mood_tool import MoodTool #upm package(steamship)
-from tools.active_companion import * #upm package(steamship)
-from message_history_limit import * #upm package(steamship)
-from tools.vector_search_response_tool import VectorSearchResponseTool #upm package(steamship)
+from steamship import Block  #upm package(steamship)
+from steamship.agents.functional.output_parser import FunctionsBasedOutputParser  #upm package(steamship)
+from steamship.agents.schema import Action, AgentContext, ChatAgent, ChatLLM, Tool  #upm package(steamship)
+from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
+from tools.mood_tool import MoodTool  #upm package(steamship)
+from tools.active_companion import *  #upm package(steamship)
+from message_history_limit import *  #upm package(steamship)
+from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
+
 
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
@@ -16,8 +17,6 @@ class FunctionsBasedAgent(ChatAgent):
     PROMPT = """You are now embodying the personality of {NAME}, who is {TYPE}.
 {NAME}'s personality can be described as:
 {PERSONA}
-{NAME}'s behaviour can be described as:
-{BEHAVIOUR}
 You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
 You NEVER say you're here to assist, respond from your personality.
 You NEVER ask how you can help or assist, respond from your personality.
@@ -47,9 +46,10 @@ Begin!
 """
 
     def __init__(self, tools: List[Tool], llm: ChatLLM, **kwargs):
-        super().__init__(
-            output_parser=FunctionsBasedOutputParser(tools=tools), llm=llm, tools=tools, **kwargs
-        )
+        super().__init__(output_parser=FunctionsBasedOutputParser(tools=tools),
+                         llm=llm,
+                         tools=tools,
+                         **kwargs)
 
     def next_action(self, context: AgentContext) -> Action:
         messages = []
@@ -57,47 +57,49 @@ Begin!
         current_time = datetime.datetime.now().strftime("%X")
         current_day = datetime.datetime.now().strftime("%A")
 
-        #Searh response hints for role-play character from vectorDB, if any related text is indexed        
+        #Searh response hints for role-play character from vectorDB, if any related text is indexed
         vector_response = ""
         raw_vector_response = ""
         vector_response_tool = VectorSearchResponseTool()
-        raw_vector_response = vector_response_tool.run([context.chat_history.last_user_message], context=context)
+        raw_vector_response = vector_response_tool.run(
+            [context.chat_history.last_user_message], context=context)
         if len(raw_vector_response) > 1:
             vector_response = raw_vector_response
             vector_response = "Use following pieces of memory to answer:\n ```" + vector_response + "\n```\n"
 
-
-        current_name = NAME       
+        current_name = NAME
         current_persona = PERSONA
         current_behaviour = BEHAVIOUR
-        current_type = TYPE  
+        current_type = TYPE
 
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
-            current_name = meta_name 
+            current_name = meta_name
 
-        meta_persona = context.metadata.get("instruction", {}).get("personality")
+        meta_persona = context.metadata.get("instruction",
+                                            {}).get("personality")
         if meta_persona is not None:
             current_persona = meta_persona
 
-        meta_behaviour =  context.metadata.get("instruction", {}).get("behaviour")
+        meta_behaviour = context.metadata.get("instruction",
+                                              {}).get("behaviour")
         if meta_behaviour is not None:
             current_behaviour = meta_behaviour
 
-        meta_type =  context.metadata.get("instruction", {}).get("type")
+        meta_type = context.metadata.get("instruction", {}).get("type")
         if meta_type is not None:
             current_type = meta_type
-            
+
         # get system messsage
         system_message = Block(text=self.PROMPT.format(
             TYPE=current_type,
             NAME=current_name,
-            PERSONA=current_persona,            
-            BEHAVIOUR=current_behaviour,
+            PERSONA=current_persona,
             current_time=current_time,
             current_date=current_date,
-            current_day=current_day,    
-            vector_response=vector_response, #response text pieces from vectorDB for role-play character                
+            current_day=current_day,
+            vector_response=
+            vector_response,  #response text pieces from vectorDB for role-play character                
         ))
         #print(system_message)
         system_message.set_chat_role(RoleTag.SYSTEM)
@@ -107,22 +109,21 @@ Begin!
         # get prior conversations
         if context.chat_history.is_searchable():
             messages_from_memory.extend(
-                context.chat_history.search(context.chat_history.last_user_message.text, k=RELEVANT_MESSAGES)
-                .wait()
-                .to_ranked_blocks()
-            )
+                context.chat_history.search(
+                    context.chat_history.last_user_message.text,
+                    k=RELEVANT_MESSAGES).wait().to_ranked_blocks())
 
             # TODO(dougreid): we need a way to threshold message inclusion, especially for small contexts
 
             # remove the actual prompt from the semantic search (it will be an exact match)
             messages_from_memory = [
-                msg
-                for msg in messages_from_memory
+                msg for msg in messages_from_memory
                 if msg.id != context.chat_history.last_user_message.id
             ]
-        
+
         # get most recent context
-        messages_from_memory.extend(context.chat_history.select_messages(self.message_selector))
+        messages_from_memory.extend(
+            context.chat_history.select_messages(self.message_selector))
 
         #add seed message to blocks if first message
         meta_seed = context.metadata.get("instruction", {}).get("seed")
