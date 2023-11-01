@@ -49,7 +49,7 @@ class TransloaditTest(GenerateSpeechTool):
             })
 
         assembly.add_step(
-            "mp3_encoded", "/audio/concat", {
+            "mp3_encoded", "/audio/merge", {
                 'use': 'imported_postroll',
                 'result': True,
                 'ffmpeg_stack': 'v4.3.1',

@@ -236,7 +236,7 @@ class ReACTAgent(LLMAgent):
                 f'<observation>{observation}</observation>\n')
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            scratchpad += "\n*Your character took a selfie for the human with the tool, do not write attachments, write reply in *\n<" + current_name + "> element."
+            scratchpad += "\n*Your character took a selfie for the human with the tool, do not write attachments, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*"
         else:
             scratchpad += "\n"
         #Log agent scratchpad

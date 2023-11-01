@@ -558,7 +558,7 @@ class MyAssistant(AgentService):
             # Return the response as a set of multi-modal blocks.
             return output_blocks
 
-    @post("generate_avatar")
+    @post("generate_avatar", public=True)
     def generate_avatar(self,
                         prompt: Optional[str] = None,
                         context_id: Optional[str] = None,
@@ -598,7 +598,7 @@ class MyAssistant(AgentService):
                                               context=context,
                                               img_height=512,
                                               img_width=512)
-            logging.warning(str(selfie_response[0]))
+            #logging.warning(str(selfie_response[0]))
             return selfie_response
 
     @post("initial_index")
