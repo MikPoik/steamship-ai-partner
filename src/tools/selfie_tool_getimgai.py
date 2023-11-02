@@ -20,7 +20,10 @@ class SelfieTool(ImageGeneratorTool):
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": "key-"}
+    generator_plugin_config: dict = {
+        "api_key":
+        "key-"
+    }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,
@@ -50,6 +53,7 @@ class SelfieTool(ImageGeneratorTool):
             if meta_image_model == "realistic":
                 current_model = "realistic-vision-v3"
 
+        #Image width
         image_width = 512
         image_height = 768
         #custom resolution
@@ -93,7 +97,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
 
-        prompt = pre_prompt + prompt + post_prompt
+        prompt = pre_prompt + prompt
         #logging.warning("Getimg prompt: "+prompt)
         task = image_generator.generate(
             text=prompt,

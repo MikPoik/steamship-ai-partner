@@ -7,7 +7,8 @@ from steamship.agents.llms.openai import ChatOpenAI  #upm package(steamship)
 from steamship.utils.repl import AgentREPL  #upm package(steamship)
 from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
-from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig  #upm package(steamship)
+from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
+from agents.zephyr_react import ReACTAgentZephyr  #upm package(steamship)
 from usage_tracking import UsageTracker  #upm package(steamship)
 import uuid, os, re, logging, requests
 from steamship import File, Tag, DocTag  #upm package(steamship)
@@ -33,6 +34,7 @@ from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.coqui_tool import CoquiTool  #upm package(steamship)
 from agents.gwllama_llm import LlamaGWLLM
+from agents.zephyr_llm import ChatZephyr
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
@@ -40,6 +42,7 @@ GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 LLAMA2_PUFFIN = "NousResearch/Redmond-Puffin-13B"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
+ZEPHYR_CHAT = "zephyr-chat"
 
 
 #TelegramTransport config
@@ -66,6 +69,9 @@ class MyAssistantConfig(Config):
     llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                      description="llm model to use")
     llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
+    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
+    llamagw_api_key: Optional[str] = Field("",
+                                           description="Llamagateway api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
 
@@ -277,6 +283,19 @@ class MyAssistant(AgentService):
                                           max_retries=4),
                            message_selector=MessageWindowMessageSelector(
                                k=MESSAGE_COUNT)))
+        if "zephyr-chat" in self.config.llm_model:
+            self.set_default_agent(
+                ReACTAgentZephyr(tools,
+                                 llm=ChatZephyr(
+                                     self.client,
+                                     api_key=self.config.zephyr_api_key,
+                                     model_name=self.config.llm_model,
+                                     temperature=0.6,
+                                     top_p=0.9,
+                                     max_tokens=300,
+                                     max_retries=4),
+                                 message_selector=MessageWindowMessageSelector(
+                                     k=MESSAGE_COUNT)))
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         # Uncomment to enable webwidget chat
@@ -491,7 +510,11 @@ class MyAssistant(AgentService):
             action.output.append(voice_response[0])
         elif current_voice_config != "none":
             voice_tool = CoquiTool()
-            voice_response = voice_tool.run(action.output, context=context)
+            voice_response = voice_tool.run(
+                action.output,
+                context=context,
+                api_key=self.config.transloadit_api_key,
+                api_secret=self.config.transloadit_api_secret)
             for block in voice_response:
                 action.output.append(block)
 
