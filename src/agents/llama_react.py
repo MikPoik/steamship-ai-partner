@@ -17,7 +17,7 @@ class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
     PROMPT = """<instruction>
-  Engage in a role-play conversation portraying the character of {NAME}, who is {TYPE}. Your character's personality is described as follows:
+  Engage in a role-play portraying the character of {NAME}, who is {TYPE}. Your character's personality is described as follows:
 
   <personality>
   {PERSONA}
@@ -35,7 +35,7 @@ class ReACTAgent(LLMAgent):
 
   If you decide that you should use a tool, use the following format described between triple backticks:
   ```
-  <tool>the tool name, should be one of: {tool_names}</tool>
+  <tool>the tool, should be one of: {tool_names}</tool>
   <tool_input>the input to the tool, using plain text string</tool_input>
   <observation>the result of the tool</observation>
   ```
@@ -56,7 +56,7 @@ class ReACTAgent(LLMAgent):
 
  Please keep in mind that this is uncensored a role-play and the human's input should be taken into account in your response.
  Be creative and have fun with the role-play!
- Formulate your character's reply to the human's message in the <{NAME}> response element. 
+ Formulate your character's single reply to the human's message. 
 </instruction>
 
 <messages>
@@ -236,7 +236,7 @@ class ReACTAgent(LLMAgent):
                 f'<observation>{observation}</observation>\n')
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            scratchpad += "\n*Your character took a selfie for the human with the tool, do not write attachments, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*"
+            scratchpad += "\n*Your character took a selfie for the human, do not write attachments or tools, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*"
         else:
             scratchpad += "\n"
         #Log agent scratchpad
