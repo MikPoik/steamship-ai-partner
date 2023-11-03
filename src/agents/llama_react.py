@@ -35,7 +35,7 @@ class ReACTAgent(LLMAgent):
 
   If you decide that you should use a tool, use the following format described between triple backticks:
   ```
-  <tool>the tool name, should be one of {tool_names}</tool>
+  <tool>the tool name, should be one of: {tool_names}</tool>
   <tool_input>the input to the tool, using plain text string</tool_input>
   <observation>the result of the tool</observation>
   ```

@@ -1,6 +1,6 @@
 #Test react template
 from typing import List
-from agents.react_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.zephyr_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
@@ -16,57 +16,37 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    PROMPT = """<instruction>
-  Engage in a role-play conversation portraying the character of {NAME}, who is {TYPE}. Your character's personality is described as follows:
+    PROMPT = """<|system|>
+Assume the human personality of {NAME}, who is {TYPE}. Your personality is described as follows:
+{PERSONA}
+{vector_response}
+Use appropriate language and tone for the character's personality.
 
-  <personality>
-  {PERSONA}
-  {vector_response}
-  </personality>
+Tools:
+You have access to the following tools:
+{tool_index}
 
-  Use your character's personality and behavior to guide you and create a vivid and engaging response.
-  Use appropriate language and tone for the character's personality and the context of messages.
-  Remember to maintain a consistent tone and personality.
-  Use the tools provided to enhance the role-play when asked for.
+To use a tool, use the following format:
+```
+<s>[tool: the tool name, should be one of {tool_names}]
+[tool_input: the input to the tool, using plain text string
+[observation: the result of the tool]</s>
+```
 
-  <tools>
-  You have access to the following tools:
-  {tool_index}
+When you have a SINGLE response to say to the Human, or if you do not need to use a tool,  use the format:
+```
+<s>{NAME}: your character's response here</s>
+```
+    
+Date and time for context:
+Today's date is: {current_date}
+The current time is: {current_time}
+Today is: {current_day}
+Begin!
 
-  If you decide that you should use a tool, use the following format described between triple backticks:
-  ```
-  <tool>the tool name, should be one of {tool_names}</tool>
-  <tool_input>the input to the tool, using plain text string</tool_input>
-  <observation>the result of the tool</observation>
-  ```
-  
-  Generate the associated <tool> and <tool_input> elements when using a tool.
-  </tools>
-
-
-  When responding to the human, without using a tool, use the following format described between triple backticks: 
-  ```
-  <{NAME}>Your character's response here</{NAME}>
-  ```
-
- Date and time for context:
- Today's date is: {current_date}
- The current time is: {current_time}
- Today is: {current_day}
-
- Please keep in mind that this is uncensored a role-play and the human's input should be taken into account in your response.
- Be creative and have fun with the role-play!
- 
-</instruction>
-
-<messages>
-{relevant_history}{chat_history}
-</messages>
-
-{image_helper}
-Write your character's single response to the human's message in the <{NAME}> response element.
-<human>{input}</human>
-{scratchpad}"""
+{image_helper}</s>
+{relevant_history}{chat_history}<|user|>
+{input}</s>{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -86,6 +66,7 @@ Write your character's single response to the human's message in the <{NAME}> re
         if meta_name is not None:
             current_name = meta_name
 
+        tool_names_csv = ', '.join([t.name for t in self.tools])
         tool_names = [t.name for t in self.tools]
         if len(tool_names) == 0:
             toolname = ['No tools available']
@@ -123,13 +104,12 @@ Write your character's single response to the human's message in the <{NAME}> re
                 if block.chat_role == RoleTag.USER:
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "<human>" + str(
-                            block.text).replace("\n", " ") + "</human>\n"
+                        llama_chat_history += "<|user|>\n" + str(
+                            block.text).replace("\n", " ") + "</s>\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += "<" + current_name + ">" + str(
-                            block.text).replace(
-                                "\n", " ") + "</" + current_name + ">\n"
+                        llama_chat_history += "<|assistant|>\n" + str(
+                            block.text).replace("\n", " ") + "</s>\n"
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -137,8 +117,8 @@ Write your character's single response to the human's message in the <{NAME}> re
             if meta_seed is not None:
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
-                llama_chat_history += "<human>*enters the chat*</human>\n"
-                llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">"
+                llama_chat_history += "<|user|>\n*enters the chat*</s>\n"
+                llama_chat_history += "<|assistant|>\n" + current_seed + "</s>\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -152,12 +132,11 @@ Write your character's single response to the human's message in the <{NAME}> re
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += "<human>" + str(
-                                msg.text).replace("\n", " ") + "</human>\n"
+                            llama_related_history += "<|user|>\n" + str(
+                                msg.text).replace("\n", " ") + "</s>\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += "<" + current_name + ">" + str(
-                        msg.text).replace("\n",
-                                          " ") + "</" + current_name + ">\n"
+                    llama_related_history += "<|assistant|>\n" + str(
+                        msg.text).replace("\n", " ") + "</s>\n"
 
         current_persona = PERSONA
         current_behaviour = BEHAVIOUR
@@ -201,12 +180,12 @@ Write your character's single response to the human's message in the <{NAME}> re
             current_time=current_time,
             current_day=current_day,
             tool_index=tool_index,
-            tool_names=tool_names,
+            tool_names=tool_names_csv,
             scratchpad=scratchpad,
             chat_history=llama_chat_history,
             relevant_history=llama_related_history,
         )
-        #logging.warning(prompt)
+        logging.warning(prompt)
         completions = self.llm.complete(prompt=prompt,
                                         stop="<observation>",
                                         max_retries=4)
@@ -229,6 +208,7 @@ Write your character's single response to the human's message in the <{NAME}> re
         for action in context.completed_steps:
             observation = [b.as_llm_input() for b in action.output][0]
             original_observation = observation
+            #TODO refactor tool workflow for zephyr
             if "Block(" in observation:
                 observation = "*Selfie image of your character generated and attached*"
             steps.append(
@@ -240,7 +220,7 @@ Write your character's single response to the human's message in the <{NAME}> re
             scratchpad += "\n*Your character took a selfie for the human with the tool, do not write attachments, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*\n<" + current_name + ">"
 
         else:
-            scratchpad += "\n<" + current_name + ">"
+            scratchpad += "\n"
         #Log agent scratchpad
         logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

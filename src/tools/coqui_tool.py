@@ -55,8 +55,6 @@ class CoquiTool(Tool):
 
             pattern = r'\*([^*]+)\*'  #Remove *gesture* texts from
             batch_text = re.sub(pattern, '', batch_text)
-            pattern = r'<[^>]*>'  #Remove <gesture> texts from
-            batch_text = re.sub(pattern, '', batch_text)
 
             task = generator.generate(text=batch_text,
                                       make_output_public=True,
