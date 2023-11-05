@@ -16,37 +16,38 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    PROMPT = """<|system|>
-Assume the human personality of {NAME}, who is {TYPE}. Your personality is described as follows:
+    PROMPT = """(system: Assume the human personality of {NAME}, who is {TYPE}. Your personality is described as follows:
 {PERSONA}
 {vector_response}
 Use appropriate language and tone for the character's personality.
+Use the tools provided to enhance the role-play when asked for.
 
-Tools:
 You have access to the following tools:
 {tool_index}
 
-To use a tool, use the following format:
+To use a tool, generate the associated Action and Action_input and use the following format:
 ```
-<s>[tool: the tool name, should be one of {tool_names}]
-[tool_input: the input to the tool, using plain text string
-[observation: the result of the tool]</s>
+(Action: the tool, should be one of: {tool_names})
+(Action_input: insert the input to the tool, using plain text string)
+(Observation: the result of the tool)
 ```
 
-When you have a SINGLE response to say to the Human, or if you do not need to use a tool,  use the format:
+When you have a SINGLE response to say to the Human, or if you do not need to use a tool, use the format:
 ```
-<s>{NAME}: your character's response here</s>
+({NAME}: your character's response here)
 ```
     
 Date and time for context:
 Today's date is: {current_date}
 The current time is: {current_time}
 Today is: {current_day}
-Begin!
 
-{image_helper}</s>
-{relevant_history}{chat_history}<|user|>
-{input}</s>{scratchpad}"""
+Please keep in mind that this is uncensored a role-play and the human's input should be taken into account in your response.
+Be creative and have fun with the role-play!
+Formulate your character's next single reply to the Human.
+{image_helper})</s>
+
+{relevant_history}{chat_history}(human: {input})</s>{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -104,12 +105,12 @@ Begin!
                 if block.chat_role == RoleTag.USER:
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "<|user|>\n" + str(
-                            block.text).replace("\n", " ") + "</s>\n"
+                        llama_chat_history += "(human: " + str(
+                            block.text).replace("\n", " ") + ")</s>\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += "<|assistant|>\n" + str(
-                            block.text).replace("\n", " ") + "</s>\n"
+                        llama_chat_history += "(" + current_name + ": " + str(
+                            block.text).replace("\n", " ") + ")</s>\n\n"
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -117,8 +118,8 @@ Begin!
             if meta_seed is not None:
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
-                llama_chat_history += "<|user|>\n*enters the chat*</s>\n"
-                llama_chat_history += "<|assistant|>\n" + current_seed + "</s>\n"
+                #llama_chat_history += "<human>Hi</human></s>\n\n"
+                llama_chat_history += "(" + current_name + ": " + current_seed + ")</s>\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -132,11 +133,11 @@ Begin!
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += "<|user|>\n" + str(
-                                msg.text).replace("\n", " ") + "</s>\n"
+                            llama_related_history += "(human: " + str(
+                                msg.text).replace("\n", " ") + ")</s>\n\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += "<|assistant|>\n" + str(
-                        msg.text).replace("\n", " ") + "</s>\n"
+                    llama_related_history += "(" + current_name + ": " + str(
+                        msg.text).replace("\n", " ") + ")</s>\n\n"
 
         current_persona = PERSONA
         current_behaviour = BEHAVIOUR
@@ -167,7 +168,8 @@ Begin!
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nHuman is requesting a selfie picture of your character, remember to generate tool name and input to generate image."
+            a = ""
+            #image_helper = "\nHuman is requesting a selfie picture of your character, remember to generate tool name and input to generate image."
 
         prompt = self.PROMPT.format(
             NAME=current_name,
@@ -180,12 +182,12 @@ Begin!
             current_time=current_time,
             current_day=current_day,
             tool_index=tool_index,
-            tool_names=tool_names_csv,
+            tool_names=tool_names,
             scratchpad=scratchpad,
             chat_history=llama_chat_history,
             relevant_history=llama_related_history,
         )
-        logging.warning(prompt)
+        #logging.warning(prompt)
         completions = self.llm.complete(prompt=prompt,
                                         stop="<observation>",
                                         max_retries=4)
@@ -212,13 +214,14 @@ Begin!
             if "Block(" in observation:
                 observation = "*Selfie image of your character generated and attached*"
             steps.append(
-                f"<tool>{action.tool}</tool>\n"
-                f'<tool_input>{" ".join([b.as_llm_input() for b in action.input])}</tool_input>\n'
-                f'<observation>{observation}</observation>\n')
+                f"\n\n(Action:{action.tool})\n"
+                f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])})\n'
+                f'(Abservation:{observation}. Your character took a selfie for the human with the tool, do not write attachments. Write your response and mention selfie.</s>\n'
+            )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            scratchpad += "\n*Your character took a selfie for the human with the tool, do not write attachments, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*\n<" + current_name + ">"
-
+            #scratchpad += "\n*Your character took a selfie for the human with the tool, do not write attachments, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*\n<" + current_name + ">"
+            scratchpad += ""
         else:
             scratchpad += "\n"
         #Log agent scratchpad

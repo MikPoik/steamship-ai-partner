@@ -66,7 +66,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(LLAMA2_HERMES,
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
                                      description="llm model to use")
     llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
     zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
@@ -290,7 +290,7 @@ class MyAssistant(AgentService):
                                      self.client,
                                      api_key=self.config.zephyr_api_key,
                                      model_name=self.config.llm_model,
-                                     temperature=0.6,
+                                     temperature=0.7,
                                      top_p=0.9,
                                      max_tokens=300,
                                      max_retries=4),
