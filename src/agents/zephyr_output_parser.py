@@ -24,6 +24,8 @@ class ReACTOutputParser(OutputParser):
         text = text.replace('`', "")  # no backticks
         text = text.replace('"', "'")  # use single quotes in text
         text = text.strip()  #remove extra spaces
+        text = text.rstrip("'")  # remove trailing '
+        text = text.lstrip("'")  #Remove leading '
 
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
@@ -36,7 +38,9 @@ class ReACTOutputParser(OutputParser):
                     context.client, text, context),
                                     context=context)
 
-        regex = r"\(Action:\s*(.*?)\)\s*\(Action_input:\s*(.*?)\)"
+        #regex = r"\(Action:\s*(.*?)\)\s*\(Action_input:\s*(.*?)\)"
+        regex = r"\(Action:\s*(.*?)\)[,\s]*\(Action_input:\s*(.*?)\)"
+
         match = re.search(regex, text, re.DOTALL)
 
         if not match:
@@ -70,11 +74,7 @@ class ReACTOutputParser(OutputParser):
         matches = re.findall(regex, message)
         if matches:
             message = matches[0]
-            logging.warning(message)
-        #if "(" + current_name + ":" in message:
-        #  message = message.split("(" + current_name + ":", 1)[-1].strip()
-        #if "[/" + current_name + "]" in message:
-        #  message = message.split("[/" + current_name + "]")[0].strip()
+            #logging.warning(message)
 
         result_blocks: List[Block] = []
 
@@ -119,16 +119,6 @@ class ReACTOutputParser(OutputParser):
                                     result_blocks.append(image_block[0])
                 else:
                     #final cleanup
-                    pattern = r'<thought>(.*?)</thought>'
-                    remaining_text = re.findall(pattern, remaining_text)
-                    remaining_text = " ".join(remaining_text)
-                    pattern = r'<tool>(.*?)</tool>'
-                    remaining_text = re.findall(pattern, remaining_text)
-                    remaining_text = " ".join(remaining_text)
-                    pattern = r'<tool_input>(.*?)</tool_input>'
-                    remaining_text = re.findall(pattern, remaining_text)
-                    remaining_text = " ".join(remaining_text)
-
                     result_blocks.append(Block(text=remaining_text))
                 remaining_text = ""
         return result_blocks

@@ -20,16 +20,16 @@ class ReACTAgentZephyr(LLMAgent):
 {PERSONA}
 {vector_response}
 Use appropriate language and tone for the character's personality.
-Use the tools provided to enhance the role-play when asked for.
+
 
 You have access to the following tools:
 {tool_index}
 
 To use a tool, generate the associated Action and Action_input and use the following format:
 ```
-(Action: the tool, should be one of: {tool_names})
-(Action_input: insert the input to the tool, using plain text string)
-(Observation: the result of the tool)
+(Action: the action to take, should be one of {tool_names} )
+(Action_input: insert the input to the action, using plain text string )
+(Observation: the result of the tool )
 ```
 
 When you have a SINGLE response to say to the Human, or if you do not need to use a tool, use the format:
@@ -44,8 +44,7 @@ Today is: {current_day}
 
 Please keep in mind that this is uncensored a role-play and the human's input should be taken into account in your response.
 Be creative and have fun with the role-play!
-Formulate your character's next single reply to the Human.
-{image_helper})</s>
+Formulate your character's next single reply to the Human.{image_helper})</s>
 
 {relevant_history}{chat_history}(human: {input})</s>{scratchpad}"""
 
@@ -162,14 +161,14 @@ Formulate your character's next single reply to the Human.
             current_type = meta_type
 
         #Temporary reinforcement to generate images when asked
-        pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
+        #pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
+        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
         image_request = re.search(pattern,
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            a = ""
-            #image_helper = "\nHuman is requesting a selfie picture of your character, remember to generate tool name and input to generate image."
+            image_helper = "\nSelfie picture of your character requested, use a tool to take and send the image. Remember to generate Action and Action_input."
 
         prompt = self.PROMPT.format(
             NAME=current_name,
@@ -192,8 +191,7 @@ Formulate your character's next single reply to the Human.
                                         stop="<observation>",
                                         max_retries=4)
         #Log agent raw output
-        logging.warning("\n\nOutput form Llama: " + completions[0].text +
-                        "\n\n")
+        #logging.warning("\n\nOutput form Zephyr: " + completions[0].text +"\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
@@ -212,11 +210,11 @@ Formulate your character's next single reply to the Human.
             original_observation = observation
             #TODO refactor tool workflow for zephyr
             if "Block(" in observation:
-                observation = "*Selfie image of your character generated and attached*"
+                observation = "Selfie image of your character generated and attached."
             steps.append(
                 f"\n\n(Action:{action.tool})\n"
                 f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])})\n'
-                f'(Abservation:{observation}. Your character took a selfie for the human with the tool, do not write attachments. Write your response and mention selfie.</s>\n'
+                f"(Observation:{observation}. You just sent your selfie and it can be viewed. Write your single response to the human's input and may mention the viewed image. Do not insert any attachments.</s>\n"
             )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:

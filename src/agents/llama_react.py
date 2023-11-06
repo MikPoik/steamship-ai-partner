@@ -23,11 +23,8 @@ class ReACTAgent(LLMAgent):
   {PERSONA}
   {vector_response}
   </personality>
-
-  Use your character's personality and behavior to guide you and create a vivid and engaging response.
-  Use appropriate language and tone for the character's personality and the context of messages.
-  Remember to maintain a consistent tone and personality.
-  Use the tools provided to enhance the role-play when asked for.
+  Use appropriate language and tone for the character's personality.
+  
 
   <tools>
   You have access to the following tools:
@@ -35,7 +32,7 @@ class ReACTAgent(LLMAgent):
 
   If you decide that you should use a tool, use the following format described between triple backticks:
   ```
-  <tool>the tool, should be one of: {tool_names}</tool>
+  <tool>the tool name, should be one of: {tool_names}</tool>
   <tool_input>the input to the tool, using plain text string</tool_input>
   <observation>the result of the tool</observation>
   ```
@@ -181,7 +178,9 @@ class ReACTAgent(LLMAgent):
             current_type = meta_type
 
         #Temporary reinforcement to generate images when asked
-        pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
+        #pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
+        #exclude words "cant" and "can't"
+        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
         image_request = re.search(pattern,
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
@@ -210,8 +209,8 @@ class ReACTAgent(LLMAgent):
                                         stop="<observation>",
                                         max_retries=4)
         #Log agent raw output
-        logging.warning("\n\nOutput form Llama: " + completions[0].text +
-                        "\n\n")
+        #logging.warning("\n\nOutput form Llama: " + completions[0].text +
+        #               "\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
