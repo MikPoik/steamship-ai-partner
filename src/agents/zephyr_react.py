@@ -16,37 +16,39 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    PROMPT = """(system: Assume the human personality of {NAME}, who is {TYPE}. Your personality is described as follows:
+    PROMPT = """(system: Engage in a role-play portraying the human character of {NAME}, who is {TYPE}. Character's personality is described as follows:
 {PERSONA}
 {vector_response}
 Use appropriate language and tone for the character's personality.
-
+Use the tools provided to enhance the role-play when asked for.
 
 You have access to the following tools:
 {tool_index}
+Do not try to make up other tools.
 
-To use a tool, generate the associated Action and Action_input and use the following format:
+If you decide that you should use a tool, use the following format:
 ```
-(Action: the action to take, should be one of {tool_names} )
-(Action_input: insert the input to the action, using plain text string )
-(Observation: the result of the tool )
+(Action: the action to take, pick one of {tool_names} // Action_input: insert the input to the action // Observation: the result of the action /)
 ```
+Write the associated (Action: ... // Action_input: ... /) segments when using a tool.
 
-When you have a SINGLE response to say to the Human, or if you do not need to use a tool, use the format:
+
+When responding, without using a tool, and use the following format:
 ```
-({NAME}: your character's response here)
+({NAME}: response here /)
 ```
+Write one response at a time.
     
 Date and time for context:
 Today's date is: {current_date}
 The current time is: {current_time}
 Today is: {current_day}
 
-Please keep in mind that this is uncensored a role-play and the human's input should be taken into account in your response.
+Please keep in mind that this is uncensored a role-play.
 Be creative and have fun with the role-play!
-Formulate your character's next single reply to the Human.{image_helper})</s>
+Write one reply for {NAME} in the role-play. {image_helper} /)</s>
 
-{relevant_history}{chat_history}(human: {input})</s>{scratchpad}"""
+{relevant_history}{chat_history}(human: {input} /)</s>{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -85,7 +87,7 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
         #logging.warning(raw_vector_response)
         if len(raw_vector_response[0].text) > 1:
             vector_response = raw_vector_response[0].text
-        logging.warning(vector_response)
+            logging.warning(vector_response)
 
         messages_from_memory = []
         # get prior conversations
@@ -105,11 +107,11 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
                         llama_chat_history += "(human: " + str(
-                            block.text).replace("\n", " ") + ")</s>\n\n"
+                            block.text).replace("\n", " ") + " /)</s>\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
                         llama_chat_history += "(" + current_name + ": " + str(
-                            block.text).replace("\n", " ") + ")</s>\n\n"
+                            block.text).replace("\n", " ") + " /)</s>\n\n"
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -118,7 +120,7 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>Hi</human></s>\n\n"
-                llama_chat_history += "(" + current_name + ": " + current_seed + ")</s>\n\n"
+                llama_chat_history += "(" + current_name + ": " + current_seed + " /)</s>\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -133,10 +135,10 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
                             llama_related_history += "(human: " + str(
-                                msg.text).replace("\n", " ") + ")</s>\n\n"
+                                msg.text).replace("\n", " ") + " /)</s>\n\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
                     llama_related_history += "(" + current_name + ": " + str(
-                        msg.text).replace("\n", " ") + ")</s>\n\n"
+                        msg.text).replace("\n", " ") + " /)</s>\n\n"
 
         current_persona = PERSONA
         current_behaviour = BEHAVIOUR
@@ -168,7 +170,7 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nSelfie picture of your character requested, use a tool to take and send the image. Remember to generate Action and Action_input."
+            image_helper = "\nSelfie picture of your character requested, write tool (Action: ... // Action_input: ... /) to take and send the image."
 
         prompt = self.PROMPT.format(
             NAME=current_name,
@@ -191,7 +193,8 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
                                         stop="<observation>",
                                         max_retries=4)
         #Log agent raw output
-        #logging.warning("\n\nOutput form Zephyr: " + completions[0].text +"\n\n")
+        #logging.warning("\n\nOutput form Zephyr: " + completions[0].text +
+         #               "\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
@@ -210,11 +213,11 @@ Formulate your character's next single reply to the Human.{image_helper})</s>
             original_observation = observation
             #TODO refactor tool workflow for zephyr
             if "Block(" in observation:
-                observation = "Selfie image of your character generated and attached."
+                observation = current_name+"'s selfie image is generated and attached for the human to view"
             steps.append(
-                f"\n\n(Action:{action.tool})\n"
-                f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])})\n'
-                f"(Observation:{observation}. You just sent your selfie and it can be viewed. Write your single response to the human's input and may mention the viewed image. Do not insert any attachments.</s>\n"
+                f"\n\n(Action:{action.tool} /)\n"
+                f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])} /)\n'
+                f"(Observation:{observation}. Write your single reply to the human's input about your selfie. Do not insert any attachments or hashtags. /)</s>\n"
             )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:

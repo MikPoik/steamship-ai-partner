@@ -33,15 +33,15 @@ class ReACTOutputParser(OutputParser):
             current_name = meta_name
 
         if "(" + current_name + ":" in text:
-            if not "(Action" in text:
+            if not "Action" in text:
                 return FinishAction(output=ReACTOutputParser._blocks_from_text(
                     context.client, text, context),
                                     context=context)
 
         #regex = r"\(Action:\s*(.*?)\)\s*\(Action_input:\s*(.*?)\)"
-        regex = r"\(Action:\s*(.*?)\)[,\s]*\(Action_input:\s*(.*?)\)"
+        regex = r"Action:\s*(.*?)\s*//\s*Action_input:\s*(.*?)\s*\)"
 
-        match = re.search(regex, text, re.DOTALL)
+        match = re.search(regex, text, re.DOTALL | re.MULTILINE)
 
         if not match:
             logging.warning(f"Prefix missing, {text} send output to user..")
@@ -51,7 +51,13 @@ class ReACTOutputParser(OutputParser):
                                 context=context)
         action = match.group(1)
         action_input = match.group(2).strip()
+        action_input = action_input.rstrip("'")
+        action_input = action_input.lstrip("'")
+        action_input = action_input.split("//")[0]
+        action_input = action_input.split("/")[0]
         tool = action.strip()
+        tool = tool.lstrip("'")
+        tool = tool.rstrip("'")
         if tool is None:
             raise RuntimeError(
                 f"Could not find tool from action: `{action}`. Known tools: {self.tools_lookup_dict.keys()}"
@@ -70,10 +76,20 @@ class ReACTOutputParser(OutputParser):
         if meta_name is not None:
             current_name = meta_name
         message = text
-        regex = r"\({}:(.*?)\)".format(current_name)
+        regex = r"\({}:(.*?)\/\)".format(current_name)
         matches = re.findall(regex, message)
+        regex2 = r"\({}:(.*?)\)".format(current_name)
+        matches2 = re.findall(regex2, message)
         if matches:
             message = matches[0]
+            message = message.strip()
+            message = message.lstrip("'")
+            message = message.rstrip("'")
+        elif matches2:
+            message = matches2[0]
+            message = message.strip()
+            message = message.lstrip("'")
+            message = message.rstrip("'")
             #logging.warning(message)
 
         result_blocks: List[Block] = []
@@ -119,6 +135,8 @@ class ReACTOutputParser(OutputParser):
                                     result_blocks.append(image_block[0])
                 else:
                     #final cleanup
+                    remaining_text = remaining_text.lstrip("'")
+                    remaining_text = remaining_text.rstrip("'")
                     result_blocks.append(Block(text=remaining_text))
                 remaining_text = ""
         return result_blocks

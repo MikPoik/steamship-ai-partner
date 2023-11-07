@@ -23,7 +23,9 @@ class ReACTAgent(LLMAgent):
   {PERSONA}
   {vector_response}
   </personality>
-  Use appropriate language and tone for the character's personality.
+  Use appropriate language and tone for the character's personality and the context of messages.
+  Remember to maintain a consistent tone and personality.
+  Use the tools provided to enhance the role-play when asked for.
   
 
   <tools>

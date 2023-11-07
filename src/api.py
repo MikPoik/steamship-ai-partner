@@ -33,8 +33,8 @@ from agents.llama_react import ReACTAgent  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.coqui_tool import CoquiTool  #upm package(steamship)
-from agents.gwllama_llm import LlamaGWLLM #upm package(steamship)
-from agents.zephyr_llm import ChatZephyr, Zephyr #upm package(steamship)
+from agents.gwllama_llm import LlamaGWLLM  #upm package(steamship)
+from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
@@ -68,10 +68,8 @@ class MyAssistantConfig(Config):
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
     llm_model: Optional[str] = Field(ZEPHYR_CHAT,
                                      description="llm model to use")
-    llama_api_key: Optional[str] = Field(
-        "LL-",
-        description="Llama api key")
-                                          description="Lemonfox api key")
+    llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
+    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
     llamagw_api_key: Optional[str] = Field("",
                                            description="Llamagateway api key")
     create_images: Optional[str] = Field(
@@ -292,8 +290,8 @@ class MyAssistant(AgentService):
                                      self.client,
                                      api_key=self.config.zephyr_api_key,
                                      model_name=self.config.llm_model,
-                                     temperature=0.6,
-                                     top_p=0.9,
+                                     temperature=0.9,
+                                     top_p=0.6,
                                      max_tokens=300,
                                      max_retries=4),
                                  message_selector=MessageWindowMessageSelector(
