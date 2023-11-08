@@ -23,6 +23,8 @@ class ReACTAgent(LLMAgent):
   {PERSONA}
   {vector_response}
   </personality>
+
+  Use your character's personality and behavior to guide you and create a vivid and engaging response.
   Use appropriate language and tone for the character's personality and the context of messages.
   Remember to maintain a consistent tone and personality.
   Use the tools provided to enhance the role-play when asked for.
@@ -102,7 +104,7 @@ class ReACTAgent(LLMAgent):
         #logging.warning(raw_vector_response)
         if len(raw_vector_response[0].text) > 1:
             vector_response = raw_vector_response[0].text
-        logging.warning(vector_response)
+            logging.warning(vector_response)
 
         messages_from_memory = []
         # get prior conversations
@@ -241,5 +243,5 @@ class ReACTAgent(LLMAgent):
         else:
             scratchpad += "\n"
         #Log agent scratchpad
-        logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
+        #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad
