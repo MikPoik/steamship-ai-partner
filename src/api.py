@@ -66,7 +66,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
+    llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                      description="llm model to use")
     llama_api_key: Optional[str] = Field("LL-", description="Llama api key")
     zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")

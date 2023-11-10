@@ -16,7 +16,7 @@ class SelfieTool(ImageGeneratorTool):
     name: str = "selfie_tool"
     human_description: str = "Generates a selfie-style image from text with getimg.ai"
     agent_description = (
-        "Useful to generate and send images from text prompts. Only use if the human is currently requesting for a selfie or image or picture, etc. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
+        "Useful to generate images from text prompts. Only use if the human is currently requesting for a selfie or image or picture, etc. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
     )
 
     generator_plugin_handle: str = "getimg-ai"
