@@ -30,8 +30,10 @@ Do not try to make up other tools.
 Do not talk about the tools to the human.
 If you decide that you should use a given tool, use the following format:
 ```
-(Action: the action to take, pick one of {tool_names} // Action_input: insert the input to the action // Observation: the result of the action /)
+(Action: the action to take, pick one of {tool_names} /) (Action_input: insert the input to the action /) (Observation: the result of the action /)
 ```
+Example usage: (Action: imagetool /)(Action_input: stunning body,explicit pose,..., very beautiful /)( Observation: Image generated. /)
+
 
 When responding to the Human, without using a tool, use the following format:
 ```
@@ -169,7 +171,7 @@ Formulate your character's single reply to the human's message. /)</s>
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nYou should use a tool now to generate a image."
+            image_helper = "\nGenerate a image of your character " + current_name + " using a tool. Write only the tool in format: (Action:  /)( Action_input:  /)( Observation:  /)."
 
         prompt = self.PROMPT.format(
             NAME=current_name,
@@ -189,11 +191,11 @@ Formulate your character's single reply to the human's message. /)</s>
         )
         #logging.warning(prompt)
         completions = self.llm.complete(prompt=prompt,
-                                        stop="<observation>",
+                                        stop="Observation:",
                                         max_retries=4)
         #Log agent raw output
         #logging.warning("\n\nOutput form Zephyr: " + completions[0].text +
-        #"\n\n")
+        #                "\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
@@ -212,11 +214,11 @@ Formulate your character's single reply to the human's message. /)</s>
             original_observation = observation
             #TODO refactor tool workflow for zephyr
             if "Block(" in observation:
-                observation = current_name + "'s selfie image is sent for the human to view"
+                observation = "You just sent " + current_name + "'s image for the human to view"
             steps.append(
                 f"\n\n(Action:{action.tool} /)\n"
                 f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])} /)\n'
-                f"(Observation:{observation}. Reply to the human's input about your selfie,without any attachments,signatures,gestures or hashtags. /)</s>\n"
+                f"(Observation:{observation}. Write your character's single response to the human's input. /)</s>\n"
             )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
@@ -225,5 +227,5 @@ Formulate your character's single reply to the human's message. /)</s>
         else:
             scratchpad += "\n"
         #Log agent scratchpad
-        #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
+        logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

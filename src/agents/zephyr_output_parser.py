@@ -38,10 +38,10 @@ class ReACTOutputParser(OutputParser):
                     context.client, text, context),
                                     context=context)
 
-        #regex = r"\(Action:\s*(.*?)\)\s*\(Action_input:\s*(.*?)\)"
-        regex = r"Action:\s*(.*?)\s*//\s*Action_input:\s*(.*?)\s*\)"
+        regex = r"\(action:\s*(.*?)\)\s*\(action_input:\s*(.*?)\)"
+        #regex = r"action:\s*(.*?)\s*//\s*action_input:\s*(.*?)\s*\/"
 
-        match = re.search(regex, text, re.DOTALL | re.MULTILINE)
+        match = re.search(regex, text.lower(), re.DOTALL | re.MULTILINE | re.IGNORECASE)
 
         if not match:
             logging.warning(f"Prefix missing, {text} send output to user..")
@@ -50,11 +50,15 @@ class ReACTOutputParser(OutputParser):
                 context.client, text, context),
                                 context=context)
         action = match.group(1)
+        action = action.rstrip("'")
+        action = action.lstrip("'")
+        action = action.rstrip("//")
+        action = action.rstrip("/")
         action_input = match.group(2).strip()
         action_input = action_input.rstrip("'")
         action_input = action_input.lstrip("'")
-        action_input = action_input.split("//")[0]
-        action_input = action_input.split("/")[0]
+        action_input = action_input.rstrip("//")
+        action_input = action_input.rstrip("/")
         tool = action.strip()
         tool = tool.lstrip("'")
         tool = tool.rstrip("'")
@@ -77,9 +81,9 @@ class ReACTOutputParser(OutputParser):
             current_name = meta_name
         message = text
         regex = r"\({}:(.*?)\/\)".format(current_name)
-        matches = re.findall(regex, message)
+        matches = re.findall(regex, message, re.DOTALL | re.MULTILINE)
         regex2 = r"\({}:(.*?)\)".format(current_name)
-        matches2 = re.findall(regex2, message)
+        matches2 = re.findall(regex2, message, re.DOTALL | re.MULTILINE)
         if matches:
             message = matches[0]
             message = message.strip()

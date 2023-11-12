@@ -9,3 +9,4 @@ steamship.json
 .replit
 poetry.lock
 replit.nix
+.env

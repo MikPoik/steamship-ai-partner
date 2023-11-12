@@ -6,6 +6,10 @@ from steamship.utils.repl import ToolREPL  #upm package(steamship)
 from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship, Task  #upm package(steamship)
 import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 #NSFW_SELFIE_TEMPLATE_PRE =""
 
 #NSFW_SELFIE_TEMPLATE_POST = ""
@@ -13,14 +17,14 @@ import logging
 
 class SelfieTool(ImageGeneratorTool):
 
-    name: str = "selfie_tool"
+    name: str = "imagetool"
     human_description: str = "Generates a selfie-style image from text with getimg.ai"
     agent_description = (
-        "Useful to generate images from text prompts. Only use if the human is currently requesting for a selfie or image or picture, etc. The input should be a plain text string of comma separated keywords, that describes in detail, the image."
+        "Useful to generate image,selfie,picture etc. from text prompt. The input should be a plain text string , that describes in detail, the image."
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": "key-"}
+    generator_plugin_config: dict = {"api_key": os.getenv('GETIMG_API_KEY')}
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,
