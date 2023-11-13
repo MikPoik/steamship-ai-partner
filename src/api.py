@@ -35,7 +35,7 @@ from steamship.agents.schema.message_selectors import MessageWindowMessageSelect
 from tools.coqui_tool import CoquiTool  #upm package(steamship)
 from agents.gwllama_llm import LlamaGWLLM  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
-from dotenv import load_dotenv
+
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
@@ -43,7 +43,7 @@ LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
 LLAMA2_PUFFIN = "NousResearch/Redmond-Puffin-13B"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
-load_dotenv()
+
 
 
 #TelegramTransport config
@@ -69,9 +69,9 @@ class MyAssistantConfig(Config):
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
     llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                      description="llm model to use")
-    llama_api_key: Optional[str] = Field(os.getenv('LLAMA_API_KEY'),
+    llama_api_key: Optional[str] = Field(os.getenv('LLAMAAPI_KEY'),
                                          description="Llama api key")
-    zephyr_api_key: Optional[str] = Field(os.getenv('LEMONFOX_API_KEY'),
+    zephyr_api_key: Optional[str] = Field(os.getenv('LEMONFOX_KEY'),
                                           description="Lemonfox api key")
     llamagw_api_key: Optional[str] = Field("",
                                            description="Llamagateway api key")

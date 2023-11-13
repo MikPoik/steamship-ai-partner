@@ -33,15 +33,16 @@ class ReACTOutputParser(OutputParser):
             current_name = meta_name
 
         if "(" + current_name + ":" in text:
-            if not "Action" in text:
+            if not "action" in text.lower():
                 return FinishAction(output=ReACTOutputParser._blocks_from_text(
                     context.client, text, context),
                                     context=context)
 
-        regex = r"\(action:\s*(.*?)\)\s*\(action_input:\s*(.*?)\)"
-        #regex = r"action:\s*(.*?)\s*//\s*action_input:\s*(.*?)\s*\/"
+        #regex = r"action:\s*(.*?)\)\s§*action_input:\s*(.*?)\)"
+        regex = '\(Action:\s*([^)/]*)\s*/?\)\s*\(Action_input:\s*([^)/]*)\s*/?\)'
 
-        match = re.search(regex, text.lower(), re.DOTALL | re.MULTILINE | re.IGNORECASE)
+        match = re.search(regex, text.lower(),
+                          re.DOTALL | re.MULTILINE | re.IGNORECASE)
 
         if not match:
             logging.warning(f"Prefix missing, {text} send output to user..")

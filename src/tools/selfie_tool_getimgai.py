@@ -7,9 +7,7 @@ from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship, Task  #upm package(steamship)
 import logging
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
 #NSFW_SELFIE_TEMPLATE_PRE =""
 
 #NSFW_SELFIE_TEMPLATE_POST = ""
@@ -24,7 +22,7 @@ class SelfieTool(ImageGeneratorTool):
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": os.getenv('GETIMG_API_KEY')}
+    generator_plugin_config: dict = {"api_key": os.getenv('GETIMG_KEY')}
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,

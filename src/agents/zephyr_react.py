@@ -88,7 +88,7 @@ Formulate your character's single reply to the human's message. /)</s>
         #logging.warning(raw_vector_response)
         if len(raw_vector_response[0].text) > 1:
             vector_response = raw_vector_response[0].text
-            logging.warning(vector_response)
+            #logging.warning(vector_response)
 
         messages_from_memory = []
         # get prior conversations
@@ -107,7 +107,7 @@ Formulate your character's single reply to the human's message. /)</s>
                 if block.chat_role == RoleTag.USER:
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "(<|user|>\nhuman: " + str(
+                        llama_chat_history += "(<|user|>\n(human: " + str(
                             block.text).replace("\n", " ") + " /)</s>\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
@@ -195,7 +195,7 @@ Formulate your character's single reply to the human's message. /)</s>
                                         max_retries=4)
         #Log agent raw output
         #logging.warning("\n\nOutput form Zephyr: " + completions[0].text +
-        #                "\n\n")
+        #               "\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
@@ -218,7 +218,9 @@ Formulate your character's single reply to the human's message. /)</s>
             steps.append(
                 f"\n\n(Action:{action.tool} /)\n"
                 f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])} /)\n'
-                f"(Observation:{observation}. Write your character's single response to the human's input. /)</s>\n"
+                f"(Observation:{observation}. Continue the conversation with "
+                + current_name +
+                "'s reply. Without attachments, actions,tools,signatures or gestures mention sending the image. /)</s>\n"
             )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
@@ -227,5 +229,5 @@ Formulate your character's single reply to the human's message. /)</s>
         else:
             scratchpad += "\n"
         #Log agent scratchpad
-        logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
+        #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad
