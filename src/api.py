@@ -45,7 +45,6 @@ MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
 
 
-
 #TelegramTransport config
 class MyAssistantConfig(Config):
     api_base: Optional[str] = Field("https://api.telegram.org/bot",
@@ -67,7 +66,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(LLAMA2_HERMES,
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
                                      description="llm model to use")
     llama_api_key: Optional[str] = Field(os.getenv('LLAMAAPI_KEY'),
                                          description="Llama api key")
@@ -145,35 +144,7 @@ class MyAssistant(AgentService):
                     }, {
                         "text": "Deposit 10$",
                         "callback_data": "/buy_option_10-1000"
-                    }],
-                                        [
-                                            {
-                                                "text":
-                                                "Deposit 25$",
-                                                "callback_data":
-                                                "/buy_option_25-2500"
-                                            },
-                                            {
-                                                "text":
-                                                "Deposit 50$",
-                                                "callback_data":
-                                                "/buy_option_50-5000"
-                                            },
-                                        ],
-                                        [
-                                            {
-                                                "text":
-                                                "Deposit 100$",
-                                                "callback_data":
-                                                "/buy_option_100-10000"
-                                            },
-                                            {
-                                                "text":
-                                                "Deposit 250$",
-                                                "callback_data":
-                                                "/buy_option_250-25000"
-                                            },
-                                        ]]
+                    }]]
                 }
             },
         )
@@ -263,17 +234,16 @@ class MyAssistant(AgentService):
 
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgentZephyr(tools,
-                                 llm=ChatLlama(
-                                     self.client,
-                                     api_key=self.config.llama_api_key,
-                                     model_name=self.config.llm_model,
-                                     temperature=0.9,
-                                     top_p=0.6,
-                                     max_tokens=300,
-                                     max_retries=4),
-                                 message_selector=MessageWindowMessageSelector(
-                                     k=MESSAGE_COUNT)))
+                ReACTAgent(tools,
+                           llm=ChatLlama(self.client,
+                                         api_key=self.config.llama_api_key,
+                                         model_name=self.config.llm_model,
+                                         temperature=0.9,
+                                         top_p=0.6,
+                                         max_tokens=300,
+                                         max_retries=4),
+                           message_selector=MessageWindowMessageSelector(
+                               k=MESSAGE_COUNT)))
 
         if "Mistral" in self.config.llm_model or "Puffin" in self.config.llm_model:
             self.set_default_agent(

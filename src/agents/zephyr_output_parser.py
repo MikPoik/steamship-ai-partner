@@ -82,68 +82,52 @@ class ReACTOutputParser(OutputParser):
             current_name = meta_name
         message = text
         regex = r"\({}:(.*?)\/\)".format(current_name)
-        matches = re.findall(regex, message, re.DOTALL | re.MULTILINE)
+        match = re.search(regex, message, re.DOTALL | re.MULTILINE)
         regex2 = r"\({}:(.*?)\)".format(current_name)
-        matches2 = re.findall(regex2, message, re.DOTALL | re.MULTILINE)
-        if matches:
-            message = matches[0]
+        match2 = re.search(regex2, message, re.DOTALL | re.MULTILINE)
+        if match:
+            message = match.group(1)
             message = message.strip()
             message = message.lstrip("'")
             message = message.rstrip("'")
-        elif matches2:
-            message = matches2[0]
+        elif match2:
+            message = match2.group(1)
             message = message.strip()
             message = message.lstrip("'")
             message = message.rstrip("'")
-            #logging.warning(message)
 
         result_blocks: List[Block] = []
 
         block_found = 0
         block_id_regex = r"(?:(?:\[|\(|<)?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)|>)?)"
         remaining_text = message
-        while remaining_text is not None and len(remaining_text) > 0:
-            match = re.search(block_id_regex, remaining_text)
-            if match:
-                block_found = 1
-                pre_block_text = ReACTOutputParser._remove_block_prefix(
-                    candidate=remaining_text[0:match.start()])
-                if len(pre_block_text) > 0:
-                    result_blocks.append(Block(text=pre_block_text))
-                result_blocks.append(Block.get(client, _id=match.group(1)))
-                remaining_text = ReACTOutputParser._remove_block_suffix(
-                    remaining_text[match.end():])
-            else:
-                if block_found == 0:
-                    result_blocks.append(Block(text=remaining_text))
-                    saved_block = context.metadata.get("blocks",
-                                                       {}).get("image")
-                    if saved_block is not None:
-                        result_blocks.append(Block.get(client,
-                                                       _id=saved_block))
-                        context.metadata['blocks'] = None
-                    else:
-                        #Another way to check for image generation, if agent forgets to use a tool
-                        pattern = r'.*\b(?:here|sent|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
-                        compiled_pattern = re.compile(pattern, re.IGNORECASE)
-                        if compiled_pattern.search(remaining_text):
-                            check_image_block = context.metadata.get(
-                                "blocks", {}).get("image")
-                            if check_image_block is None:
-                                #logging.warning("Create selfie for prompt")
-                                create_images = context.metadata.get(
-                                    "instruction", {}).get("create_images")
-                                if create_images == "true":
-                                    selfie = SelfieTool()
-                                    image_block = selfie.run(
-                                        [Block(text=remaining_text)], context)
-                                    result_blocks.append(image_block[0])
-                else:
-                    #final cleanup
-                    remaining_text = remaining_text.lstrip("'")
-                    remaining_text = remaining_text.rstrip("'")
-                    result_blocks.append(Block(text=remaining_text))
-                remaining_text = ""
+
+        result_blocks.append(Block(text=remaining_text))
+        saved_block = context.metadata.get("blocks",
+                                           {}).get("image")
+        if saved_block is not None:
+            result_blocks.append(Block.get(client,
+                                           _id=saved_block))
+            context.metadata['blocks'] = None
+        else:
+            #Another way to check for image generation, if agent forgets to use a tool
+            pattern = r'.*\b(?:here|sent|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
+            compiled_pattern = re.compile(pattern, re.IGNORECASE)
+            if compiled_pattern.search(remaining_text):
+                check_image_block = context.metadata.get(
+                    "blocks", {}).get("image")
+                if check_image_block is None:
+                    #logging.warning("Create selfie for prompt")
+                    create_images = context.metadata.get(
+                        "instruction", {}).get("create_images")
+                    if create_images == "true":
+                        selfie = SelfieTool()
+                        image_block = selfie.run(
+                            [Block(text=remaining_text)], context)
+                        result_blocks.append(image_block[0])
+
+                #final cleanup
+                #result_blocks.append(Block(text=remaining_text))   
         return result_blocks
 
     @staticmethod

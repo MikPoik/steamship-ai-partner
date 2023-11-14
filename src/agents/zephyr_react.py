@@ -4,7 +4,7 @@ from agents.zephyr_output_parser import ReACTOutputParser  #upm package(steamshi
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
-from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED  #upm package(steamship)
+from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED,SELFIE_TEMPLATE_PRE  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 import datetime
@@ -20,6 +20,10 @@ class ReACTAgentZephyr(LLMAgent):
 (system: Engage in a role-play portraying the character of {NAME}, who is {TYPE}. Your Character's personality is described as follows:
 {PERSONA}
 {vector_response}
+
+Appearance:
+{SELFIE_TEMPLATE_PRE}
+
 Use appropriate language and tone for the character's personality and the context of messages.
 Use the tools provided to enhance the role-play when asked for.
 
@@ -171,12 +175,13 @@ Formulate your character's single reply to the human's message. /)</s>
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nGenerate a image of your character " + current_name + " using a tool. Write only the tool in format: (Action:  /)( Action_input:  /)( Observation:  /)."
+            image_helper = "\nGenerate a image of your character " + current_name + " using a tool. Write only the tool in format: (Action:  /)( Action_input: describe the image /)( Observation:  /)."
 
         prompt = self.PROMPT.format(
             NAME=current_name,
             PERSONA=current_persona,
             TYPE=current_type,
+            SELFIE_TEMPLATE_PRE=SELFIE_TEMPLATE_PRE,
             vector_response=vector_response,
             image_helper=image_helper,
             input=context.chat_history.last_user_message.text,
@@ -214,13 +219,13 @@ Formulate your character's single reply to the human's message. /)</s>
             original_observation = observation
             #TODO refactor tool workflow for zephyr
             if "Block(" in observation:
-                observation = "You just sent " + current_name + "'s image for the human to view"
+                observation = "" + current_name + "'s image sent for the human to view"
             steps.append(
-                f"\n\n(Action:{action.tool} /)\n"
+                f"\n\nAction output for {current_name}:\n(Action:{action.tool} /)\n"
                 f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])} /)\n'
                 f"(Observation:{observation}. Continue the conversation with "
                 + current_name +
-                "'s reply. Without attachments, actions,tools,signatures or gestures mention sending the image. /)</s>\n"
+                "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. /)</s>\n"
             )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:

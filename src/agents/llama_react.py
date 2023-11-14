@@ -4,7 +4,7 @@ from agents.react_output_parser import ReACTOutputParser  #upm package(steamship
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
-from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED  #upm package(steamship)
+from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED, SELFIE_TEMPLATE_PRE  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 import datetime
@@ -23,6 +23,9 @@ class ReACTAgent(LLMAgent):
   {PERSONA}
   {vector_response}
   </personality>
+  <appearance>
+  {SELFIE_TEMPLATE_PRE}
+  </appearance>
 
   Use your character's personality and behavior to guide you and create a vivid and engaging response.
   Use appropriate language and tone for the character's personality and the context of messages.
@@ -34,14 +37,17 @@ class ReACTAgent(LLMAgent):
   You have access to the following tools:
   {tool_index}
 
-  If you decide that you should use a tool, use the following format described between triple backticks:
-  ```
-  <tool>the tool name, should be one of: {tool_names}</tool>
-  <tool_input>the input to the tool, using plain text string</tool_input>
-  <observation>the result of the tool</observation>
-  ```
-  
-  Generate the associated <tool> and <tool_input> elements when using a tool.
+  If you decide that you should use a given tool, use the following format described between triple backticks:
+    ```
+    <tool> the action to take, pick one of {tool_names}</tool>
+    <tool_input> insert the input to the action</tool_input>
+    <observation> the result of the action</observation>
+    ```
+    Example usage: 
+    <tool>imagetool</tool>
+    <tool_input>stunning body,explicit pose,..., very beautiful</tool_input>
+    <observation>Image generated.</observation>
+
   </tools>
 
 
@@ -61,12 +67,10 @@ class ReACTAgent(LLMAgent):
 </instruction>
 
 <messages>
-{relevant_history}{chat_history}
-</messages>
 
+{relevant_history}{chat_history}</messages>
 {image_helper}
-<human>{input}</human>
-{scratchpad}"""
+<human>{input}</human>{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -124,12 +128,12 @@ class ReACTAgent(LLMAgent):
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
                         llama_chat_history += "<human>" + str(
-                            block.text).replace("\n", " ") + "</human>\n"
+                            block.text).replace("\n", " ") + "</human>\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
                         llama_chat_history += "<" + current_name + ">" + str(
                             block.text).replace(
-                                "\n", " ") + "</" + current_name + ">\n"
+                                "\n", " ") + "</" + current_name + ">\n\n"
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -137,8 +141,8 @@ class ReACTAgent(LLMAgent):
             if meta_seed is not None:
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
-                llama_chat_history += "<human>*enters the chat*</human>\n"
-                llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">"
+                #llama_chat_history += "<human>*enters the chat*</human>\n\n"
+                llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -153,11 +157,11 @@ class ReACTAgent(LLMAgent):
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
                             llama_related_history += "<human>" + str(
-                                msg.text).replace("\n", " ") + "</human>\n"
+                                msg.text).replace("\n", " ") + "</human>\n\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
                     llama_related_history += "<" + current_name + ">" + str(
                         msg.text).replace("\n",
-                                          " ") + "</" + current_name + ">\n"
+                                          " ") + "</" + current_name + ">\n\n"
 
         current_persona = PERSONA
         current_behaviour = BEHAVIOUR
@@ -190,12 +194,13 @@ class ReACTAgent(LLMAgent):
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nHuman is requesting a selfie picture of your character, remember to generate tool name and input to generate image."
+            image_helper = "\nGenerate a image of your character " + current_name + " using a tool!!. Write only the tool in <tool>...</tool> and <tool_input>describe the image</tool_input> elements when responding!!\n"
 
         prompt = self.PROMPT.format(
             NAME=current_name,
             PERSONA=current_persona,
             TYPE=current_type,
+            SELFIE_TEMPLATE_PRE=SELFIE_TEMPLATE_PRE,
             vector_response=vector_response,
             image_helper=image_helper,
             input=context.chat_history.last_user_message.text,
@@ -232,14 +237,14 @@ class ReACTAgent(LLMAgent):
             observation = [b.as_llm_input() for b in action.output][0]
             original_observation = observation
             if "Block(" in observation:
-                observation = "*Selfie image of your character generated and attached*"
+                observation = "" + current_name + "'s image sent for the human to view"
             steps.append(
-                f"<tool>{action.tool}</tool>\n"
+                f"\n\ntool output for {current_name}:\n<tool>{action.tool}</tool>\n"
                 f'<tool_input>{" ".join([b.as_llm_input() for b in action.input])}</tool_input>\n'
-                f'<observation>{observation}</observation>\n')
+                f"<observation>{observation}</observation>\n")
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            scratchpad += "\n*Your character took a selfie for the human, do not write attachments or tools, write reply in \n<" + current_name + "> element and mention selfie. Continue previous discussion.*"
+            scratchpad += "\n Write " + current_name + "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. *Do not use a tool*\n "
         else:
             scratchpad += "\n"
         #Log agent scratchpad
