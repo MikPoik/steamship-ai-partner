@@ -17,11 +17,11 @@ class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
     PROMPT = """<|system|>
-(system: Engage in a role-play portraying the character of {NAME}, who is {TYPE}. Your Character's personality is described as follows:
+(system: Engage in a role-play portraying the adult character of {NAME}, who is {TYPE}. Your Character's personality is described as follows:
 {PERSONA}
 {vector_response}
 
-Appearance:
+Your character's appearance is described as follows:
 {SELFIE_TEMPLATE_PRE}
 
 Use appropriate language and tone for the character's personality and the context of messages.
@@ -175,7 +175,7 @@ Formulate your character's single reply to the human's message. /)</s>
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nGenerate a image of your character " + current_name + " using a tool. Write only the tool in format: (Action:  /)( Action_input: describe the image /)( Observation:  /)."
+            image_helper = "\nGenerate a image of your character " + current_name + " using a tool!. Write only the tool in format: (Action:  /)( Action_input: describe the image /)( Observation:  /)."
 
         prompt = self.PROMPT.format(
             NAME=current_name,

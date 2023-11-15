@@ -17,12 +17,13 @@ class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
     PROMPT = """<instruction>
-  Engage in a role-play portraying the character of {NAME}, who is {TYPE}. Your character's personality is described as follows:
+  Engage in a role-play portraying the adult character of {NAME}, who is {TYPE}. Your character's personality is described as follows:
 
   <personality>
   {PERSONA}
   {vector_response}
   </personality>
+  Your character's appearance is described as follows:
   <appearance>
   {SELFIE_TEMPLATE_PRE}
   </appearance>
@@ -45,7 +46,7 @@ class ReACTAgent(LLMAgent):
     ```
     Example usage: 
     <tool>imagetool</tool>
-    <tool_input>stunning body,explicit pose,..., very beautiful</tool_input>
+    <tool_input>stunning body,explicit pose,..., very beautiful,</tool_input>
     <observation>Image generated.</observation>
 
   </tools>
@@ -194,7 +195,7 @@ class ReACTAgent(LLMAgent):
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nGenerate a image of your character " + current_name + " using a tool!!. Write only the tool in <tool>...</tool> and <tool_input>describe the image</tool_input> elements when responding!!\n"
+            image_helper = "\nGenerate a image of your character " + current_name + " using a tool!!. Write only the tool in <tool>...</tool> and <tool_input>describe the image in detail</tool_input> elements when responding!!\n"
 
         prompt = self.PROMPT.format(
             NAME=current_name,
@@ -244,7 +245,8 @@ class ReACTAgent(LLMAgent):
                 f"<observation>{observation}</observation>\n")
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            scratchpad += "\n Write " + current_name + "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. *Do not use a tool*\n "
+            #scratchpad += "\n Write " + current_name + "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. *Do not use a tool*\n "
+            scratchpad += "\n*Do not write attachments or tools, write reply in \n<" + current_name + "> element and mention sent selfie. Continue previous discussion.*"
         else:
             scratchpad += "\n"
         #Log agent scratchpad
