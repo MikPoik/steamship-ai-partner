@@ -95,13 +95,21 @@ class ReACTOutputParser(OutputParser):
             message = message.strip()
             message = message.lstrip("'")
             message = message.rstrip("'")
+        elif current_name + ":" in message:
+            if current_name + ":" in message:
+                message = message.split("" + current_name + ":", 1)[-1].strip()
+            if "/)" in message:
+                message = message.split("/)",1)[0].strip()
 
         result_blocks: List[Block] = []
 
         block_found = 0
         block_id_regex = r"(?:(?:\[|\(|<)?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)|>)?)"
         remaining_text = message
-
+        
+        if "action" in remaining_text.lower():
+            remaining_text = remaining_text.lower().split("action:")[0]
+            
         result_blocks.append(Block(text=remaining_text))
         saved_block = context.metadata.get("blocks",
                                            {}).get("image")
@@ -128,6 +136,8 @@ class ReACTOutputParser(OutputParser):
 
                 #final cleanup
                 #result_blocks.append(Block(text=remaining_text))   
+
+
         return result_blocks
 
     @staticmethod

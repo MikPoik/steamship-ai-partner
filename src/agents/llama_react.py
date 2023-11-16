@@ -246,7 +246,7 @@ class ReACTAgent(LLMAgent):
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
             #scratchpad += "\n Write " + current_name + "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. *Do not use a tool*\n "
-            scratchpad += "\n*Do not write attachments or tools, write reply in \n<" + current_name + "> element and mention sent selfie. Continue previous discussion.*"
+            scratchpad += "\n*Do not write attachments or tools, write message to \n<" + current_name + "> element to continue discussion and mention sent selfie*"
         else:
             scratchpad += "\n"
         #Log agent scratchpad

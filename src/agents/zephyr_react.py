@@ -219,13 +219,13 @@ Formulate your character's single reply to the human's message. /)</s>
             original_observation = observation
             #TODO refactor tool workflow for zephyr
             if "Block(" in observation:
-                observation = "" + current_name + "'s image sent for the human to view"
+                observation = "" + current_name + "'s image is sent and attached for the human to view"
             steps.append(
                 f"\n\nAction output for {current_name}:\n(Action:{action.tool} /)\n"
                 f'(Action_input:{" ".join([b.as_llm_input() for b in action.input])} /)\n'
                 f"(Observation:{observation}. Continue the conversation with "
                 + current_name +
-                "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. /)</s>\n"
+                "'s message. Without attachments, actions,tools,signatures or gestures mention the image of "+current_name+". /)</s>\n"
             )
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:

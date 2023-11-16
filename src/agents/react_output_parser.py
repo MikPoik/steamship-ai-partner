@@ -71,12 +71,15 @@ class ReACTOutputParser(OutputParser):
         message = text
         if "<" + current_name + ">" in message:
             message = message.split("<" + current_name + ">", 1)[-1].strip()
-        if "</" + current_name + ">" in message:
-            message = message.split("</" + current_name + ">",1)[0].strip()
+            if "</" + current_name + ">" in message:
+                message = message.split("</" + current_name + ">",1)[0].strip()        
 
         result_blocks: List[Block] = []
         remaining_text = message
 
+        if "tool" in remaining_text.lower():
+            remaining_text = remaining_text.lower().split("tool")[0]
+            remaining_text = remaining_text.rstrip("<")
 
         result_blocks.append(Block(text=remaining_text))
         saved_block = context.metadata.get("blocks",
