@@ -39,7 +39,7 @@ from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
-LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-13b"
+LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-70b"
 LLAMA2_PUFFIN = "NousResearch/Redmond-Puffin-13B"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
@@ -66,10 +66,9 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
+    llm_model: Optional[str] = Field(LLAMA2_HERMES,
                                      description="llm model to use")
-    llama_api_key: Optional[str] = Field(os.getenv('LLAMAAPI_KEY'),
-                                         description="Llama api key")
+    llama_api_key: Optional[str] = Field("", description="Llama api key")
     zephyr_api_key: Optional[str] = Field(os.getenv('LEMONFOX_KEY'),
                                           description="Lemonfox api key")
     llamagw_api_key: Optional[str] = Field("",
@@ -245,18 +244,19 @@ class MyAssistant(AgentService):
                            message_selector=MessageWindowMessageSelector(
                                k=MESSAGE_COUNT)))
 
-        if "Mistral" in self.config.llm_model or "Puffin" in self.config.llm_model:
+        if "Mistral" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgent(tools,
-                           llm=LlamaGWLLM(self.client,
-                                          api_key=self.config.llama_api_key,
-                                          model_name=self.config.llm_model,
-                                          temperature=0.9,
-                                          top_p=0.6,
-                                          max_tokens=300,
-                                          max_retries=4),
-                           message_selector=MessageWindowMessageSelector(
-                               k=MESSAGE_COUNT)))
+                ReACTAgentZephyr(tools,
+                                 llm=ChatLlama(
+                                     self.client,
+                                     api_key=self.config.llama_api_key,
+                                     model_name=self.config.llm_model,
+                                     temperature=0.9,
+                                     top_p=0.6,
+                                     max_tokens=300,
+                                     max_retries=4),
+                                 message_selector=MessageWindowMessageSelector(
+                                     k=MESSAGE_COUNT)))
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
                 ReACTAgentZephyr(tools,
@@ -519,7 +519,6 @@ class MyAssistant(AgentService):
         """Run an agent with the provided text as the input."""
         with self.build_default_context(context_id, **kwargs) as context:
             prompt = prompt or kwargs.get("question")
-
             #context = self.build_default_context(context_id, **kwargs)
             context.chat_history.append_user_message(prompt)
 

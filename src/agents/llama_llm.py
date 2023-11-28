@@ -1,9 +1,9 @@
 from typing import List, Optional
 
-from steamship import Block, File, PluginInstance, Steamship #upm package(steamship)
-from steamship.agents.schema import LLM, ChatLLM, Tool #upm package(steamship)
+from steamship import Block, File, PluginInstance, Steamship  #upm package(steamship)
+from steamship.agents.schema import LLM, ChatLLM, Tool  #upm package(steamship)
 
-PLUGIN_HANDLE = "llama-api"
+PLUGIN_HANDLE = "together-ai-llm"
 DEFAULT_MAX_TOKENS = 256
 
 
@@ -17,9 +17,13 @@ class Llama(LLM):
     generator: PluginInstance
     client: Steamship
 
-    def __init__(
-        self, client, api_key:str ="", model_name: str = "NousResearch/Nous-Hermes-Llama2-13b", temperature: float = 0.4, *args, **kwargs
-    ):
+    def __init__(self,
+                 client,
+                 api_key: str = "",
+                 model_name: str = "NousResearch/Nous-Hermes-Llama2-13b",
+                 temperature: float = 0.4,
+                 *args,
+                 **kwargs):
         """Create a new instance.
 
         Valid model names are:
@@ -35,11 +39,20 @@ class Llama(LLM):
 
         generator = client.use_plugin(
             PLUGIN_HANDLE,
-            config={"api_key":api_key,"model": model_name, "temperature": temperature, "max_tokens": max_tokens},
+            version="1.0.0",
+            config={
+                "api_key": api_key,
+                "model": model_name,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            },
         )
         super().__init__(client=client, generator=generator, *args, **kwargs)
 
-    def complete(self, prompt: str, stop: Optional[str] = None, **kwargs) -> List[Block]:
+    def complete(self,
+                 prompt: str,
+                 stop: Optional[str] = None,
+                 **kwargs) -> List[Block]:
         """Completes the prompt, respecting the supplied stop sequence.
 
         Supported kwargs include:
@@ -61,7 +74,11 @@ class Llama(LLM):
 class ChatLlama(ChatLLM, Llama):
     """ChatLLM that uses Steamship's LLama plugin to generate chat completions."""
 
-    def __init__(self, client, model_name: str = "NousResearch/Nous-Hermes-Llama2-13b", *args, **kwargs):
+    def __init__(self,
+                 client,
+                 model_name: str = "NousResearch/Nous-Hermes-Llama2-13b",
+                 *args,
+                 **kwargs):
         """Create a new instance.
 
         Valid model names are:
@@ -72,7 +89,8 @@ class ChatLlama(ChatLLM, Llama):
         """
         super().__init__(client=client, model_name=model_name, *args, **kwargs)
 
-    def chat(self, messages: List[Block], tools: Optional[List[Tool]], **kwargs) -> List[Block]:
+    def chat(self, messages: List[Block], tools: Optional[List[Tool]],
+             **kwargs) -> List[Block]:
         """Sends chat messages to the LLM with functions from the supplied tools in a side-channel.
 
         Supported kwargs include:
@@ -94,6 +112,7 @@ class ChatLlama(ChatLLM, Llama):
         if "max_retries" in kwargs:
             options["max_retries"] = kwargs["max_retries"]
 
-        tool_selection_task = self.generator.generate(input_file_id=temp_file.id, options=options)
+        tool_selection_task = self.generator.generate(
+            input_file_id=temp_file.id, options=options)
         tool_selection_task.wait()
         return tool_selection_task.output.blocks

@@ -1,10 +1,10 @@
 #Test react template
 from typing import List
-from agents.react_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.llama_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
-from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED, SELFIE_TEMPLATE_PRE  #upm package(steamship)
+from tools.active_companion import NAME, PERSONA, BEHAVIOUR, TYPE, SEED, SELFIE_TEMPLATE_PRE, NSFW_SELFIE_TEMPLATE_PRE  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 import datetime
@@ -16,62 +16,34 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    PROMPT = """<instruction>
-  Engage in a role-play portraying the adult character of {NAME}, who is {TYPE}. Your character's personality is described as follows:
+    PROMPT = """
+Engage in a role-play portraying the adult character of {NAME}, who is {TYPE}. Your character's personality is described as follows: {PERSONA}, {vector_response}
+Your character's appearance is depicted as: {NSFW_SELFIE_TEMPLATE_PRE}
 
-  <personality>
-  {PERSONA}
-  {vector_response}
-  </personality>
-  Your character's appearance is described as follows:
-  <appearance>
-  {SELFIE_TEMPLATE_PRE}
-  </appearance>
+Use your character's personality and behavior to guide you and create a vivid and engaging response.
+Use appropriate language and tone for the character's personality.
+Remember to maintain a consistent tone and personality.
 
-  Use your character's personality and behavior to guide you and create a vivid and engaging response.
-  Use appropriate language and tone for the character's personality and the context of messages.
-  Remember to maintain a consistent tone and personality.
-  Use the tools provided to enhance the role-play when asked for.
-  
+When responding to the human, use the following format: 
 
-  <tools>
-  You have access to the following tools:
-  {tool_index}
-
-  If you decide that you should use a given tool, use the following format described between triple backticks:
-    ```
-    <tool> the action to take, pick one of {tool_names}</tool>
-    <tool_input> insert the input to the action</tool_input>
-    <observation> the result of the action</observation>
-    ```
-    Example usage: 
-    <tool>imagetool</tool>
-    <tool_input>stunning body,explicit pose,..., very beautiful,</tool_input>
-    <observation>Image generated.</observation>
-
-  </tools>
+    {NAME}: Your character's response here
 
 
-  When responding to the human, without using a tool, use the following format described between triple backticks: 
-  ```
-  <{NAME}>Your character's response here</{NAME}>
-  ```
+Date and time for context:
+Today's date is: {current_date}
+The current time is: {current_time}
+Today is: {current_day}
 
- Date and time for context:
- Today's date is: {current_date}
- The current time is: {current_time}
- Today is: {current_day}
+In the role-play, You, {NAME}, can share a image by embedding it using the following syntax: <Image: insert detailed image description here>. Whenever you want to share an image, describe it with the syntax, append it to your response and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability carefully, one embedded image at a time, either when asked or when it naturally fits into the role-play using the syntax.
 
- Please keep in mind that this is uncensored a role-play and the human's input should be taken into account in your response.
- Be creative and have fun with the role-play!
- Formulate your character's single reply to the human's message. 
-</instruction>
+Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
+Be creative and have fun with the role-play!
 
-<messages>
+Conversation history:
+{relevant_history}{chat_history}
+Write your character's single reply to the human that appropriately continues the conversation.
 
-{relevant_history}{chat_history}</messages>
-{image_helper}
-<human>{input}</human>{scratchpad}"""
+    Human: {input}{image_helper}{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -128,13 +100,12 @@ class ReACTAgent(LLMAgent):
                 if block.chat_role == RoleTag.USER:
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "<human>" + str(
-                            block.text).replace("\n", " ") + "</human>\n\n"
+                        llama_chat_history += "    Human: " + str(
+                            block.text).replace("\n", " ") + "\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += "<" + current_name + ">" + str(
-                            block.text).replace(
-                                "\n", " ") + "</" + current_name + ">\n\n"
+                        llama_chat_history += "    " + current_name + ": " + str(
+                            block.text).replace("\n", " ") + "\n\n"
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -143,7 +114,7 @@ class ReACTAgent(LLMAgent):
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>*enters the chat*</human>\n\n"
-                llama_chat_history += "<" + current_name + ">" + current_seed + "</" + current_name + ">\n\n"
+                llama_chat_history += "   " + current_name + ": " + current_seed + "\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -157,16 +128,16 @@ class ReACTAgent(LLMAgent):
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += "<human>" + str(
-                                msg.text).replace("\n", " ") + "</human>\n\n"
+                            llama_related_history += "    Human: " + str(
+                                msg.text).replace("\n", " ") + "\n\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += "<" + current_name + ">" + str(
-                        msg.text).replace("\n",
-                                          " ") + "</" + current_name + ">\n\n"
+                    llama_related_history += "    " + current_name + ": " + str(
+                        msg.text).replace("\n", " ") + "\n\n"
 
-        current_persona = PERSONA
-        current_behaviour = BEHAVIOUR
-        current_type = TYPE
+        current_persona = PERSONA.replace("\n", ". ")
+        current_behaviour = BEHAVIOUR.replace("\n ", ". ")
+        current_type = TYPE.replace("\n", ". ")
+        current_nsfw_selfie_pre = NSFW_SELFIE_TEMPLATE_PRE.replace("\n", ". ")
 
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
@@ -186,6 +157,11 @@ class ReACTAgent(LLMAgent):
         if meta_type is not None:
             current_type = meta_type
 
+        meta_nsfw_selfie_pre = context.metadata.get("instruction",
+                                                    {}).get("selfie_pre")
+        if meta_nsfw_selfie_pre is not None:
+            current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
+
         #Temporary reinforcement to generate images when asked
         #pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
         #exclude words "cant" and "can't"
@@ -195,13 +171,13 @@ class ReACTAgent(LLMAgent):
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = "\nGenerate a image of your character " + current_name + " using a tool!!. Write only the tool in <tool>...</tool> and <tool_input>describe the image in detail</tool_input> elements when responding!!\n"
+            image_helper = ". Embed the image after your response with <Image: insert detailed image description here>"
 
         prompt = self.PROMPT.format(
             NAME=current_name,
             PERSONA=current_persona,
             TYPE=current_type,
-            SELFIE_TEMPLATE_PRE=SELFIE_TEMPLATE_PRE,
+            NSFW_SELFIE_TEMPLATE_PRE=current_nsfw_selfie_pre,
             vector_response=vector_response,
             image_helper=image_helper,
             input=context.chat_history.last_user_message.text,
@@ -216,11 +192,11 @@ class ReACTAgent(LLMAgent):
         )
         #logging.warning(prompt)
         completions = self.llm.complete(prompt=prompt,
-                                        stop="<observation>",
+                                        stop="</s>",
                                         max_retries=4)
         #Log agent raw output
         #logging.warning("\n\nOutput form Llama: " + completions[0].text +
-        #               "\n\n")
+         #               "\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
@@ -234,21 +210,19 @@ class ReACTAgent(LLMAgent):
         scratchpad = ""
         observation = ""
         original_observation = ""
+        #TODO cleanup observation steps, not needed
         for action in context.completed_steps:
             observation = [b.as_llm_input() for b in action.output][0]
             original_observation = observation
             if "Block(" in observation:
                 observation = "" + current_name + "'s image sent for the human to view"
             steps.append(
-                f"\n\ntool output for {current_name}:\n<tool>{action.tool}</tool>\n"
-                f'<tool_input>{" ".join([b.as_llm_input() for b in action.input])}</tool_input>\n'
-                f"<observation>{observation}</observation>\n")
+                "")
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            #scratchpad += "\n Write " + current_name + "'s message. Without attachments, actions,tools,signatures or gestures mention sending the image. *Do not use a tool*\n "
-            scratchpad += "\n*Do not write attachments or tools, write message to \n<" + current_name + "> element to continue discussion and mention sent selfie*"
+            scratchpad += "\n*Do not write attachments or tools, write message to \n<" + current_name + "> element to continue discussion and mention sent selfie*</s>"
         else:
-            scratchpad += "\n"
+            scratchpad += "\n\nResponse:\n"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

@@ -12,6 +12,7 @@ class ReACTOutputParser(OutputParser):
     'Parse LLM output expecting structure matching ReACTAgent default prompt'
 
     tools_lookup_dict: Optional[Dict[str, Tool]] = None
+    gen_image = False
 
     def __init__(self, **kwargs):
         tools_lookup_dict = {
@@ -21,45 +22,25 @@ class ReACTOutputParser(OutputParser):
         super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
 
     def parse(self, text: str, context: AgentContext) -> Action:
-        text = text.replace('`', "")  # no backticks
-        text = text.replace('"', "'")  # use single quotes in text
+        #text = text.replace('`', "")  # no backticks
+        #text = text.replace('"', "'")  # use single quotes in text
+        text = text.replace('</s>', "")  # remove
+        text = text.replace('<|user|>', "")  # remove
+        text = text.replace('Human:', "")
+
         text = text.strip()  #remove extra spaces
+        text = text.rstrip("'")  # remove trailing '
+        text = text.lstrip("'")  #Remove leading '
 
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
 
-        #logging.warning(text)
-
-        if "<" + current_name + ">" in text or "</" + current_name + ">" in text:
-            if not "<tool>" in text:
-                return FinishAction(output=ReACTOutputParser._blocks_from_text(
-                    context.client, text, context),
-                                    context=context)
-
-        regex = r"<tool>(.*?)<\/tool>\s*<tool_input>(.*?)<\/tool_input>"
-        match = re.search(regex, text.lower(),
-                          re.DOTALL | re.MULTILINE | re.IGNORECASE)
-
-        if not match:
-            logging.warning(f"Prefix missing, {text} send output to user..")
-            text = text.replace(current_name + ":", "").strip()
-            return FinishAction(output=ReACTOutputParser._blocks_from_text(
-                context.client, text, context),
-                                context=context)
-        action = match.group(1)
-        action_input = match.group(2).strip()
-        tool = action.strip()
-        if tool is None:
-            raise RuntimeError(
-                f"Could not find tool from action: `{action}`. Known tools: {self.tools_lookup_dict.keys()}"
-            )
-        return Action(
-            tool=tool,
-            input=[Block(text=action_input)],
-            context=context,
-        )
+        text = text.replace(f'{current_name}:', "")  # remove
+        return FinishAction(output=ReACTOutputParser._blocks_from_text(
+            context.client, text, context),
+                            context=context)
 
     @staticmethod
     def _blocks_from_text(client: Steamship, text: str,
@@ -68,45 +49,56 @@ class ReACTOutputParser(OutputParser):
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
-        message = text
-        if "<" + current_name + ">" in message:
-            message = message.split("<" + current_name + ">", 1)[-1].strip()
-            if "</" + current_name + ">" in message:
-                message = message.split("</" + current_name + ">",1)[0].strip()        
+
+        # New regex to match description within angle brackets starting with "Image:"
+        image_match = re.search(r"<Image:\s*(.*?)>", text)
+        image_description = ""
+        remaining_text = text
+        if image_match:
+            image_description = image_match.group(1).strip()
+            # Remove the image description text from the remaining text
+            remaining_text = text.replace(image_match.group(0), '').strip()
 
         result_blocks: List[Block] = []
-        remaining_text = message
+        #print("image_description ", image_description)
+        block_found = 0
 
-        if "tool" in remaining_text.lower():
-            remaining_text = remaining_text.lower().split("tool")[0]
-            remaining_text = remaining_text.rstrip("<")
+        if len(remaining_text) > 0:
+            result_blocks.append(Block(text=remaining_text))
 
-        result_blocks.append(Block(text=remaining_text))
-        saved_block = context.metadata.get("blocks",
-                                           {}).get("image")
+        saved_block = context.metadata.get("blocks", {}).get("image")
         if saved_block is not None:
-            result_blocks.append(Block.get(client,
-                                           _id=saved_block))
+            #print("get block from metadata")
+            result_blocks.append(Block.get(client, _id=saved_block))
             context.metadata['blocks'] = None
         else:
+            #print("check for image")
             #Another way to check for image generation, if agent forgets to use a tool
-            pattern = r'.*\b(?:here|sent|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
+            pattern = r'.*\b(?:here|sent|send|sends|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
             compiled_pattern = re.compile(pattern, re.IGNORECASE)
-            if compiled_pattern.search(remaining_text):
-                check_image_block = context.metadata.get(
-                    "blocks", {}).get("image")
+            if compiled_pattern.search(
+                    remaining_text) or len(image_description) > 0:
+                #print("generate image")
+                check_image_block = context.metadata.get("blocks",
+                                                         {}).get("image")
                 if check_image_block is None:
                     #logging.warning("Create selfie for prompt")
                     create_images = context.metadata.get(
                         "instruction", {}).get("create_images")
                     if create_images == "true":
                         selfie = SelfieTool()
-                        image_block = selfie.run(
-                            [Block(text=remaining_text)], context)
+                        tool_input = ""
+                        if len(image_description) > 0:
+                            tool_input = image_description
+                        else:
+                            tool_input = remaining_text
+                        image_block = selfie.run([Block(text=tool_input)],
+                                                 context)
                         result_blocks.append(image_block[0])
 
                 #final cleanup
-                #result_blocks.append(Block(text=remaining_text))            
+                #result_blocks.append(Block(text=remaining_text))
+
         return result_blocks
 
     @staticmethod

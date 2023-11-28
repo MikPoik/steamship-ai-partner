@@ -12,6 +12,7 @@ class ReACTOutputParser(OutputParser):
     'Parse LLM output expecting structure matching ReACTAgent default prompt'
 
     tools_lookup_dict: Optional[Dict[str, Tool]] = None
+    gen_image = False
 
     def __init__(self, **kwargs):
         tools_lookup_dict = {
@@ -22,56 +23,27 @@ class ReACTOutputParser(OutputParser):
 
     def parse(self, text: str, context: AgentContext) -> Action:
         text = text.replace('`', "")  # no backticks
-        text = text.replace('"', "'")  # use single quotes in text
+        #text = text.replace('"', "'")  # use single quotes in text
+        text = text.replace('</s>', "")  # remove
+        text = text.replace('<|user|>', "")  # remove
+        text = text.replace('<|assistant|>', "")  # remove
+        text = text.replace('<|im_end|>', "")  # remove<im_end>
+        text= text.replace('Human:',"")    
+
         text = text.strip()  #remove extra spaces
         text = text.rstrip("'")  # remove trailing '
         text = text.lstrip("'")  #Remove leading '
+        
 
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
 
-        if "(" + current_name + ":" in text:
-            if not "action" in text.lower():
-                return FinishAction(output=ReACTOutputParser._blocks_from_text(
-                    context.client, text, context),
-                                    context=context)
-
-        #regex = r"action:\s*(.*?)\)\s§*action_input:\s*(.*?)\)"
-        regex = '\(Action:\s*([^)/]*)\s*/?\)\s*\(Action_input:\s*([^)/]*)\s*/?\)'
-
-        match = re.search(regex, text.lower(),
-                          re.DOTALL | re.MULTILINE | re.IGNORECASE)
-
-        if not match:
-            logging.warning(f"Prefix missing, {text} send output to user..")
-            text = text.replace(current_name + ":", "").strip()
-            return FinishAction(output=ReACTOutputParser._blocks_from_text(
-                context.client, text, context),
-                                context=context)
-        action = match.group(1)
-        action = action.rstrip("'")
-        action = action.lstrip("'")
-        action = action.rstrip("//")
-        action = action.rstrip("/")
-        action_input = match.group(2).strip()
-        action_input = action_input.rstrip("'")
-        action_input = action_input.lstrip("'")
-        action_input = action_input.rstrip("//")
-        action_input = action_input.rstrip("/")
-        tool = action.strip()
-        tool = tool.lstrip("'")
-        tool = tool.rstrip("'")
-        if tool is None:
-            raise RuntimeError(
-                f"Could not find tool from action: `{action}`. Known tools: {self.tools_lookup_dict.keys()}"
-            )
-        return Action(
-            tool=tool,
-            input=[Block(text=action_input)],
-            context=context,
-        )
+        text = text.replace(f'{current_name}:', "")  # remove
+        return FinishAction(output=ReACTOutputParser._blocks_from_text(
+            context.client, text, context),
+                            context=context)
 
     @staticmethod
     def _blocks_from_text(client: Steamship, text: str,
@@ -80,63 +52,58 @@ class ReACTOutputParser(OutputParser):
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
-        message = text
-        regex = r"\({}:(.*?)\/\)".format(current_name)
-        match = re.search(regex, message, re.DOTALL | re.MULTILINE)
-        regex2 = r"\({}:(.*?)\)".format(current_name)
-        match2 = re.search(regex2, message, re.DOTALL | re.MULTILINE)
-        if match:
-            message = match.group(1)
-            message = message.strip()
-            message = message.lstrip("'")
-            message = message.rstrip("'")
-        elif match2:
-            message = match2.group(1)
-            message = message.strip()
-            message = message.lstrip("'")
-            message = message.rstrip("'")
-        elif current_name + ":" in message:
-            if current_name + ":" in message:
-                message = message.split("" + current_name + ":", 1)[-1].strip()
-            if "/)" in message:
-                message = message.split("/)",1)[0].strip()
+
+        # Modify the following to match and extract the src and alt from an <img> tag
+        img_tag_match = re.search(r'<img\s+[^>]*src="([^"]+)"\s+[^>]*alt="([^"]*)"[^>]*>', text)
+        image_description = ""
+        image_url = ""
+        if img_tag_match:
+            image_url = img_tag_match.group(1).strip()
+            image_description = img_tag_match.group(2).strip()
+            # Remove the HTML image tag from the remaining text
+            remaining_text = text.replace(img_tag_match.group(0), '').strip()
+        else:
+            remaining_text = text
 
         result_blocks: List[Block] = []
-
+        #print("image_description ", image_description)
         block_found = 0
-        block_id_regex = r"(?:(?:\[|\(|<)?Block)?\(?([A-F0-9]{8}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{4}\-[A-F0-9]{12})\)?(?:(\]|\)|>)?)"
-        remaining_text = message
-        
-        if "action" in remaining_text.lower():
-            remaining_text = remaining_text.lower().split("action:")[0]
-            
-        result_blocks.append(Block(text=remaining_text))
-        saved_block = context.metadata.get("blocks",
-                                           {}).get("image")
+        remaining_text = remaining_text.rstrip(">")  #Remove suffix
+        if len(remaining_text) > 0:
+            result_blocks.append(Block(text=remaining_text))
+
+        saved_block = context.metadata.get("blocks", {}).get("image")
         if saved_block is not None:
-            result_blocks.append(Block.get(client,
-                                           _id=saved_block))
+            #print("get block from metadata")
+            result_blocks.append(Block.get(client, _id=saved_block))
             context.metadata['blocks'] = None
         else:
+            #print("check for image")
             #Another way to check for image generation, if agent forgets to use a tool
-            pattern = r'.*\b(?:here|sent|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
+            pattern = r"^(?!.*can't)(?!.*cant).*\b(?:here|sent|send|sends|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*"
             compiled_pattern = re.compile(pattern, re.IGNORECASE)
-            if compiled_pattern.search(remaining_text):
-                check_image_block = context.metadata.get(
-                    "blocks", {}).get("image")
+            if compiled_pattern.search(
+                    remaining_text) or len(image_description) > 0:
+                #print("generate image")
+                check_image_block = context.metadata.get("blocks",
+                                                         {}).get("image")
                 if check_image_block is None:
                     #logging.warning("Create selfie for prompt")
                     create_images = context.metadata.get(
                         "instruction", {}).get("create_images")
                     if create_images == "true":
                         selfie = SelfieTool()
-                        image_block = selfie.run(
-                            [Block(text=remaining_text)], context)
+                        tool_input = ""
+                        if len(image_description) > 0:
+                            tool_input = image_description
+                        else:
+                            tool_input = remaining_text
+                        image_block = selfie.run([Block(text=tool_input)],
+                                                 context)
                         result_blocks.append(image_block[0])
 
                 #final cleanup
-                #result_blocks.append(Block(text=remaining_text))   
-
+                #result_blocks.append(Block(text=remaining_text))
 
         return result_blocks
 
@@ -157,3 +124,4 @@ class ReACTOutputParser(OutputParser):
                 "]") or removed.endswith(">"):
             removed = removed[1:]
         return removed
+
