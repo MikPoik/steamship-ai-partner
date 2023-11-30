@@ -22,17 +22,18 @@ class ReACTOutputParser(OutputParser):
         super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
 
     def parse(self, text: str, context: AgentContext) -> Action:
-        #text = text.replace('`', "")  # no backticks
+        text = text.replace('`', "")  # no backticks
         #text = text.replace('"', "'")  # use single quotes in text
         text = text.replace('</s>', "")  # remove
-        #text = text.replace('</im_end>', "")  # remove
         text = text.replace('<|user|>', "")  # remove
-        text = text.replace('<|end|>', "")  # remove
-        #text = text.replace('Human:', "")
+        text = text.replace('<|assistant|>', "")  # remove
+        text = text.replace('<|im_end|>', "")  # remove<im_end>
+        text= text.replace('Human:',"")    
 
         text = text.strip()  #remove extra spaces
         text = text.rstrip("'")  # remove trailing '
         text = text.lstrip("'")  #Remove leading '
+        
 
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
@@ -52,7 +53,6 @@ class ReACTOutputParser(OutputParser):
         if meta_name is not None:
             current_name = meta_name
 
-        
         # Modify the following to match and extract the src and alt from an <img> tag
         img_tag_match = re.search(r'<img\s+[^>]*src="([^"]+)"\s+[^>]*alt="([^"]*)"[^>]*>', text)
         image_description = ""
@@ -64,13 +64,12 @@ class ReACTOutputParser(OutputParser):
             remaining_text = text.replace(img_tag_match.group(0), '').strip()
         else:
             remaining_text = text
+
         result_blocks: List[Block] = []
         #print("image_description ", image_description)
         block_found = 0
-
+        remaining_text = remaining_text.rstrip(">")  #Remove suffix
         if len(remaining_text) > 0:
-            remaining_text = remaining_text.split("Human:")[0]
-            remaining_text = remaining_text.lstrip(".").strip()
             result_blocks.append(Block(text=remaining_text))
 
         saved_block = context.metadata.get("blocks", {}).get("image")
@@ -81,7 +80,7 @@ class ReACTOutputParser(OutputParser):
         else:
             #print("check for image")
             #Another way to check for image generation, if agent forgets to use a tool
-            pattern = r'.*\b(?:here|sent|send|sends|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
+            pattern = r"^(?!.*can't)(?!.*cant).*\b(?:here|sent|send|sends|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*"
             compiled_pattern = re.compile(pattern, re.IGNORECASE)
             if compiled_pattern.search(
                     remaining_text) or len(image_description) > 0:
@@ -125,3 +124,4 @@ class ReACTOutputParser(OutputParser):
                 "]") or removed.endswith(">"):
             removed = removed[1:]
         return removed
+

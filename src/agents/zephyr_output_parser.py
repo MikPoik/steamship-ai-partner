@@ -102,8 +102,6 @@ class ReACTOutputParser(OutputParser):
                                                  context)
                         result_blocks.append(image_block[0])
 
-                #final cleanup
-                #result_blocks.append(Block(text=remaining_text))
 
         return result_blocks
 

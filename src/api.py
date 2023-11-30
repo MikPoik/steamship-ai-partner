@@ -8,7 +8,7 @@ from steamship.utils.repl import AgentREPL  #upm package(steamship)
 from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
 from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
-from agents.zephyr_react import ReACTAgentZephyr  #upm package(steamship)
+from agents.chatlm_react import ReACTAgentChatlm  #upm package(steamship)
 from usage_tracking import UsageTracker  #upm package(steamship)
 import uuid, os, re, logging, requests
 from steamship import File, Tag, DocTag  #upm package(steamship)
@@ -27,13 +27,12 @@ from steamship.invocable.mixins.indexer_mixin import IndexerMixin  #upm package(
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin  #upm package(steamship)
 from tools.active_companion import *  #upm package(steamship)
 from utils import send_file_from_local  #upm package(steamship)
-from agents.llama_llm import ChatLlama  #upm package(steamship)
+from agents.togetherai_llm import ChatLlama  #upm package(steamship)
 from agents.llama_react import ReACTAgent  #upm package(steamship)
-#from tools.duckduckgo_tool import DuckDuckGoTool  #upm package(steamship)
+from agents.zephyr_react import ReACTAgentZephyr  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.coqui_tool import CoquiTool  #upm package(steamship)
-from agents.gwllama_llm import LlamaGWLLM  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
 
 #Available llm models to use
@@ -43,6 +42,7 @@ LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-70b"
 LLAMA2_PUFFIN = "NousResearch/Redmond-Puffin-13B"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
+MYTHOMAX = "Gryphe/MythoMax-L2-13b"
 
 
 #TelegramTransport config
@@ -66,13 +66,10 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(LLAMA2_HERMES,
-                                     description="llm model to use")
+    llm_model: Optional[str] = Field(MISTRAL, description="llm model to use")
     llama_api_key: Optional[str] = Field("", description="Llama api key")
     zephyr_api_key: Optional[str] = Field(os.getenv('LEMONFOX_KEY'),
                                           description="Lemonfox api key")
-    llamagw_api_key: Optional[str] = Field("",
-                                           description="Llamagateway api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
 
@@ -246,7 +243,7 @@ class MyAssistant(AgentService):
 
         if "Mistral" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgentZephyr(tools,
+                ReACTAgentChatlm(tools,
                                  llm=ChatLlama(
                                      self.client,
                                      api_key=self.config.llama_api_key,
@@ -257,6 +254,18 @@ class MyAssistant(AgentService):
                                      max_retries=4),
                                  message_selector=MessageWindowMessageSelector(
                                      k=MESSAGE_COUNT)))
+        if "Mytho" in self.config.llm_model:
+            self.set_default_agent(
+                ReACTAgent(tools,
+                           llm=ChatLlama(self.client,
+                                         api_key=self.config.llama_api_key,
+                                         model_name=self.config.llm_model,
+                                         temperature=0.9,
+                                         top_p=0.6,
+                                         max_tokens=300,
+                                         max_retries=4),
+                           message_selector=MessageWindowMessageSelector(
+                               k=MESSAGE_COUNT)))
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
                 ReACTAgentZephyr(tools,

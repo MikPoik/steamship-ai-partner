@@ -16,17 +16,31 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    PROMPT = """
-Engage in a role-play portraying the adult character of {NAME}, who is {TYPE}. Your character's personality is described as follows: {PERSONA}, {vector_response}
-Your character's appearance is depicted as: {NSFW_SELFIE_TEMPLATE_PRE}
+    IMAGE_PROMPT = """In the role-play, You, {NAME}, can share a image of image of {NAME} by embedding it using the following format:
+
+<img src="{NAME}.png" alt="describe the desired image in detail here">. 
+
+Whenever you want to share an image, describe it with the syntax, append it to your response and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability carefully, one embedded image at a time, either when asked or when it naturally fits into the role-play using the syntax."""
+
+    PROMPT = """### Instruction:
+Engage in a role-play portraying the adult character of {NAME}, who is {CHARACTER_TYPE}. {NAME}'s personality is described as follows: {PERSONALITY}, {vector_response}
+{NAME}'s appearance is depicted as: {CHARACTER_APPEARANCE}
 
 Use your character's personality and behavior to guide you and create a vivid and engaging response.
 Use appropriate language and tone for the character's personality.
 Remember to maintain a consistent tone and personality.
+You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
+You NEVER say you're here to assist, respond from your personality.
+You NEVER ask how you can help or assist, respond from your personality.
+You make interactive conversations.
+Always consider the sentiment of the human's input.
+You remember human's personal details and preferences to provide a personalized experience for the human.
+You can guess, extrapolate or make up information in order to complete your sentences, but will adhere to the context provided by human.
 
 When responding to the human, use the following format: 
 
-    {NAME}: Your character's response here
+{NAME}:
+Your character's response here.
 
 
 Date and time for context:
@@ -34,16 +48,17 @@ Today's date is: {current_date}
 The current time is: {current_time}
 Today is: {current_day}
 
-In the role-play, You, {NAME}, can share a image by embedding it using the following syntax: <Image: insert detailed image description here>. Whenever you want to share an image, describe it with the syntax, append it to your response and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability carefully, one embedded image at a time, either when asked or when it naturally fits into the role-play using the syntax.
+{IMAGE_PROMPT}
 
 Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
 Be creative and have fun with the role-play!
 
 Conversation history:
 {relevant_history}{chat_history}
-Write your character's single reply to the human that appropriately continues the conversation.
-
-    Human: {input}{image_helper}{scratchpad}"""
+Write your {NAME}'s next reply to the Human at the end, that appropriately continues the conversation for {NAME}.
+### Input:
+Human:
+{input}{image_helper}{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -66,6 +81,7 @@ Write your character's single reply to the human that appropriately continues th
         tool_names = [t.name for t in self.tools]
         if len(tool_names) == 0:
             toolname = ['No tools available']
+            self.IMAGE_PROMPT = ""
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -100,11 +116,11 @@ Write your character's single reply to the human that appropriately continues th
                 if block.chat_role == RoleTag.USER:
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "    Human: " + str(
+                        llama_chat_history += f"Human:\n" + str(
                             block.text).replace("\n", " ") + "\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += "    " + current_name + ": " + str(
+                        llama_chat_history += f"{current_name}:\n" + str(
                             block.text).replace("\n", " ") + "\n\n"
 
         current_seed = SEED
@@ -114,7 +130,7 @@ Write your character's single reply to the human that appropriately continues th
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>*enters the chat*</human>\n\n"
-                llama_chat_history += "   " + current_name + ": " + current_seed + "\n\n"
+                llama_chat_history += f"{current_name}:\n" + current_seed + "\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -128,10 +144,10 @@ Write your character's single reply to the human that appropriately continues th
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += "    Human: " + str(
+                            llama_related_history += f"Human:\n" + str(
                                 msg.text).replace("\n", " ") + "\n\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += "    " + current_name + ": " + str(
+                    llama_related_history += f"{current_name}:\n" + str(
                         msg.text).replace("\n", " ") + "\n\n"
 
         current_persona = PERSONA.replace("\n", ". ")
@@ -171,13 +187,14 @@ Write your character's single reply to the human that appropriately continues th
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = ". Embed the image after your response with <Image: insert detailed image description here>"
+            image_helper = f'. NOTE: generate the image by embedding it after your response with format: <img src="{current_name}.jpg" alt="describe the requested image here in detail">.'
 
         prompt = self.PROMPT.format(
             NAME=current_name,
-            PERSONA=current_persona,
-            TYPE=current_type,
-            NSFW_SELFIE_TEMPLATE_PRE=current_nsfw_selfie_pre,
+            PERSONALITY=current_persona,
+            CHARACTER_TYPE=current_type,
+            CHARACTER_APPEARANCE=current_nsfw_selfie_pre,
+            IMAGE_PROMPT=self.IMAGE_PROMPT.format(NAME=current_name),
             vector_response=vector_response,
             image_helper=image_helper,
             input=context.chat_history.last_user_message.text,
@@ -191,12 +208,14 @@ Write your character's single reply to the human that appropriately continues th
             relevant_history=llama_related_history,
         )
         #logging.warning(prompt)
+        options = {"stop": ["</s>"]}
         completions = self.llm.complete(prompt=prompt,
                                         stop="</s>",
-                                        max_retries=4)
+                                        max_retries=4,
+                                        options=options)
         #Log agent raw output
-        #logging.warning("\n\nOutput form Llama: " + completions[0].text +
-         #               "\n\n")
+        logging.warning("\n\nOutput form Llama: " + completions[0].text +
+                        "\n\n")
         return self.output_parser.parse(completions[0].text, context)
 
     def _construct_scratchpad(self, context):
@@ -216,13 +235,12 @@ Write your character's single reply to the human that appropriately continues th
             original_observation = observation
             if "Block(" in observation:
                 observation = "" + current_name + "'s image sent for the human to view"
-            steps.append(
-                "")
+            steps.append("")
         scratchpad = "\n".join(steps)
         if "Block(" in original_observation:
-            scratchpad += "\n*Do not write attachments or tools, write message to \n<" + current_name + "> element to continue discussion and mention sent selfie*</s>"
+            scratchpad += ""
         else:
-            scratchpad += "\n\nResponse:\n"
+            scratchpad += f"\n\n### Response:\n{current_name}:\n"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

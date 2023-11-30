@@ -39,7 +39,7 @@ class Llama(LLM):
 
         generator = client.use_plugin(
             PLUGIN_HANDLE,
-            version="1.0.0",
+            version="1.0.4",
             config={
                 "api_key": api_key,
                 "model": model_name,

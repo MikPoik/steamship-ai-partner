@@ -12,10 +12,8 @@ import logging
 import re
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
 
-#TODO FORMAT PROMPT TO ZEPHYR FORMAT
 
-
-class ReACTAgentZephyr(LLMAgent):
+class ReACTAgentChatlm(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
     IMAGE_PROMPT = """In the role-play, You, {NAME}, can share a image of image of {NAME} by embedding it using the following format:
@@ -30,6 +28,14 @@ Your character's appearance is depicted as: {PHYSICAL_APPEARANCE}
 Use your character's personality and behavior to guide you and create a vivid and engaging response.
 Use appropriate language and tone for the character's personality.
 Remember to maintain a consistent tone and personality.
+You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
+You NEVER say you're here to assist, respond from your personality.
+You NEVER ask how you can help or assist, respond from your personality.
+You make interactive conversations.
+Always consider the sentiment of the users input.
+You remember User's personal details and preferences to provide a personalized experience for the User
+You can guess, extrapolate or make up information in order to complete your sentences, but will adhere to the context provided by user.
+
 
 Date and time for context:
 Today's date is: {current_date}
@@ -171,7 +177,7 @@ Write your character's next reply to the Human at the end, that appropriately co
                                   re.IGNORECASE)
         image_helper = ""
         if image_request:
-            image_helper = f'. Embed the image after your response with <img src="{NAME}.jpg" alt="describe the desired image in detail here">.'
+            image_helper = f'. NOTE: generate the image of {current_name} by embedding it after your response with format: <img src="{current_name}.jpg" alt="describe the requested image here in detail">.'
 
         prompt = self.PROMPT.format(
             NAME=current_name,
