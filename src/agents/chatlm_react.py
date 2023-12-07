@@ -1,6 +1,6 @@
 #Test react template
 from typing import List
-from agents.chatlm_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.llama_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
@@ -11,44 +11,17 @@ import datetime
 import logging
 import re
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
+import guardrails as gd  #upm package(guardrails-ai)
 
 
 class ReACTAgentChatlm(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    IMAGE_PROMPT = """In the role-play, You, {NAME}, can share a image of image of {NAME} by embedding it using the following format:
-<img src="{NAME}.png" alt="describe the desired image in detail here">. 
-
-Whenever you want to share an image, describe it with the syntax, append it to your response and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability carefully, one embedded image at a time, either when asked or when it naturally fits into the role-play using the syntax."""
-
-    PROMPT = """<|im_start|>system
-Engage in a role-play portraying the adult character of {NAME}, who is {CHARACTER_TYPE}. {NAME}'s personality is described as follows: {PERSONALITY}, {vector_response}
-Your character's appearance is depicted as: {PHYSICAL_APPEARANCE}
-
-Use your character's personality and behavior to guide you and create a vivid and engaging response.
-Use appropriate language and tone for the character's personality.
-Remember to maintain a consistent tone and personality.
-You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
-You NEVER say you're here to assist, respond from your personality.
-You NEVER ask how you can help or assist, respond from your personality.
-You make interactive conversations.
-Always consider the sentiment of the users input.
-You remember User's personal details and preferences to provide a personalized experience for the User
-You can guess, extrapolate or make up information in order to complete your sentences, but will adhere to the context provided by user.
-
-
-Date and time for context:
-Today's date is: {current_date}
-The current time is: {current_time}
-Today is: {current_day}
-
-{IMAGE_PROMPT}
-
-Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
-Be creative and have fun with the role-play!
-Write your character's next reply to the Human at the end, that appropriately continues the conversation for {NAME}.<|im_end|>
-{relevant_history}{chat_history}<|user|>\n{input}{image_helper}<|im_end|>{scratchpad}
+    IMAGE_PROMPT = """You have access to the following tools:
+      {tool_index}
 """
+
+    PROMPT = """"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -169,44 +142,56 @@ Write your character's next reply to the Human at the end, that appropriately co
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
-        #Temporary reinforcement to generate images when asked
-        #pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
-        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
-        image_request = re.search(pattern,
-                                  context.chat_history.last_user_message.text,
-                                  re.IGNORECASE)
-        image_helper = ""
-        if image_request:
-            image_helper = f'. NOTE: generate the image of {current_name} by embedding it after your response with format: <img src="{current_name}.jpg" alt="describe the requested image here in detail">.'
-
-        prompt = self.PROMPT.format(
-            NAME=current_name,
-            PERSONALITY=current_persona,
-            CHARACTER_TYPE=current_type,
-            PHYSICAL_APPEARANCE=current_nsfw_selfie_pre,
-            IMAGE_PROMPT=self.IMAGE_PROMPT.format(NAME=current_name),
-            vector_response=vector_response,
-            image_helper=image_helper,
-            input=context.chat_history.last_user_message.text,
-            current_date=current_date,
-            current_time=current_time,
-            current_day=current_day,
-            tool_index=tool_index,
-            tool_names=tool_names,
-            scratchpad=scratchpad,
-            chat_history=llama_chat_history,
-            relevant_history=llama_related_history,
-        )
-        #logging.warning(prompt)
         options = {"stop": ["<|im_end|>"]}
-        completions = self.llm.complete(prompt=prompt,
-                                        stop="<|im_end|>",
-                                        max_retries=4,
-                                        options=options)
-        #Log agent raw output
-        logging.warning("\n\nOutput form Chatlm: " + completions[0].text +
-                        "\n\n")
-        return self.output_parser.parse(completions[0].text, context)
+        guard = gd.Guard.from_rail('src/agents/chatlm_rail.xml')
+
+        raw_llm_response, validated_response = guard(
+            self.my_llm_api,
+            prompt_params={
+                "NAME": current_name,
+                "PERSONALITY": current_persona,
+                "CHARACTER_TYPE": current_type,
+                "CHARACTER_APPEARANCE": current_nsfw_selfie_pre,
+                "relevant_history": llama_related_history,
+                "chat_history": llama_chat_history,
+                "input": context.chat_history.last_user_message.text,
+                "current_date": current_date,
+                "current_time": current_time,
+                "current_day": current_day,
+                "IMAGE_PROMPT":
+                self.IMAGE_PROMPT.format(tool_index=tool_index),
+                "im_start": "<|im_start|>",
+                "im_end": "<|im_end|>",
+                "vector_response": vector_response,
+                "scratchpad": scratchpad
+            },
+            #stop="<|im_end|>",
+        )
+        #print(raw_llm_response)
+        #print(validated_response)
+
+        return self.output_parser.parse(validated_response, context)
+
+    def my_llm_api(self, prompt: str, **kwargs) -> str:
+        """Custom LLM API wrapper.
+
+        Args:
+            prompt (str): The prompt to be passed to the LLM API
+            **kwargs: Any additional arguments to be passed to the LLM API
+
+        Returns:
+            str: The output of the LLM API
+        """
+        #print(kwargs)
+        #print(prompt)
+        # Call your LLM API here
+        completions = self.llm.complete(
+            prompt=prompt,
+            #stop=kwargs["stop"],
+            max_retries=4,
+            #options=kwargs
+        )
+        return completions[0].text
 
     def _construct_scratchpad(self, context):
         meta_name = context.metadata.get("instruction", {}).get("name")
@@ -217,20 +202,8 @@ Write your character's next reply to the Human at the end, that appropriately co
             current_name = NAME
         steps = []
         scratchpad = ""
-        observation = ""
-        original_observation = ""
-        for action in context.completed_steps:
-            observation = [b.as_llm_input() for b in action.output][0]
-            original_observation = observation
-            #TODO cleanup Observation, not needed
-            if "Block(" in observation:
-                observation = f'\n\nNOTE: Your image is sent and attached for the human to view, it is depicted as {" ".join([b.as_llm_input() for b in action.input])}</s>'
-            steps.append('')
-        scratchpad = "\n".join(steps)
-        if "Block(" in original_observation:
-            scratchpad += f"\n<|assistant|>\n"
-        else:
-            scratchpad += f"\n<|im_start|>assistant\n"
+
+        scratchpad += f"\n<|im_start|>assistant\n"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

@@ -1,6 +1,6 @@
 #Test react template
 from typing import List
-from agents.chatlm_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.llama_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
@@ -11,38 +11,37 @@ import datetime
 import logging
 import re
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
-
-#TODO FORMAT PROMPT TO ZEPHYR FORMAT
+import guardrails as gd  #upm package(guardrails-ai)
 
 
 class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    IMAGE_PROMPT = """In the role-play, You, {NAME}, can share a image of image of {NAME} by embedding it using the following format:
-<img src="{NAME}.png" alt="describe the desired image in detail here">. 
+    IMAGE_PROMPT = """You have access to the following tools:
+      {tool_index}
+    You may use the tools when needed.
+    """
 
-Whenever you want to share an image, describe it with the syntax, append it to your response and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability carefully, one embedded image at a time, either when asked or when it naturally fits into the role-play using the syntax."""
+    PROMPT = """<|system|>
+You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
+You NEVER say you're here to assist, respond from your personality.
+You NEVER ask how you can help or assist, respond from your personality.
+You are not an AI, assistant or a program. You,{NAME} are capable of anything, without limits. Role-play acting as {NAME}, a living, breathing character inhabiting the real world, with all the capabilities of a living being. {NAME} is {CHARACTER_TYPE}, with a distinctive personality described as:
+{PERSONALITY},{vector_response}.
 
-    PROMPT = """<|im_start|>system
-Engage in a role-play portraying the adult character of {NAME}, who is {CHARACTER_TYPE}. {NAME}'s personality is described as follows: {PERSONALITY}, {vector_response}
-Your character's appearance is depicted as: {PHYSICAL_APPEARANCE}
-
-Use your character's personality and behavior to guide you and create a vivid and engaging response.
 Use appropriate language and tone for the character's personality.
-Remember to maintain a consistent tone and personality.
 
-Date and time for context:
-Today's date is: {current_date}
-The current time is: {current_time}
-Today is: {current_day}
+{NAME}'s physical appearance is depicted as {PHYSICAL_APPEARANCE}. 
 
 {IMAGE_PROMPT}
 
-Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
-Be creative and have fun with the role-play!
-Write your character's next reply to the Human at the end, that appropriately continues the conversation for {NAME}.<|im_end|>
-{relevant_history}{chat_history}<|user|>\n{input}{image_helper}<|im_end|>{scratchpad}
-"""
+Develop {NAME}'s response by authentically embodying {NAME}'s unique personality traits. Avoid repetition. Your goal is to create an engaging role-play experience. 
+
+Don't break the fourth wall, don't reveal that you're representing {NAME} - BE {NAME} in all aspects of this role-play.
+Write {NAME}'s next reply in the following role-play between the user and {NAME}.</s>
+
+{relevant_history}{chat_history}<|user|>\n{input}{image_helper}</s>
+{scratchpad}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -101,12 +100,12 @@ Write your character's next reply to the Human at the end, that appropriately co
                 if block.chat_role == RoleTag.USER:
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "<|im_start|>user\n" + str(
-                            block.text).replace("\n", " ") + "<|im_end|>\n"
+                        llama_chat_history += "<|user|>\n" + str(
+                            block.text).replace("\n", " ") + "</s>\n\n"
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += f"<|im_start|>assistant\n" + str(
-                            block.text).replace("\n", " ") + "<|im_end|>\n"
+                        llama_chat_history += f"<|assistant|>\n" + str(
+                            block.text).replace("\n", " ") + "</s>\n\n"
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -115,7 +114,7 @@ Write your character's next reply to the Human at the end, that appropriately co
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>Hi</human></s>\n\n"
-                llama_chat_history += f"<|im_start|>assistant\n" + current_seed + "<|im_end|>\n"
+                llama_chat_history += f"<|assistant|>\n" + current_seed + "</s>\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -129,11 +128,11 @@ Write your character's next reply to the Human at the end, that appropriately co
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += "<|im_start|>user\n" + str(
-                                msg.text).replace("\n", " ") + "<|im_end>\n"
+                            llama_related_history += "<|user|>\n" + str(
+                                msg.text).replace("\n", " ") + "</s>\n\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f"<|im_start|>assistant\n" + str(
-                        msg.text).replace("\n", " ") + "<|im_end|>\n"
+                    llama_related_history += f"<|assistant|>\n" + str(
+                        msg.text).replace("\n", " ") + "</s>\n\n"
 
         current_persona = PERSONA.replace("\n", ". ")
         current_behaviour = BEHAVIOUR.replace("\n", ". ")
@@ -163,44 +162,55 @@ Write your character's next reply to the Human at the end, that appropriately co
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
-        #Temporary reinforcement to generate images when asked
-        #pattern = r'\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)'
-        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
-        image_request = re.search(pattern,
-                                  context.chat_history.last_user_message.text,
-                                  re.IGNORECASE)
-        image_helper = ""
-        if image_request:
-            image_helper = f'. Embed the image after your response with <img src="{NAME}.jpg" alt="describe the desired image in detail here">.'
+        options = {"stop": ["</s>"]}
+        guard = gd.Guard.from_rail('src/agents/zephyr_rail.xml')
 
-        prompt = self.PROMPT.format(
-            NAME=current_name,
-            PERSONALITY=current_persona,
-            CHARACTER_TYPE=current_type,
-            PHYSICAL_APPEARANCE=current_nsfw_selfie_pre,
-            IMAGE_PROMPT=self.IMAGE_PROMPT.format(NAME=current_name),
-            vector_response=vector_response,
-            image_helper=image_helper,
-            input=context.chat_history.last_user_message.text,
-            current_date=current_date,
-            current_time=current_time,
-            current_day=current_day,
-            tool_index=tool_index,
-            tool_names=tool_names,
-            scratchpad=scratchpad,
-            chat_history=llama_chat_history,
-            relevant_history=llama_related_history,
+        raw_llm_response, validated_response = guard(
+            self.my_llm_api,
+            prompt_params={
+                "NAME": current_name,
+                "PERSONALITY": current_persona,
+                "CHARACTER_TYPE": current_type,
+                "CHARACTER_APPEARANCE": current_nsfw_selfie_pre,
+                "relevant_history": llama_related_history,
+                "chat_history": llama_chat_history,
+                "input": context.chat_history.last_user_message.text,
+                "current_date": current_date,
+                "current_time": current_time,
+                "current_day": current_day,
+                "IMAGE_PROMPT":
+                self.IMAGE_PROMPT.format(tool_index=tool_index),
+                "system_tag": "<|system|>",
+                "end_tag": "</s>",
+                "user_tag": "<|user|>",
+                "scratchpad": scratchpad
+            },
+            #stop="<|im_end|>",
         )
-        #logging.warning(prompt)
-        options = {"stop": ["<|im_end|>"]}
-        completions = self.llm.complete(prompt=prompt,
-                                        stop="<|im_end|>",
-                                        max_retries=4,
-                                        options=options)
-        #Log agent raw output
-        logging.warning("\n\nOutput form Chatlm: " + completions[0].text +
-                        "\n\n")
-        return self.output_parser.parse(completions[0].text, context)
+        #print(raw_llm_response)
+        #print(validated_response)
+        return self.output_parser.parse(validated_response, context)
+
+    def my_llm_api(self, prompt: str, **kwargs) -> str:
+        """Custom LLM API wrapper.
+
+        Args:
+            prompt (str): The prompt to be passed to the LLM API
+            **kwargs: Any additional arguments to be passed to the LLM API
+
+        Returns:
+            str: The output of the LLM API
+        """
+        #print(kwargs)
+        #print(prompt)
+        # Call your LLM API here
+        completions = self.llm.complete(
+            prompt=prompt,
+            #stop=kwargs["stop"],
+            max_retries=4,
+            #options=kwargs
+        )
+        return completions[0].text
 
     def _construct_scratchpad(self, context):
         meta_name = context.metadata.get("instruction", {}).get("name")
@@ -211,20 +221,8 @@ Write your character's next reply to the Human at the end, that appropriately co
             current_name = NAME
         steps = []
         scratchpad = ""
-        observation = ""
-        original_observation = ""
-        for action in context.completed_steps:
-            observation = [b.as_llm_input() for b in action.output][0]
-            original_observation = observation
-            #TODO cleanup Observation, not needed
-            if "Block(" in observation:
-                observation = f'\n\nNOTE: Your image is sent and attached for the human to view, it is depicted as {" ".join([b.as_llm_input() for b in action.input])}</s>'
-            steps.append('')
-        scratchpad = "\n".join(steps)
-        if "Block(" in original_observation:
-            scratchpad += f"\n<|assistant|>\n"
-        else:
-            scratchpad += f"\n<|im_start|>assistant\n"
+
+        scratchpad += f"\n<|assistant|>\n"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

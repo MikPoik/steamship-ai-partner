@@ -39,7 +39,7 @@ class Llama(LLM):
 
         generator = client.use_plugin(
             PLUGIN_HANDLE,
-            version="1.0.4",
+            version="1.0.20",
             config={
                 "api_key": api_key,
                 "model": model_name,
@@ -59,8 +59,9 @@ class Llama(LLM):
         - `max_tokens` (controls the size of LLM responses)
         """
         options = {}
+        options["stop"] = ["</s>","<|im_end|>"]
         if stop:
-            options["stop"] = stop
+            options["stop"] = [stop]
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]

@@ -222,7 +222,7 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatOpenAI(self.client,
                                    model_name=self.config.llm_model,
-                                   temperature=0.4,
+                                   temperature=0.7,
                                    max_tokens=256,
                                    moderate_output=False),
                     message_selector=MessageWindowMessageSelector(
@@ -230,55 +230,61 @@ class MyAssistant(AgentService):
 
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgent(tools,
-                           llm=ChatLlama(self.client,
-                                         api_key=self.config.llama_api_key,
-                                         model_name=self.config.llm_model,
-                                         temperature=0.9,
-                                         top_p=0.6,
-                                         max_tokens=300,
-                                         max_retries=4),
-                           message_selector=MessageWindowMessageSelector(
-                               k=MESSAGE_COUNT)))
+                ReACTAgent(
+                    tools,
+                    llm=ChatLlama(
+                        self.client,
+                        api_key=self.config.llama_api_key,
+                        model_name=self.config.llm_model,
+                        temperature=0.7,
+                        #top_p=0.7,
+                        max_tokens=300,
+                        max_retries=4),
+                    message_selector=MessageWindowMessageSelector(
+                        k=MESSAGE_COUNT)))
 
         if "Mistral" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgentChatlm(tools,
-                                 llm=ChatLlama(
-                                     self.client,
-                                     api_key=self.config.llama_api_key,
-                                     model_name=self.config.llm_model,
-                                     temperature=0.9,
-                                     top_p=0.6,
-                                     max_tokens=300,
-                                     max_retries=4),
-                                 message_selector=MessageWindowMessageSelector(
-                                     k=MESSAGE_COUNT)))
+                ReACTAgentChatlm(
+                    tools,
+                    llm=ChatLlama(
+                        self.client,
+                        api_key=self.config.llama_api_key,
+                        model_name=self.config.llm_model,
+                        temperature=0.6,
+                        #top_p=0.6,
+                        max_tokens=300,
+                        max_retries=4),
+                    message_selector=MessageWindowMessageSelector(
+                        k=MESSAGE_COUNT)))
         if "Mytho" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgent(tools,
-                           llm=ChatLlama(self.client,
-                                         api_key=self.config.llama_api_key,
-                                         model_name=self.config.llm_model,
-                                         temperature=0.9,
-                                         top_p=0.6,
-                                         max_tokens=300,
-                                         max_retries=4),
-                           message_selector=MessageWindowMessageSelector(
-                               k=MESSAGE_COUNT)))
+                ReACTAgent(
+                    tools,
+                    llm=ChatLlama(
+                        self.client,
+                        api_key=self.config.llama_api_key,
+                        model_name=self.config.llm_model,
+                        temperature=0.6,
+                        #top_p=0.9,
+                        max_tokens=300,
+                        max_retries=4),
+                    message_selector=MessageWindowMessageSelector(
+                        k=MESSAGE_COUNT)))
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgentZephyr(tools,
-                                 llm=ChatZephyr(
-                                     self.client,
-                                     api_key=self.config.zephyr_api_key,
-                                     model_name=self.config.llm_model,
-                                     temperature=0.9,
-                                     top_p=0.6,
-                                     max_tokens=300,
-                                     max_retries=4),
-                                 message_selector=MessageWindowMessageSelector(
-                                     k=MESSAGE_COUNT)))
+                ReACTAgentZephyr(
+                    tools,
+                    llm=ChatZephyr(
+                        self.client,
+                        api_key=self.config.zephyr_api_key,
+                        model_name=self.config.llm_model,
+                        temperature=0.7,
+                        #top_p=0.6,
+                        max_tokens=300,
+                        max_retries=4),
+                    message_selector=MessageWindowMessageSelector(
+                        k=MESSAGE_COUNT)))
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         # Uncomment to enable webwidget chat

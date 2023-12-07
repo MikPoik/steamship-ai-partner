@@ -15,63 +15,49 @@ class ReACTOutputParser(OutputParser):
     gen_image = False
 
     def __init__(self, **kwargs):
-        tools_lookup_dict = {
+        ReACTOutputParser.tools_lookup_dict = {
             tool.name: tool
             for tool in kwargs.pop("tools", [])
         }
-        super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
+        super().__init__(**kwargs)
 
-    def parse(self, text: str, context: AgentContext) -> Action:
-        #text = text.replace('`', "")  # no backticks
-        #text = text.replace('"', "'")  # use single quotes in text
-        text = text.replace('</s>', "")  # remove
-        #text = text.replace('</im_end>', "")  # remove
-        text = text.replace('<|user|>', "")  # remove
-        text = text.replace('<|end|>', "")  # remove
-        #text = text.replace('Human:', "")
+    def parse(self, response: Dict, context: AgentContext) -> Action:
+        text = {}
+        run_tool = {}
+        run_tool_input = {}
+        if response is not None:
+            text = response.get("response", {})
+            run_tool = response.get("run_tool", {})
+            run_tool_input = response.get("run_tool_input", {})
 
         text = text.strip()  #remove extra spaces
-        text = text.rstrip("'")  # remove trailing '
-        text = text.lstrip("'")  #Remove leading '
 
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
 
-        text = text.replace(f'{current_name}:', "")  # remove
+
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
-            context.client, text, context),
+            context.client, text, run_tool, run_tool_input,
+            context),
                             context=context)
 
     @staticmethod
-    def _blocks_from_text(client: Steamship, text: str,
+    def _blocks_from_text(client: Steamship, text: str, tool_name: str,
+                          tool_input: str,
                           context: AgentContext) -> List[Block]:
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
 
-        
-        # Modify the following to match and extract the src and alt from an <img> tag
-        img_tag_match = re.search(r'<img\s+[^>]*src="([^"]+)"\s+[^>]*alt="([^"]*)"[^>]*>', text)
-        image_description = ""
-        image_url = ""
-        if img_tag_match:
-            image_url = img_tag_match.group(1).strip()
-            image_description = img_tag_match.group(2).strip()
-            # Remove the HTML image tag from the remaining text
-            remaining_text = text.replace(img_tag_match.group(0), '').strip()
-        else:
-            remaining_text = text
         result_blocks: List[Block] = []
-        #print("image_description ", image_description)
+
         block_found = 0
 
-        if len(remaining_text) > 0:
-            remaining_text = remaining_text.split("Human:")[0]
-            remaining_text = remaining_text.lstrip(".").strip()
-            result_blocks.append(Block(text=remaining_text))
+        if len(text) > 0:
+            result_blocks.append(Block(text=text))
 
         saved_block = context.metadata.get("blocks", {}).get("image")
         if saved_block is not None:
@@ -79,33 +65,19 @@ class ReACTOutputParser(OutputParser):
             result_blocks.append(Block.get(client, _id=saved_block))
             context.metadata['blocks'] = None
         else:
-            #print("check for image")
-            #Another way to check for image generation, if agent forgets to use a tool
-            pattern = r'.*\b(?:here|sent|send|sends|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
-            compiled_pattern = re.compile(pattern, re.IGNORECASE)
-            if compiled_pattern.search(
-                    remaining_text) or len(image_description) > 0:
-                #print("generate image")
-                check_image_block = context.metadata.get("blocks",
-                                                         {}).get("image")
-                if check_image_block is None:
-                    #logging.warning("Create selfie for prompt")
-                    create_images = context.metadata.get(
-                        "instruction", {}).get("create_images")
-                    if create_images == "true":
-                        selfie = SelfieTool()
-                        tool_input = ""
-                        if len(image_description) > 0:
-                            tool_input = image_description
-                        else:
-                            tool_input = remaining_text
-                        image_block = selfie.run([Block(text=tool_input)],
-                                                 context)
-                        result_blocks.append(image_block[0])
 
-                #final cleanup
-                #result_blocks.append(Block(text=remaining_text))
-
+            create_images = context.metadata.get("instruction",
+                                                 {}).get("create_images")
+            if create_images == "true":
+                if tool_name:
+                    selfie_tool = ReACTOutputParser.tools_lookup_dict.get(
+                        tool_name, None)
+                    if selfie_tool:
+                        # Call the tool with the input
+                        image_block = selfie_tool.run([Block(
+                            text=tool_input)], context) if tool_input else None
+                        if image_block:
+                            result_blocks.append(image_block[0])
         return result_blocks
 
     @staticmethod

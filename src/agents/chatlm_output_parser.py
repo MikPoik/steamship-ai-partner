@@ -21,10 +21,11 @@ class ReACTOutputParser(OutputParser):
         }
         super().__init__(tools_lookup_dict=tools_lookup_dict, **kwargs)
 
-    def parse(self, text: str, context: AgentContext) -> Action:
+    def parse(self, response: Dict, context: AgentContext) -> Action:
+        text =  response["response"]
         text = text.replace('`', "")  # no backticks
         #text = text.replace('"', "'")  # use single quotes in text
-        text = text.replace('</s>', "")  # remove
+        text = text.replace('</s>', "")  # removed
         text = text.replace('<|user|>', "")  # remove
         text = text.replace('<|assistant|>', "")  # remove
         text = text.replace('<|im_end|>', "")  # remove<im_end>
