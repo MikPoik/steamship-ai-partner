@@ -1,6 +1,6 @@
 #Test react template
 from typing import List
-from agents.llama_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.rail_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
@@ -203,7 +203,7 @@ class ReACTAgentChatlm(LLMAgent):
         steps = []
         scratchpad = ""
 
-        scratchpad += f"\n<|im_start|>assistant\n"
+        scratchpad += f"\n<|im_start|>assistant"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

@@ -30,7 +30,6 @@ class ReACTOutputParser(OutputParser):
             run_tool = response.get("run_tool", {})
             run_tool_input = response.get("run_tool_input", {})
 
-        text = text.strip()  #remove extra spaces
 
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")

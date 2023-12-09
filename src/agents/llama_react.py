@@ -1,6 +1,6 @@
 #Test react template
 from typing import List
-from agents.llama_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.rail_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
@@ -18,7 +18,8 @@ class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
     IMAGE_PROMPT = """You have access to the following tools:
   {tool_index}
-
+  
+Do not talk about the tools to the human.
 """
 
     PROMPT = """"""
@@ -77,14 +78,15 @@ class ReACTAgent(LLMAgent):
             if block.id not in ids:
                 ids.append(block.id)
                 if block.chat_role == RoleTag.USER:
+                    print(block.text)
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += f"Human:\n" + str(
-                            block.text).replace("\n", " ") + "\n\n"
+                        llama_chat_history += "{" + f'"Human": "' + str(
+                            block.text).replace("\n", " ") + '"}\n\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += f"{current_name}:\n" + str(
-                            block.text).replace("\n", " ") + "\n\n"
+                        llama_chat_history += "{" + f'"{current_name}": "' + str(
+                            block.text).replace("\n", " ") + '"}\n\n'
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -93,7 +95,7 @@ class ReACTAgent(LLMAgent):
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>*enters the chat*</human>\n\n"
-                llama_chat_history += f"{current_name}:\n" + current_seed + "\n\n"
+                llama_chat_history += "{" + f'"{current_name}": "' + current_seed + '"}\n\n'
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -107,11 +109,11 @@ class ReACTAgent(LLMAgent):
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += f"Human:\n" + str(
-                                msg.text).replace("\n", " ") + "\n\n"
+                            llama_related_history += "{" + '"Human": "' + str(
+                                msg.text).replace("\n", " ") + '"}\n\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f"{current_name}:\n" + str(
-                        msg.text).replace("\n", " ") + "\n\n"
+                    llama_related_history += "{" + f'"{current_name}": "' + str(
+                        msg.text).replace("\n", " ") + '"}\n\n'
 
         current_persona = PERSONA.replace("\n", ". ")
         current_behaviour = BEHAVIOUR.replace("\n ", ". ")
@@ -141,7 +143,7 @@ class ReACTAgent(LLMAgent):
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
-        options = {"stop": ["</s>"]}
+        #options = {}
 
         guard = gd.Guard.from_rail('src/agents/rail.xml')
 
@@ -202,7 +204,7 @@ class ReACTAgent(LLMAgent):
         steps = []
         scratchpad = ""
 
-        scratchpad += f"\n\n### Response:\n{current_name}:\n"
+        #scratchpad += f"\n### Response:\n"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

@@ -66,8 +66,11 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MISTRAL, description="llm model to use")
-    llama_api_key: Optional[str] = Field("", description="Llama api key")
+    llm_model: Optional[str] = Field(LLAMA2_HERMES,
+                                     description="llm model to use")
+    together_ai_api_key: Optional[str] = Field(
+        "", description="Together.ai api key")
+
     zephyr_api_key: Optional[str] = Field(os.getenv('LEMONFOX_KEY'),
                                           description="Lemonfox api key")
     create_images: Optional[str] = Field(
@@ -234,7 +237,7 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatLlama(
                         self.client,
-                        api_key=self.config.llama_api_key,
+                        api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
                         temperature=0.7,
                         #top_p=0.7,
@@ -249,9 +252,9 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatLlama(
                         self.client,
-                        api_key=self.config.llama_api_key,
+                        api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.6,
+                        temperature=0.7,
                         #top_p=0.6,
                         max_tokens=300,
                         max_retries=4),
@@ -263,7 +266,7 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatLlama(
                         self.client,
-                        api_key=self.config.llama_api_key,
+                        api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
                         temperature=0.6,
                         #top_p=0.9,

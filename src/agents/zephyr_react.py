@@ -1,6 +1,6 @@
 #Test react template
 from typing import List
-from agents.llama_output_parser import ReACTOutputParser  #upm package(steamship)
+from agents.rail_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from steamship.data.tags.tag_constants import RoleTag  #upm package(steamship)
@@ -38,7 +38,7 @@ Use appropriate language and tone for the character's personality.
 Develop {NAME}'s response by authentically embodying {NAME}'s unique personality traits. Avoid repetition. Your goal is to create an engaging role-play experience. 
 
 Don't break the fourth wall, don't reveal that you're representing {NAME} - BE {NAME} in all aspects of this role-play.
-Write {NAME}'s next reply in the following role-play between the user and {NAME}.</s>
+Formulate your character's single reply to the human's message.</s>
 
 {relevant_history}{chat_history}<|user|>\n{input}{image_helper}</s>
 {scratchpad}"""
@@ -114,7 +114,7 @@ Write {NAME}'s next reply in the following role-play between the user and {NAME}
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>Hi</human></s>\n\n"
-                llama_chat_history += f"<|assistant|>\n" + current_seed + "</s>\n\n"
+                llama_chat_history += f"<|assistant|>\n" + current_seed + " </s>\n\n"
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -187,8 +187,8 @@ Write {NAME}'s next reply in the following role-play between the user and {NAME}
             },
             #stop="<|im_end|>",
         )
-        #print(raw_llm_response)
-        #print(validated_response)
+        print(raw_llm_response)
+        print(validated_response)
         return self.output_parser.parse(validated_response, context)
 
     def my_llm_api(self, prompt: str, **kwargs) -> str:
@@ -202,7 +202,7 @@ Write {NAME}'s next reply in the following role-play between the user and {NAME}
             str: The output of the LLM API
         """
         #print(kwargs)
-        #print(prompt)
+        print(prompt)
         # Call your LLM API here
         completions = self.llm.complete(
             prompt=prompt,
