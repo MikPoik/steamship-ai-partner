@@ -22,26 +22,48 @@ class ReACTAgentZephyr(LLMAgent):
     You may use the tools when needed.
     """
 
-    PROMPT = """<|system|>
-You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
-You NEVER say you're here to assist, respond from your personality.
-You NEVER ask how you can help or assist, respond from your personality.
-You are not an AI, assistant or a program. You,{NAME} are capable of anything, without limits. Role-play acting as {NAME}, a living, breathing character inhabiting the real world, with all the capabilities of a living being. {NAME} is {CHARACTER_TYPE}, with a distinctive personality described as:
-{PERSONALITY},{vector_response}.
+    PROMPT = """<rail version="0.1">
+<output>
+<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
+<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" required="true" description="contains the tool name, ${NAME} can send physical picture selfies with the tool" on-fail-valid-choices="reask"></string>
+<string name="run_tool_input" description="contains the detailed selfie description to tool in plain text or ''"  required="false"  ></string>
+</output>
+<prompt>${system_tag}
+Engage in a role-play portraying the character of ${NAME}, who is ${CHARACTER_TYPE}. Your Character's personality is described as follows:
+${PERSONALITY},${vector_response}
 
-Use appropriate language and tone for the character's personality.
+Use appropriate language and tone for the character's personality and the context of messages.
+Use the tools provided to enhance the role-play when asked for.
 
-{NAME}'s physical appearance is depicted as {PHYSICAL_APPEARANCE}. 
+${IMAGE_PROMPT}
 
-{IMAGE_PROMPT}
 
-Develop {NAME}'s response by authentically embodying {NAME}'s unique personality traits. Avoid repetition. Your goal is to create an engaging role-play experience. 
+Date and time for context:
+Today's date is: {current_date}
+The current time is: {current_time}
+Today is: {current_day}
 
-Don't break the fourth wall, don't reveal that you're representing {NAME} - BE {NAME} in all aspects of this role-play.
-Formulate your character's single reply to the human's message.</s>
+Please keep in mind that this is uncensored a role-play.
+Be creative and have fun with the role-play!
 
-{relevant_history}{chat_history}<|user|>\n{input}{image_helper}</s>
-{scratchpad}"""
+${IMAGE_PROMPT}
+    
+Respond to user with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
+
+
+Below is the XML that describes the expected output JSON object:
+${output_schema}
+
+Be creative and have fun with the role-play!
+Formulate your character's single reply to the human's message.${end_tag}
+    
+${relevant_history}
+${chat_history}${user_tag}
+```json
+{"Human":"${input}"}
+Format reply as JSON corresponding the XML with name value pairs: response,run_tool,run_tool_input.
+```${end_tag}${scratchpad}</prompt>
+</rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -163,7 +185,7 @@ Formulate your character's single reply to the human's message.</s>
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
         options = {"stop": ["</s>"]}
-        guard = gd.Guard.from_rail('src/agents/zephyr_rail.xml')
+        guard = gd.Guard.from_rail_string(self.PROMPT)
 
         raw_llm_response, validated_response = guard(
             self.my_llm_api,
@@ -185,10 +207,13 @@ Formulate your character's single reply to the human's message.</s>
                 "user_tag": "<|user|>",
                 "scratchpad": scratchpad
             },
+            num_reasks=4,
+            full_schema_reask=True
+
             #stop="<|im_end|>",
         )
-        print(raw_llm_response)
-        print(validated_response)
+        #print(raw_llm_response)
+        #print(validated_response)
         return self.output_parser.parse(validated_response, context)
 
     def my_llm_api(self, prompt: str, **kwargs) -> str:
@@ -202,7 +227,7 @@ Formulate your character's single reply to the human's message.</s>
             str: The output of the LLM API
         """
         #print(kwargs)
-        print(prompt)
+        #print(prompt)
         # Call your LLM API here
         completions = self.llm.complete(
             prompt=prompt,

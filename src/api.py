@@ -34,15 +34,17 @@ from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.coqui_tool import CoquiTool  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
+import os
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-70b"
-LLAMA2_PUFFIN = "NousResearch/Redmond-Puffin-13B"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
 MYTHOMAX = "Gryphe/MythoMax-L2-13b"
+
+os.environ["GUARDRAILS_PROCESS_COUNT"] = "1"
 
 
 #TelegramTransport config
@@ -66,13 +68,12 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(LLAMA2_HERMES,
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "", description="Together.ai api key")
 
-    zephyr_api_key: Optional[str] = Field(os.getenv('LEMONFOX_KEY'),
-                                          description="Lemonfox api key")
+    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
 

@@ -22,7 +22,49 @@ class ReACTAgent(LLMAgent):
 Do not talk about the tools to the human.
 """
 
-    PROMPT = """"""
+    PROMPT = """<rail version="0.1">
+<output>
+<string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
+<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" description="contains the tool name,use tool if currently asked for a picture" required="true" on-fail-valid-choices="reask"></string>
+<string name="run_tool_input" description="contains the detailed input to the tool in plain text or ''" required="false" ></string>
+
+</output>
+<prompt>
+### Instruction:
+Engage in a role-play portraying the adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}. ${vector_response}
+${NAME}'s appearance is depicted as: ${CHARACTER_APPEARANCE}
+
+Use your character's personality and behavior to guide you and create a vivid and engaging response.
+Use appropriate language and tone for the character's personality.
+
+Date and time for context:
+Today's date is: ${current_date}
+The current time is: ${current_time}
+Today is: ${current_day}
+
+${IMAGE_PROMPT}
+
+Respond to human with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
+
+
+Below is the XML that describes the expected output JSON object:
+${output_schema}
+Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
+Be creative and have fun with the role-play!
+Write ${NAME}'s next reply to the Human.
+
+Other related history:
+${relevant_history}
+Conversation history:
+${chat_history}
+### Input:
+```json
+{"Human": "${input}"}
+Format reply as JSON corresponding the XML with name value pairs: response,run_tool,run_tool_input.
+```
+### Response:
+</prompt>
+</rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -144,8 +186,8 @@ Do not talk about the tools to the human.
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
         #options = {}
-
-        guard = gd.Guard.from_rail('src/agents/rail.xml')
+        guard = gd.Guard.from_rail_string(
+            self.PROMPT)  # from_rail('agents/rail.xml')
 
         raw_llm_response, validated_response = guard(
             self.my_llm_api,
@@ -164,11 +206,14 @@ Do not talk about the tools to the human.
                 self.IMAGE_PROMPT.format(tool_index=tool_index),
                 "vector_response": vector_response
             },
+            num_reasks=4,
+            full_schema_reask=True
+
             #options=options,
             #stop="</s>"
         )
-        #print(raw_llm_response)
-        #print(validated_response)
+        print(raw_llm_response)
+        print(validated_response)
 
         return self.output_parser.parse(validated_response, context)
 
@@ -184,7 +229,7 @@ Do not talk about the tools to the human.
                 str: The output of the LLM API
             """
         #print(kwargs)
-        #print(prompt)
+        print(prompt)
         # Call your LLM API here
         completions = self.llm.complete(
             prompt=prompt,
@@ -192,6 +237,7 @@ Do not talk about the tools to the human.
             max_retries=4,
             #options=kwargs
         )
+
         return completions[0].text
 
     def _construct_scratchpad(self, context):

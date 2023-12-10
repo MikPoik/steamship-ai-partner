@@ -21,7 +21,43 @@ class ReACTAgentChatlm(LLMAgent):
       {tool_index}
 """
 
-    PROMPT = """"""
+    PROMPT = """<rail version="0.1">
+<output>
+<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
+<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" required="true" description="contains the tool name, use tool if currently asked for a picture" on-fail-valid-choices="reask"></string>
+<string name="run_tool_input" description="contains the detailed input to the tool in plain text or `null`" required="false" ></string>
+</output>
+<prompt>${im_start}system
+Engage in a role-play portraying the adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}, ${vector_response}
+Your character's appearance is depicted as: ${CHARACTER_APPEARANCE}
+
+Use your character's personality and behavior to guide you and create a vivid and engaging response.
+Use appropriate language and tone for the character's personality.
+
+Date and time for context:
+Today's date is: ${current_date}
+The current time is: ${current_time}
+Today is: ${current_day}
+
+${IMAGE_PROMPT}
+    
+Respond to user with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
+
+Below is the XML that describes the expected output JSON object:
+${output_schema}
+
+Be creative and have fun with the role-play!
+Write ${NAME}'s next reply to the user.${im_end}
+${relevant_history}
+${chat_history}
+${im_start}user
+```json
+{"user":"${input}"}
+Format reply as valid JSON object corresponding the XML with name value pairs: response,run_tool,run_tool_input.
+```
+${im_end}${scratchpad}
+</prompt>
+</rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -143,7 +179,7 @@ class ReACTAgentChatlm(LLMAgent):
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
         options = {"stop": ["<|im_end|>"]}
-        guard = gd.Guard.from_rail('src/agents/chatlm_rail.xml')
+        guard = gd.Guard.from_rail_string(rail_string=self.PROMPT)
 
         raw_llm_response, validated_response = guard(
             self.my_llm_api,
@@ -165,8 +201,8 @@ class ReACTAgentChatlm(LLMAgent):
                 "vector_response": vector_response,
                 "scratchpad": scratchpad
             },
-            #stop="<|im_end|>",
-        )
+            num_reasks=4,
+            full_schema_reask=True)
         #print(raw_llm_response)
         #print(validated_response)
 
