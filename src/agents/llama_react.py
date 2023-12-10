@@ -25,7 +25,7 @@ Do not talk about the tools to the human.
     PROMPT = """<rail version="0.1">
 <output>
 <string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
-<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" description="contains the tool name,use tool if currently asked for a picture" required="true" on-fail-valid-choices="reask"></string>
+<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" description="contains the tool name" required="true" on-fail-valid-choices="reask"></string>
 <string name="run_tool_input" description="contains the detailed input to the tool in plain text or ''" required="false" ></string>
 
 </output>
@@ -60,7 +60,7 @@ ${chat_history}
 ### Input:
 ```json
 {"Human": "${input}"}
-Format reply as JSON corresponding the XML with name value pairs: response,run_tool,run_tool_input.
+Format reply as JSON corresponding the XML with following name fields: response, run_tool, run_tool_input.
 ```
 ### Response:
 </prompt>
@@ -123,12 +123,12 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                     print(block.text)
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += "{" + f'"Human": "' + str(
-                            block.text).replace("\n", " ") + '"}\n\n'
+                        llama_chat_history += f'Human:\n' + str(
+                            block.text).replace("\n", " ") + '\n\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += "{" + f'"{current_name}": "' + str(
-                            block.text).replace("\n", " ") + '"}\n\n'
+                        llama_chat_history += f'{current_name}:\n' + str(
+                            block.text).replace("\n", " ") + '\n\n'
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
@@ -137,7 +137,7 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>*enters the chat*</human>\n\n"
-                llama_chat_history += "{" + f'"{current_name}": "' + current_seed + '"}\n\n'
+                llama_chat_history += f'{current_name}:\n' + current_seed + '\n\n'
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -151,11 +151,11 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += "{" + '"Human": "' + str(
-                                msg.text).replace("\n", " ") + '"}\n\n'
+                            llama_related_history += 'Human:\n' + str(
+                                msg.text).replace("\n", " ") + '\n\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += "{" + f'"{current_name}": "' + str(
-                        msg.text).replace("\n", " ") + '"}\n\n'
+                    llama_related_history += f'{current_name}:\n' + str(
+                        msg.text).replace("\n", " ") + '\n\n'
 
         current_persona = PERSONA.replace("\n", ". ")
         current_behaviour = BEHAVIOUR.replace("\n ", ". ")
@@ -207,13 +207,13 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                 "vector_response": vector_response
             },
             num_reasks=4,
-            full_schema_reask=True
+            full_schema_reask=False
 
             #options=options,
             #stop="</s>"
         )
-        print(raw_llm_response)
-        print(validated_response)
+        #print(raw_llm_response)
+        #print(validated_response)
 
         return self.output_parser.parse(validated_response, context)
 
@@ -229,7 +229,7 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                 str: The output of the LLM API
             """
         #print(kwargs)
-        print(prompt)
+        #print(prompt)
         # Call your LLM API here
         completions = self.llm.complete(
             prompt=prompt,

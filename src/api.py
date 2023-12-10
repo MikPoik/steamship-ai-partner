@@ -68,12 +68,13 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
-                                     description="llm model to use")
+    llm_model: Optional[str] = Field(LLAMA2_HERMES, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
-        "", description="Together.ai api key")
+        "",
+        description="Together.ai api key")
 
-    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
+    zephyr_api_key: Optional[str] = Field("",
+                                          description="Lemonfox api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
 

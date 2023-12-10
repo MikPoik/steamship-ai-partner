@@ -208,7 +208,7 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                 "scratchpad": scratchpad
             },
             num_reasks=4,
-            full_schema_reask=True
+            full_schema_reask=False
 
             #stop="<|im_end|>",
         )

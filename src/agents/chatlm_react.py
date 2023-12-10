@@ -202,7 +202,7 @@ ${im_end}${scratchpad}
                 "scratchpad": scratchpad
             },
             num_reasks=4,
-            full_schema_reask=True)
+            full_schema_reask=False)
         #print(raw_llm_response)
         #print(validated_response)
 
