@@ -68,13 +68,12 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(LLAMA2_HERMES, description="llm model to use")
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
+                                     description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
-        "",
-        description="Together.ai api key")
+        "", description="Together.ai api key")
 
-    zephyr_api_key: Optional[str] = Field("",
-                                          description="Lemonfox api key")
+    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
 
@@ -228,7 +227,7 @@ class MyAssistant(AgentService):
                     llm=ChatOpenAI(self.client,
                                    model_name=self.config.llm_model,
                                    temperature=0.7,
-                                   max_tokens=256,
+                                   max_tokens=300,
                                    moderate_output=False),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
@@ -241,7 +240,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.7,
+                        temperature=0.65,
                         #top_p=0.7,
                         max_tokens=300,
                         max_retries=4),
@@ -256,7 +255,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.7,
+                        temperature=0.65,
                         #top_p=0.6,
                         max_tokens=300,
                         max_retries=4),
@@ -270,7 +269,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.6,
+                        temperature=0.65,
                         #top_p=0.9,
                         max_tokens=300,
                         max_retries=4),
@@ -284,7 +283,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.7,
+                        temperature=0.6,
                         #top_p=0.6,
                         max_tokens=300,
                         max_retries=4),

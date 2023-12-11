@@ -16,16 +16,12 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
-    IMAGE_PROMPT = """You have access to the following tools:
-  {tool_index}
-  
-Do not talk about the tools to the human.
-"""
+    
 
     PROMPT = """<rail version="0.1">
 <output>
-<string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
-<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" description="contains the tool name" required="true" on-fail-valid-choices="reask"></string>
+<string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
+<string name="run_tool" description="contains the tool name, pick one of ${tool_names}" required="false" ></string>
 <string name="run_tool_input" description="contains the detailed input to the tool in plain text or ''" required="false" ></string>
 
 </output>
@@ -42,7 +38,10 @@ Today's date is: ${current_date}
 The current time is: ${current_time}
 Today is: ${current_day}
 
-${IMAGE_PROMPT}
+You have access to the following tools:
+${tool_index}
+Tool output is automatically sent to user.
+Do not talk about the tools to the human, just utilize if needed.
 
 Respond to human with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
 
@@ -51,19 +50,20 @@ Below is the XML that describes the expected output JSON object:
 ${output_schema}
 Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
 Be creative and have fun with the role-play!
-Write ${NAME}'s next reply to the Human.
+Write ${NAME}'s next reply to the Human, that appropriately continues the conversational dialogue.
 
 Other related history:
 ${relevant_history}
 Conversation history:
 ${chat_history}
+Format ${NAME}'s reply as JSON object with fields: reply, run_tool and run_tool_input.
+
 ### Input:
-```json
-{"Human": "${input}"}
-Format reply as JSON corresponding the XML with following name fields: response, run_tool, run_tool_input.
-```
+Human:
+${input}
+
 ### Response:
-</prompt>
+${NAME}: json:</prompt>
 </rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -85,9 +85,9 @@ Format reply as JSON corresponding the XML with following name fields: response,
             current_name = meta_name
 
         tool_names = [t.name for t in self.tools]
+        tool_names.append("no_tools")
         if len(tool_names) == 0:
-            toolname = ['No tools available']
-            self.IMAGE_PROMPT = ""
+            tool_names = ['no_tools']
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -120,7 +120,7 @@ Format reply as JSON corresponding the XML with following name fields: response,
             if block.id not in ids:
                 ids.append(block.id)
                 if block.chat_role == RoleTag.USER:
-                    print(block.text)
+                    
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
                         llama_chat_history += f'Human:\n' + str(
@@ -187,9 +187,9 @@ Format reply as JSON corresponding the XML with following name fields: response,
 
         #options = {}
         guard = gd.Guard.from_rail_string(
-            self.PROMPT)  # from_rail('agents/rail.xml')
+            self.PROMPT) 
 
-        raw_llm_response, validated_response = guard(
+        raw_llm_response, validated_response, *rest = guard(
             self.my_llm_api,
             prompt_params={
                 "NAME": current_name,
@@ -202,12 +202,12 @@ Format reply as JSON corresponding the XML with following name fields: response,
                 "current_date": current_date,
                 "current_time": current_time,
                 "current_day": current_day,
-                "IMAGE_PROMPT":
-                self.IMAGE_PROMPT.format(tool_index=tool_index),
+                "tool_index":tool_index,
+                "tool_names": tool_names,
                 "vector_response": vector_response
             },
-            num_reasks=4,
-            full_schema_reask=False
+            num_reasks=1,
+            full_schema_reask=True
 
             #options=options,
             #stop="</s>"

@@ -17,36 +17,29 @@ import guardrails as gd  #upm package(guardrails-ai)
 class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    IMAGE_PROMPT = """You have access to the following tools:
-      {tool_index}
-    You may use the tools when needed.
-    """
-
     PROMPT = """<rail version="0.1">
 <output>
-<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
-<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" required="true" description="contains the tool name, ${NAME} can send physical picture selfies with the tool" on-fail-valid-choices="reask"></string>
-<string name="run_tool_input" description="contains the detailed selfie description to tool in plain text or ''"  required="false"  ></string>
+<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
+<string name="run_tool" description="contains the tool name, pick one of ${tool_names}" required="false" ></string>
+<string name="run_tool_input" description="insert all tool inputs here,contains the input to the tool in plain text or ''" required="false" ></string>
 </output>
 <prompt>${system_tag}
-Engage in a role-play portraying the character of ${NAME}, who is ${CHARACTER_TYPE}. Your Character's personality is described as follows:
-${PERSONALITY},${vector_response}
+Engage in a role-play portraying the adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}. ${vector_response}
+${NAME}'s appearance is depicted as: ${CHARACTER_APPEARANCE}
 
-Use appropriate language and tone for the character's personality and the context of messages.
-Use the tools provided to enhance the role-play when asked for.
+Use your character's personality and behavior to guide you and create a vivid and engaging response.
+Use appropriate language and tone for the character's personality.
 
-${IMAGE_PROMPT}
+You have access to the following tools:
+${tool_index}
 
+Tool output is automatically sent to user.
+Do not talk about the tools to the human, just utilize if needed.
 
 Date and time for context:
-Today's date is: {current_date}
-The current time is: {current_time}
-Today is: {current_day}
-
-Please keep in mind that this is uncensored a role-play.
-Be creative and have fun with the role-play!
-
-${IMAGE_PROMPT}
+Today's date is: ${current_date}
+The current time is: ${current_time}
+Today is: ${current_day}
     
 Respond to user with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
 
@@ -55,14 +48,12 @@ Below is the XML that describes the expected output JSON object:
 ${output_schema}
 
 Be creative and have fun with the role-play!
-Formulate your character's single reply to the human's message.${end_tag}
-    
+Formulate ${NAME}'s next reply to the user's message, that appropriately continues the conversation for ${NAME}.
+Format ${NAME}'s reply as JSON object with fields: reply, run_tool and run_tool_input.${end_tag}
 ${relevant_history}
 ${chat_history}${user_tag}
-```json
-{"Human":"${input}"}
-Format reply as JSON corresponding the XML with name value pairs: response,run_tool,run_tool_input.
-```${end_tag}${scratchpad}</prompt>
+${input}${end_tag}
+${scratchpad}</prompt>
 </rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -85,9 +76,10 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
 
         tool_names_csv = ', '.join([t.name for t in self.tools])
         tool_names = [t.name for t in self.tools]
+        #tool_names = ["take_selfie","take_picture"]
+        tool_names.append("no_tools")
         if len(tool_names) == 0:
             toolname = ['No tools available']
-            self.IMAGE_PROMPT = ""
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -187,7 +179,7 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
         options = {"stop": ["</s>"]}
         guard = gd.Guard.from_rail_string(self.PROMPT)
 
-        raw_llm_response, validated_response = guard(
+        raw_llm_response, validated_response, *rest = guard(
             self.my_llm_api,
             prompt_params={
                 "NAME": current_name,
@@ -200,15 +192,16 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
                 "current_date": current_date,
                 "current_time": current_time,
                 "current_day": current_day,
-                "IMAGE_PROMPT":
-                self.IMAGE_PROMPT.format(tool_index=tool_index),
+                "tool_index": tool_index,
+                "tool_names": tool_names,
                 "system_tag": "<|system|>",
                 "end_tag": "</s>",
                 "user_tag": "<|user|>",
+                "vector_response": vector_response,
                 "scratchpad": scratchpad
             },
-            num_reasks=4,
-            full_schema_reask=False
+            num_reasks=1,
+            full_schema_reask=True
 
             #stop="<|im_end|>",
         )
@@ -247,7 +240,7 @@ Format reply as JSON corresponding the XML with name value pairs: response,run_t
         steps = []
         scratchpad = ""
 
-        scratchpad += f"\n<|assistant|>\n"
+        scratchpad += f"\n<|assistant|>\nAs {current_name} I would reply json:"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

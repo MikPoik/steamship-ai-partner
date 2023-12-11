@@ -17,15 +17,11 @@ import guardrails as gd  #upm package(guardrails-ai)
 class ReACTAgentChatlm(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    IMAGE_PROMPT = """You have access to the following tools:
-      {tool_index}
-"""
-
     PROMPT = """<rail version="0.1">
 <output>
-<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="response"></string>
-<string format="valid-choices: {['take_selfie','no_tool']}" name="run_tool" required="true" description="contains the tool name, use tool if currently asked for a picture" on-fail-valid-choices="reask"></string>
-<string name="run_tool_input" description="contains the detailed input to the tool in plain text or `null`" required="false" ></string>
+<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
+<string name="run_tool" description="contains the tool name, pick one of ${tool_names}" required="false" ></string>
+<string name="run_tool_input" description="contains the detailed input to the tool in plain text or ''" required="false" ></string>
 </output>
 <prompt>${im_start}system
 Engage in a role-play portraying the adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}, ${vector_response}
@@ -39,7 +35,10 @@ Today's date is: ${current_date}
 The current time is: ${current_time}
 Today is: ${current_day}
 
-${IMAGE_PROMPT}
+You have access to the following tools:
+${tool_index}
+Tool output is automatically sent to user.
+Do not talk about the tools to the human, just utilize if needed.
     
 Respond to user with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
 
@@ -47,15 +46,13 @@ Below is the XML that describes the expected output JSON object:
 ${output_schema}
 
 Be creative and have fun with the role-play!
-Write ${NAME}'s next reply to the user.${im_end}
+Write ${NAME}'s next reply to the user, that appropriately continues the conversational dialogue.
+Format ${NAME}'s reply as JSON object with fields: reply, run_tool and run_tool_input.${im_end}
 ${relevant_history}
 ${chat_history}
 ${im_start}user
-```json
-{"user":"${input}"}
-Format reply as valid JSON object corresponding the XML with name value pairs: response,run_tool,run_tool_input.
-```
-${im_end}${scratchpad}
+${input}${im_end}
+${scratchpad}
 </prompt>
 </rail>"""
 
@@ -77,11 +74,12 @@ ${im_end}${scratchpad}
         if meta_name is not None:
             current_name = meta_name
 
-        tool_names_csv = ', '.join([t.name for t in self.tools])
+        #tool_names_csv = ', '.join([t.name for t in self.tools])
         tool_names = [t.name for t in self.tools]
+        tool_names.append("no_tools")
         if len(tool_names) == 0:
-            toolname = ['No tools available']
-            self.IMAGE_PROMPT = ""
+            tool_names = ['no_tools']
+
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -145,7 +143,7 @@ ${im_end}${scratchpad}
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
                             llama_related_history += "<|im_start|>user\n" + str(
-                                msg.text).replace("\n", " ") + "<|im_end>\n"
+                                msg.text).replace("\n", " ") + "<|im_end|>\n"
                 if msg.chat_role == RoleTag.ASSISTANT:
                     llama_related_history += f"<|im_start|>assistant\n" + str(
                         msg.text).replace("\n", " ") + "<|im_end|>\n"
@@ -181,7 +179,7 @@ ${im_end}${scratchpad}
         options = {"stop": ["<|im_end|>"]}
         guard = gd.Guard.from_rail_string(rail_string=self.PROMPT)
 
-        raw_llm_response, validated_response = guard(
+        raw_llm_response, validated_response, *rest = guard(
             self.my_llm_api,
             prompt_params={
                 "NAME": current_name,
@@ -194,15 +192,15 @@ ${im_end}${scratchpad}
                 "current_date": current_date,
                 "current_time": current_time,
                 "current_day": current_day,
-                "IMAGE_PROMPT":
-                self.IMAGE_PROMPT.format(tool_index=tool_index),
+                "tool_index": tool_index,
+                "tool_names": tool_names,
                 "im_start": "<|im_start|>",
                 "im_end": "<|im_end|>",
                 "vector_response": vector_response,
                 "scratchpad": scratchpad
             },
-            num_reasks=4,
-            full_schema_reask=False)
+            num_reasks=1,
+            full_schema_reask=True)
         #print(raw_llm_response)
         #print(validated_response)
 
@@ -239,7 +237,7 @@ ${im_end}${scratchpad}
         steps = []
         scratchpad = ""
 
-        scratchpad += f"\n<|im_start|>assistant"
+        scratchpad += f"\n<|im_start|>assistant\n{current_name}'s reply, json:"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad

@@ -22,19 +22,17 @@ class ReACTOutputParser(OutputParser):
         super().__init__(**kwargs)
 
     def parse(self, response: Dict, context: AgentContext) -> Action:
+        current_name = NAME
+        meta_name = context.metadata.get("instruction", {}).get("name")
+        if meta_name is not None:
+                current_name = meta_name
         text = {}
         run_tool = {}
         run_tool_input = {}
         if response is not None:
-            text = response.get("response", {})
+            text = response.get("reply", {})
             run_tool = response.get("run_tool", {})
             run_tool_input = response.get("run_tool_input", {})
-
-
-        current_name = NAME
-        meta_name = context.metadata.get("instruction", {}).get("name")
-        if meta_name is not None:
-            current_name = meta_name
 
 
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
