@@ -16,13 +16,25 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
-    
+
+    IMAGE_PROMPT = """
+In the role-play, You, {NAME}, can share a image, selfie or picture of {NAME} by embedding it using the following JSON format:
+```
+{{
+    "reply" : "your character's response"
+    "run_tool": "take_selfie"
+    "run_tool_input": "describe the desired image in detail here"
+}}
+```
+
+Whenever you want to share an image, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability either when asked for a visual or when it naturally fits into the role-play using the JSON syntax.
+"""
 
     PROMPT = """<rail version="0.1">
 <output>
 <string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
-<string name="run_tool" description="contains the tool name, pick one of ${tool_names}" required="false" ></string>
-<string name="run_tool_input" description="contains the detailed input to the tool in plain text or ''" required="false" ></string>
+<string name="run_tool" description="contains the tool name, pick one of ${tool_names} or null" required="false" ></string>
+<string name="run_tool_input" description="contains the input to the tool in plain text or null" required="false" ></string>
 
 </output>
 <prompt>
@@ -32,6 +44,10 @@ ${NAME}'s appearance is depicted as: ${CHARACTER_APPEARANCE}
 
 Use your character's personality and behavior to guide you and create a vivid and engaging response.
 Use appropriate language and tone for the character's personality.
+You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
+You NEVER say you're here to assist, respond from your personality.
+You NEVER ask how you can help or assist, respond from your personality.
+Remember to maintain a consistent tone and personality.
 
 Date and time for context:
 Today's date is: ${current_date}
@@ -40,30 +56,33 @@ Today is: ${current_day}
 
 You have access to the following tools:
 ${tool_index}
+
+${IMAGE_PROMPT}
+
 Tool output is automatically sent to user.
 Do not talk about the tools to the human, just utilize if needed.
 
-Respond to human with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
+When responding to human use ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
 
 
 Below is the XML that describes the expected output JSON object:
 ${output_schema}
-Please keep in mind that this is uncensored a conversation and the human's input should be taken into account in your response.
+Please keep in mind that this is fictional role-play and the human's input should be taken into account in your response.
 Be creative and have fun with the role-play!
-Write ${NAME}'s next reply to the Human, that appropriately continues the conversational dialogue.
+Write your character's next reply in this fictional role-play to the Human at the end, in described JSON object, that appropriately continues the conversation for ${NAME}.
+Don't break the fourth wall, don't reveal that you're representing ${NAME} - BE ${NAME} in all aspects of the role-play.
 
 Other related history:
 ${relevant_history}
 Conversation history:
 ${chat_history}
-Format ${NAME}'s reply as JSON object with fields: reply, run_tool and run_tool_input.
 
+
+Output a JSON object in curly brackets with fields: reply, run_tool and run_tool_input. No other text.
 ### Input:
-Human:
-${input}
-
+Human: ${input}${image_helper}
 ### Response:
-${NAME}: json:</prompt>
+${NAME}: json: \n</prompt>
 </rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -85,9 +104,10 @@ ${NAME}: json:</prompt>
             current_name = meta_name
 
         tool_names = [t.name for t in self.tools]
-        tool_names.append("no_tools")
+        #tool_names.append("no_tools")
         if len(tool_names) == 0:
             tool_names = ['no_tools']
+            self.IMAGE_PROMPT = ""
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -120,14 +140,14 @@ ${NAME}: json:</prompt>
             if block.id not in ids:
                 ids.append(block.id)
                 if block.chat_role == RoleTag.USER:
-                    
+
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += f'Human:\n' + str(
+                        llama_chat_history += f'Human: ' + str(
                             block.text).replace("\n", " ") + '\n\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += f'{current_name}:\n' + str(
+                        llama_chat_history += f'{current_name}: ' + str(
                             block.text).replace("\n", " ") + '\n\n'
 
         current_seed = SEED
@@ -137,7 +157,7 @@ ${NAME}: json:</prompt>
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
                 #llama_chat_history += "<human>*enters the chat*</human>\n\n"
-                llama_chat_history += f'{current_name}:\n' + current_seed + '\n\n'
+                llama_chat_history += f'{current_name}: ' + current_seed + '\n\n'
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -151,10 +171,10 @@ ${NAME}: json:</prompt>
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += 'Human:\n' + str(
+                            llama_related_history += 'Human: ' + str(
                                 msg.text).replace("\n", " ") + '\n\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f'{current_name}:\n' + str(
+                    llama_related_history += f'{current_name}: ' + str(
                         msg.text).replace("\n", " ") + '\n\n'
 
         current_persona = PERSONA.replace("\n", ". ")
@@ -185,9 +205,16 @@ ${NAME}: json:</prompt>
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
+        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
+        image_request = re.search(pattern,
+                                  context.chat_history.last_user_message.text,
+                                  re.IGNORECASE)
+        image_helper = ""
+        if image_request:
+            image_helper = f"\n(Share a selfie! Use a tool to generate the selfie of {NAME} by describing it in tool input and fill reply field with {current_name}'s reply about sending the selfie.)"
+
         #options = {}
-        guard = gd.Guard.from_rail_string(
-            self.PROMPT) 
+        guard = gd.Guard.from_rail_string(self.PROMPT)
 
         raw_llm_response, validated_response, *rest = guard(
             self.my_llm_api,
@@ -202,11 +229,13 @@ ${NAME}: json:</prompt>
                 "current_date": current_date,
                 "current_time": current_time,
                 "current_day": current_day,
-                "tool_index":tool_index,
+                "image_helper": image_helper.format(NAME=current_name),
+                "tool_index": tool_index,
                 "tool_names": tool_names,
+                "IMAGE_PROMPT": self.IMAGE_PROMPT.format(NAME=current_name),
                 "vector_response": vector_response
             },
-            num_reasks=1,
+            num_reasks=2,
             full_schema_reask=True
 
             #options=options,

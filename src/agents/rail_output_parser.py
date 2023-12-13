@@ -31,6 +31,7 @@ class ReACTOutputParser(OutputParser):
         run_tool_input = {}
         if response is not None:
             text = response.get("reply", {})
+            text = text.replace(current_name+": ", "")
             run_tool = response.get("run_tool", {})
             run_tool_input = response.get("run_tool_input", {})
 

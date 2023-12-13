@@ -40,6 +40,7 @@ import os
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-70b"
+LLAMA2_HERMES13B = "NousResearch/Nous-Hermes-Llama2-13b"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
 MYTHOMAX = "Gryphe/MythoMax-L2-13b"
@@ -68,7 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
+    llm_model: Optional[str] = Field(LLAMA2_HERMES13B,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "", description="Together.ai api key")
@@ -277,13 +278,13 @@ class MyAssistant(AgentService):
                         k=MESSAGE_COUNT)))
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgentZephyr(
+                ReACTAgent(
                     tools,
                     llm=ChatZephyr(
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.6,
+                        temperature=0.65,
                         #top_p=0.6,
                         max_tokens=300,
                         max_retries=4),

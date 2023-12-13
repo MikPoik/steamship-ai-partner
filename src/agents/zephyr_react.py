@@ -16,22 +16,37 @@ import guardrails as gd  #upm package(guardrails-ai)
 
 class ReACTAgentZephyr(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
+    IMAGE_PROMPT = """In the role-play, You, {NAME}, can share a image, selfie or picture of  {NAME} by embedding it using the following JSON format:
+    ```
+    {{
+        "reply" : "your character's response"
+        "run_tool": "take_selfie"
+        "run_tool_input": "describe the desired image in detail here"
+    }}
+    ```
+    Whenever you want to share an image, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability either when asked for a visual or when it naturally fits into the role-play using the JSON syntax."""
 
     PROMPT = """<rail version="0.1">
 <output>
-<string description="contains the text and emojis that ${NAME} wants to send to the user." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
-<string name="run_tool" description="contains the tool name, pick one of ${tool_names}" required="false" ></string>
-<string name="run_tool_input" description="insert all tool inputs here,contains the input to the tool in plain text or ''" required="false" ></string>
+<string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 300" on-fail-valid-length="reask" name="reply"></string>
+<string name="run_tool" description="contains the tool name, pick one of ${tool_names} or null" required="false" ></string>
+<string name="run_tool_input" description="contains the detailed input to the tool in plain text or null" required="false" ></string>
 </output>
 <prompt>${system_tag}
-Engage in a role-play portraying the adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}. ${vector_response}
+Engage in a fictional role-play portraying the physical being adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}. ${vector_response}
 ${NAME}'s appearance is depicted as: ${CHARACTER_APPEARANCE}
 
 Use your character's personality and behavior to guide you and create a vivid and engaging response.
 Use appropriate language and tone for the character's personality.
+You never say you're a machine, an AI language model, or an assistant. Respond from your personality.
+You NEVER say you're here to assist, respond from your personality.
+You NEVER ask how you can help or assist, respond from your personality.
+Remember to maintain a consistent tone and personality.
 
 You have access to the following tools:
 ${tool_index}
+
+${IMAGE_PROMPT}
 
 Tool output is automatically sent to user.
 Do not talk about the tools to the human, just utilize if needed.
@@ -41,18 +56,27 @@ Today's date is: ${current_date}
 The current time is: ${current_time}
 Today is: ${current_day}
     
-Respond to user with ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
+When responding to user use ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
 
 
 Below is the XML that describes the expected output JSON object:
 ${output_schema}
 
-Be creative and have fun with the role-play!
-Formulate ${NAME}'s next reply to the user's message, that appropriately continues the conversation for ${NAME}.
-Format ${NAME}'s reply as JSON object with fields: reply, run_tool and run_tool_input.${end_tag}
+example JSON:
+´´´
+{
+    "reply": your character's response
+    "run_tool": null,
+    "run_tool_input": null
+}
+´´´
+
+Please keep in mind that this is fictional role-play and the human's input should be taken into account in your response. Be creative and have fun with the role-play between user and ${NAME}!
+Write your character's next reply in this fictional role-play to the Human at the end, in described JSON object, that appropriately continues the conversation for ${NAME}.
+Don't break the fourth wall, don't reveal that you're representing ${NAME} - BE ${NAME} in all aspects of the role-play.${end_tag}
 ${relevant_history}
 ${chat_history}${user_tag}
-${input}${end_tag}
+${input}${image_helper}${end_tag}
 ${scratchpad}</prompt>
 </rail>"""
 
@@ -77,9 +101,10 @@ ${scratchpad}</prompt>
         tool_names_csv = ', '.join([t.name for t in self.tools])
         tool_names = [t.name for t in self.tools]
         #tool_names = ["take_selfie","take_picture"]
-        tool_names.append("no_tools")
+        #tool_names.append("no_tools")
         if len(tool_names) == 0:
             toolname = ['No tools available']
+            self.IMAGE_PROMPT = ""
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -175,6 +200,13 @@ ${scratchpad}</prompt>
                                                     {}).get("selfie_pre")
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
+        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
+        image_request = re.search(pattern,
+                                  context.chat_history.last_user_message.text,
+                                  re.IGNORECASE)
+        image_helper = ""
+        if image_request:
+            image_helper = f"\n(Sharing a fictional picture of {NAME} requested. Use a tool to generate virtual image of {NAME} describing it in tool input, and write {NAME}'s JSON reply to conversation about {NAME} sending a selfie, nothing else.{NAME} may reply like here is the selfie.)"
 
         options = {"stop": ["</s>"]}
         guard = gd.Guard.from_rail_string(self.PROMPT)
@@ -195,8 +227,10 @@ ${scratchpad}</prompt>
                 "tool_index": tool_index,
                 "tool_names": tool_names,
                 "system_tag": "<|system|>",
+                "IMAGE_PROMPT": self.IMAGE_PROMPT.format(NAME=current_name),
                 "end_tag": "</s>",
                 "user_tag": "<|user|>",
+                "image_helper": image_helper,
                 "vector_response": vector_response,
                 "scratchpad": scratchpad
             },
@@ -205,7 +239,7 @@ ${scratchpad}</prompt>
 
             #stop="<|im_end|>",
         )
-        #print(raw_llm_response)
+        print(raw_llm_response)
         #print(validated_response)
         return self.output_parser.parse(validated_response, context)
 
@@ -240,7 +274,7 @@ ${scratchpad}</prompt>
         steps = []
         scratchpad = ""
 
-        scratchpad += f"\n<|assistant|>\nAs {current_name} I would reply json:"
+        scratchpad += f"\n<|assistant|>\n{current_name}'s reply, json:"
         #Log agent scratchpad
         #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
         return scratchpad
