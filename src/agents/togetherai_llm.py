@@ -59,7 +59,9 @@ class Llama(LLM):
         - `max_tokens` (controls the size of LLM responses)
         """
         options = {}
-        options["stop"] = ["</s>","<|im_end|>"]
+        options["stop"] = [
+            "</s>", "<|im_end|>", "<|", "\n#", "\n\n\n", "Human:"
+        ]
         if stop:
             options["stop"] = [stop]
 

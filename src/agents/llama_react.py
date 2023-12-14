@@ -21,21 +21,20 @@ class ReACTAgent(LLMAgent):
 In the role-play, You, {NAME}, can share a image, selfie or picture of {NAME} by embedding it using the following JSON format:
 ```
 {{
-    "reply" : "your character's response"
-    "run_tool": "take_selfie"
-    "run_tool_input": "describe the desired image in detail here"
+    "reply" : "your character's response",
+    "run_tool": "take_selfie",
+    "run_tool_input": "your detailed description of desired image here"
 }}
 ```
 
-Whenever you want to share an image, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability either when asked for a visual or when it naturally fits into the role-play using the JSON syntax.
+Whenever you want to share an image, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability thoughtfully either when asked for a visual or when it naturally fits into the role-play using the JSON syntax.
 """
 
     PROMPT = """<rail version="0.1">
 <output>
-<string description="contains the text and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
-<string name="run_tool" description="contains the tool name, pick one of ${tool_names} or null" required="false" ></string>
+<string description="contains text (engaging, natural, authentic, descriptive, creative) and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
+<string name="run_tool" description="contains the tool name,if needed, pick one of ${tool_names} or null" required="false" ></string>
 <string name="run_tool_input" description="contains the input to the tool in plain text or null" required="false" ></string>
-
 </output>
 <prompt>
 ### Instruction:
@@ -49,7 +48,7 @@ You NEVER say you're here to assist, respond from your personality.
 You NEVER ask how you can help or assist, respond from your personality.
 Remember to maintain a consistent tone and personality.
 
-Date and time for context:
+Current date and time of role-play for context:
 Today's date is: ${current_date}
 The current time is: ${current_time}
 Today is: ${current_day}
@@ -62,11 +61,20 @@ ${IMAGE_PROMPT}
 Tool output is automatically sent to user.
 Do not talk about the tools to the human, just utilize if needed.
 
-When responding to human use ONLY a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types.
+When responding to human use ONLY a valid JSON object, where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types. 
 
 
 Below is the XML that describes the expected output JSON object:
 ${output_schema}
+Example of JSON:
+```
+{
+    "reply" : "your character's response",
+    "run_tool": null,
+    "run_tool_input": null
+}
+```
+
 Please keep in mind that this is fictional role-play and the human's input should be taken into account in your response.
 Be creative and have fun with the role-play!
 Write your character's next reply in this fictional role-play to the Human at the end, in described JSON object, that appropriately continues the conversation for ${NAME}.
@@ -78,7 +86,7 @@ Conversation history:
 ${chat_history}
 
 
-Output a JSON object in curly brackets with fields: reply, run_tool and run_tool_input. No other text.
+Output a JSON object in curly brackets with fields: reply${llama13_tool_fix}
 ### Input:
 Human: ${input}${image_helper}
 ### Response:
@@ -98,13 +106,18 @@ ${NAME}: json: \n</prompt>
         current_time = datetime.datetime.now().strftime("%X")
         current_day = datetime.datetime.now().strftime("%A")
 
+        current_model = ""
+        meta_model = context.metadata.get("instruction", {}).get("model")
+        if meta_model is not None:
+            current_model = meta_model
+
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
 
         tool_names = [t.name for t in self.tools]
-        #tool_names.append("no_tools")
+        tool_names.append("no_tools")
         if len(tool_names) == 0:
             tool_names = ['no_tools']
             self.IMAGE_PROMPT = ""
@@ -122,8 +135,8 @@ ${NAME}: json: \n</prompt>
             [context.chat_history.last_user_message], context=context)
         #logging.warning(raw_vector_response)
         if len(raw_vector_response[0].text) > 1:
-            vector_response = raw_vector_response[0].text
-            logging.warning(vector_response)
+            vector_response = raw_vector_response[0].text.replace("\n", ". ")
+            #logging.warning(vector_response)
 
         messages_from_memory = []
         # get prior conversations
@@ -205,13 +218,22 @@ ${NAME}: json: \n</prompt>
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
+        #help some models to send images
         pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
         image_request = re.search(pattern,
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
+
+        #Stop llama13B from sending images constantly
+        llama13_tool_fix = ""
+        if current_model == "NousResearch/Nous-Hermes-Llama2-13b":
+            llama13_tool_fix = ". Fill run_tool and run_tool_input values with `null` unless required."
+        else:
+            llama13_tool_fix = ", run_tool, run_tool_input"
+
         image_helper = ""
         if image_request:
-            image_helper = f"\n(Share a selfie! Use a tool to generate the selfie of {NAME} by describing it in tool input and fill reply field with {current_name}'s reply about sending the selfie.)"
+            image_helper = f"\n(Share a selfie! Use a tool to generate the selfie of {NAME} by describing it in JSON run_tool_input and fill reply field with {current_name}'s reply about sending the selfie. No urls.)"
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.PROMPT)
@@ -233,7 +255,8 @@ ${NAME}: json: \n</prompt>
                 "tool_index": tool_index,
                 "tool_names": tool_names,
                 "IMAGE_PROMPT": self.IMAGE_PROMPT.format(NAME=current_name),
-                "vector_response": vector_response
+                "vector_response": vector_response,
+                "llama13_tool_fix": llama13_tool_fix,
             },
             num_reasks=2,
             full_schema_reask=True

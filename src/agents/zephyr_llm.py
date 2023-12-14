@@ -3,7 +3,7 @@ from typing import List, Optional
 from steamship import Block, File, PluginInstance, Steamship  #upm package(steamship)
 from steamship.agents.schema import LLM, ChatLLM, Tool  #upm package(steamship)
 
-PLUGIN_HANDLE = "lemonfox-zephyr-chat"
+PLUGIN_HANDLE = "lemonfox-streaming-llm"
 DEFAULT_MAX_TOKENS = 256
 
 
@@ -39,6 +39,7 @@ class Zephyr(LLM):
 
         generator = client.use_plugin(
             PLUGIN_HANDLE,
+            version="1.0.1",
             config={
                 "api_key": api_key,
                 "model": model_name,
@@ -58,6 +59,9 @@ class Zephyr(LLM):
         - `max_tokens` (controls the size of LLM responses)
         """
         options = {}
+        options["stop"] = [
+            "</s>", "\n#", "\n\n", "Human:"
+        ]
         if stop:
             options["stop"] = stop
 

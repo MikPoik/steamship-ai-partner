@@ -69,7 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(LLAMA2_HERMES13B,
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "", description="Together.ai api key")
@@ -233,6 +233,10 @@ class MyAssistant(AgentService):
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
 
+        llama_temp = 0.65
+        if "NousResearch/Nous-Hermes-Llama2-13b" in self.config.llm_model:
+            llama_temp = 0.5
+
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
                 ReACTAgent(
@@ -241,7 +245,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.65,
+                        temperature=llama_temp,
                         #top_p=0.7,
                         max_tokens=300,
                         max_retries=4),
@@ -250,7 +254,7 @@ class MyAssistant(AgentService):
 
         if "Mistral" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgentChatlm(
+                ReACTAgent(
                     tools,
                     llm=ChatLlama(
                         self.client,
