@@ -80,8 +80,8 @@ class SelfieTool(ImageGeneratorTool):
 
         prompt = tool_input[0].text  #.replace(current_name + ",", "")
         #prompt = prompt.replace(current_name, "")
-        prompt = prompt.replace('"', "")
-        prompt = prompt.replace("'", "")
+        #prompt = prompt.replace('"', "")
+        #prompt = prompt.replace("'", "")
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
         post_prompt = NSFW_SELFIE_TEMPLATE_POST
@@ -96,7 +96,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
 
-        prompt = pre_prompt + prompt
+        prompt = pre_prompt + ", " + prompt
         #logging.warning("Getimg prompt: "+prompt)
         task = image_generator.generate(
             text=prompt,

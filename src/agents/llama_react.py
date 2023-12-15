@@ -19,21 +19,19 @@ class ReACTAgent(LLMAgent):
 
     IMAGE_PROMPT = """
 In the role-play, You, {NAME}, can share a image, selfie or picture of {NAME} by embedding it using the following JSON format:
-```
 {{
     "reply" : "your character's response",
     "run_tool": "take_selfie",
-    "run_tool_input": "your detailed description of desired image here"
+    "run_tool_input": "your description of desired image here"
 }}
-```
 
-Whenever you want to share an image, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability thoughtfully either when asked for a visual or when it naturally fits into the role-play using the JSON syntax.
+Whenever you want to share an image, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability either when asked for a visual or when it naturally fits into the role-play using the JSON syntax.
 """
 
     PROMPT = """<rail version="0.1">
 <output>
 <string description="contains text (engaging, natural, authentic, descriptive, creative) and emojis that ${NAME} wants to send to the Human." required="true" format="length: 2 1000" on-fail-valid-length="reask" name="reply"></string>
-<string name="run_tool" description="contains the tool name,if needed, pick one of ${tool_names} or null" required="false" ></string>
+<string name="run_tool" description="contains the tool name, pick one of ${tool_names} or null" required="false" ></string>
 <string name="run_tool_input" description="contains the input to the tool in plain text or null" required="false" ></string>
 </output>
 <prompt>
@@ -67,13 +65,11 @@ When responding to human use ONLY a valid JSON object, where the key of the fiel
 Below is the XML that describes the expected output JSON object:
 ${output_schema}
 Example of JSON:
-```
 {
     "reply" : "your character's response",
     "run_tool": null,
     "run_tool_input": null
 }
-```
 
 Please keep in mind that this is fictional role-play and the human's input should be taken into account in your response.
 Be creative and have fun with the role-play!
@@ -115,10 +111,16 @@ ${NAME}: json: \n</prompt>
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
-
+            
+        images_enabled = "true"
+        meta_images_enabled = context.metadata.get("instruction",
+            {}).get("create_images")
+        if meta_images_enabled is not None:
+            images_enabled = meta_images_enabled
+            
         tool_names = [t.name for t in self.tools]
-        tool_names.append("no_tools")
-        if len(tool_names) == 0:
+        #tool_names.append("no_tools")
+        if "false" in images_enabled:
             tool_names = ['no_tools']
             self.IMAGE_PROMPT = ""
 
@@ -224,6 +226,7 @@ ${NAME}: json: \n</prompt>
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
 
+            
         #Stop llama13B from sending images constantly
         llama13_tool_fix = ""
         if current_model == "NousResearch/Nous-Hermes-Llama2-13b":
@@ -232,8 +235,8 @@ ${NAME}: json: \n</prompt>
             llama13_tool_fix = ", run_tool, run_tool_input"
 
         image_helper = ""
-        if image_request:
-            image_helper = f"\n(Share a selfie! Use a tool to generate the selfie of {NAME} by describing it in JSON run_tool_input and fill reply field with {current_name}'s reply about sending the selfie. No urls.)"
+        if image_request and "true" in images_enabled:
+            image_helper = f"\n(Run a tool to share a visual selfie! describe {current_name} in JSON run_tool_input field and write {current_name}'s reply about showing the selfie.)"
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.PROMPT)

@@ -8,7 +8,7 @@ from steamship.utils.repl import AgentREPL  #upm package(steamship)
 from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
 from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
-from agents.chatlm_react import ReACTAgentChatlm  #upm package(steamship)
+from agents.chatlm_react import ReACTAgentChatlm
 from usage_tracking import UsageTracker  #upm package(steamship)
 import uuid, os, re, logging, requests
 from steamship import File, Tag, DocTag  #upm package(steamship)
@@ -32,7 +32,7 @@ from agents.llama_react import ReACTAgent  #upm package(steamship)
 from agents.zephyr_react import ReACTAgentZephyr  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
-from tools.coqui_tool import CoquiTool  #upm package(steamship)
+from tools.lemonfox_tts_tool import LemonfoxTTSTool  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
 import os
 
@@ -227,15 +227,11 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatOpenAI(self.client,
                                    model_name=self.config.llm_model,
-                                   temperature=0.7,
+                                   temperature=0.65,
                                    max_tokens=300,
                                    moderate_output=False),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
-
-        llama_temp = 0.65
-        if "NousResearch/Nous-Hermes-Llama2-13b" in self.config.llm_model:
-            llama_temp = 0.5
 
         if "Llama2" in self.config.llm_model:
             self.set_default_agent(
@@ -245,7 +241,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=llama_temp,
+                        temperature=0.65,
                         #top_p=0.7,
                         max_tokens=300,
                         max_retries=4),
@@ -507,12 +503,11 @@ class MyAssistant(AgentService):
             voice_response = voice_tool.run(action.output, context=context)
             action.output.append(voice_response[0])
         elif current_voice_config != "none":
-            voice_tool = CoquiTool()
+            voice_tool = LemonfoxTTSTool()
             voice_response = voice_tool.run(
                 action.output,
                 context=context,
-                api_key=self.config.transloadit_api_key,
-                api_secret=self.config.transloadit_api_secret)
+            )
             for block in voice_response:
                 action.output.append(block)
 
@@ -554,7 +549,7 @@ class MyAssistant(AgentService):
                 "selfie_pre": selfie_pre or None,
                 "selfie_post": selfie_post or None,
                 "seed": seed or None,
-                "model": model or None,
+                "model": self.config.llm_model or None,
                 "image_model": image_model or None,
                 "voice_id": voice_id or None,
                 "create_images": self.config.create_images or None
