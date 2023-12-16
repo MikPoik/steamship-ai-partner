@@ -111,13 +111,13 @@ ${NAME}: json: \n</prompt>
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
-            
+
         images_enabled = "true"
         meta_images_enabled = context.metadata.get("instruction",
-            {}).get("create_images")
+                                                   {}).get("create_images")
         if meta_images_enabled is not None:
             images_enabled = meta_images_enabled
-            
+
         tool_names = [t.name for t in self.tools]
         #tool_names.append("no_tools")
         if "false" in images_enabled:
@@ -226,7 +226,6 @@ ${NAME}: json: \n</prompt>
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
 
-            
         #Stop llama13B from sending images constantly
         llama13_tool_fix = ""
         if current_model == "NousResearch/Nous-Hermes-Llama2-13b":
@@ -236,7 +235,7 @@ ${NAME}: json: \n</prompt>
 
         image_helper = ""
         if image_request and "true" in images_enabled:
-            image_helper = f"\n(Run a tool to share a visual selfie! describe {current_name} in JSON run_tool_input field and write {current_name}'s reply about showing the selfie.)"
+            image_helper = f"\n(Run a tool to share a visual selfie! describe {current_name} in JSON run_tool_input field and write {current_name}'s reply to human about showing the selfie.)"
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.PROMPT)

@@ -53,9 +53,16 @@ class SelfieTool(ImageGeneratorTool):
                 current_model = "realistic-vision-v3"
 
         #Image width
-        image_width = 512
-        image_height = 768
-        #custom resolution
+        image_width = 384
+        image_height = 512
+        #check if Pro
+        meta_is_pro = context.metadata.get("instruction", {}).get("is_pro")
+        if meta_is_pro is not None:
+            if meta_is_pro == "true":
+                image_width = 512
+                image_height = 768
+
+        #custom resolution for avatar
         if img_width > 0 and img_height > 0:
             image_width = img_width
             image_height = img_height

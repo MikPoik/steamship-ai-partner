@@ -1,4 +1,4 @@
-#import the used persona below from personas folder
+#import the used companion below from companions folder
 from companions.empty_companion import NAME, TYPE, PERSONA, BEHAVIOUR, SELFIE_TEMPLATE_POST, SELFIE_TEMPLATE_PRE, NSFW_SELFIE_TEMPLATE_POST, NSFW_SELFIE_TEMPLATE_PRE, VOICE_ID, MOOD_KEYWORDS, SEED  #upm package(steamship)
 
 NAME = NAME

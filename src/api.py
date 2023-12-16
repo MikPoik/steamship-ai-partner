@@ -233,7 +233,7 @@ class MyAssistant(AgentService):
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
 
-        if "Llama2" in self.config.llm_model:
+        if not "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
                 ReACTAgent(
                     tools,
@@ -248,34 +248,6 @@ class MyAssistant(AgentService):
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
 
-        if "Mistral" in self.config.llm_model:
-            self.set_default_agent(
-                ReACTAgent(
-                    tools,
-                    llm=ChatLlama(
-                        self.client,
-                        api_key=self.config.together_ai_api_key,
-                        model_name=self.config.llm_model,
-                        temperature=0.65,
-                        #top_p=0.6,
-                        max_tokens=300,
-                        max_retries=4),
-                    message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
-        if "Mytho" in self.config.llm_model:
-            self.set_default_agent(
-                ReACTAgent(
-                    tools,
-                    llm=ChatLlama(
-                        self.client,
-                        api_key=self.config.together_ai_api_key,
-                        model_name=self.config.llm_model,
-                        temperature=0.65,
-                        #top_p=0.9,
-                        max_tokens=300,
-                        max_retries=4),
-                    message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
                 ReACTAgent(
@@ -534,6 +506,7 @@ class MyAssistant(AgentService):
                image_model: Optional[str] = None,
                voice_id: Optional[str] = None,
                create_images: Optional[str] = None,
+               is_pro: Optional[str] = None,
                **kwargs) -> List[Block]:
         """Run an agent with the provided text as the input."""
         with self.build_default_context(context_id, **kwargs) as context:
@@ -552,14 +525,18 @@ class MyAssistant(AgentService):
                 "model": self.config.llm_model or None,
                 "image_model": image_model or None,
                 "voice_id": voice_id or None,
-                "create_images": self.config.create_images or None
+                "create_images": self.config.create_images or None,
+                "is_pro": is_pro or None,
             }
+
             meta_name = context.metadata.get("instruction", {}).get("name")
             #split the name if it contains spaces
             if meta_name is not None:
                 meta_name = meta_name.split(" ")[0]
                 context.metadata["instruction"]["name"] = meta_name
-            #logging.warning("prompt inputs: "+str(context.metadata["instruction"]))
+
+            #logging.warning("prompt inputs: " +
+            #str(context.metadata["instruction"]))
             output_blocks = []
 
             def sync_emit(blocks: List[Block], meta: Metadata):
