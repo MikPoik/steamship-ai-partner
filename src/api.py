@@ -532,7 +532,7 @@ class MyAssistant(AgentService):
             meta_name = context.metadata.get("instruction", {}).get("name")
             #split the name if it contains spaces
             if meta_name is not None:
-                meta_name = meta_name.split(" ")[0]
+                #meta_name = meta_name.split(" ")[0]
                 context.metadata["instruction"]["name"] = meta_name
 
             #logging.warning("prompt inputs: " +
