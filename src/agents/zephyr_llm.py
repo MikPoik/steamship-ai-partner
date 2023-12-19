@@ -59,7 +59,7 @@ class Zephyr(LLM):
         - `max_tokens` (controls the size of LLM responses)
         """
         options = {}
-        options["stop"] = ["</s>", "\n#", "\n\n", "Human:"]
+        options["stop"] = ["</s>", "\n#", "\n\n"]
         if stop:
             options["stop"] = stop
 

@@ -8,7 +8,6 @@ from steamship.utils.repl import AgentREPL  #upm package(steamship)
 from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
 from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTransportConfig
-from agents.chatlm_react import ReACTAgentChatlm
 from usage_tracking import UsageTracker  #upm package(steamship)
 import uuid, os, re, logging, requests
 from steamship import File, Tag, DocTag  #upm package(steamship)
@@ -29,7 +28,6 @@ from tools.active_companion import *  #upm package(steamship)
 from utils import send_file_from_local  #upm package(steamship)
 from agents.togetherai_llm import ChatLlama  #upm package(steamship)
 from agents.llama_react import ReACTAgent  #upm package(steamship)
-from agents.zephyr_react import ReACTAgentZephyr  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.lemonfox_tts_tool import LemonfoxTTSTool  #upm package(steamship)
@@ -258,7 +256,7 @@ class MyAssistant(AgentService):
                         model_name=self.config.llm_model,
                         temperature=0.65,
                         #top_p=0.6,
-                        max_tokens=300,
+                        max_tokens=400,
                         max_retries=4),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))

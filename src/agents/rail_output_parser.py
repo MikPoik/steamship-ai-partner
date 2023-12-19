@@ -1,12 +1,13 @@
 import logging
 import re
 from typing import Dict, List, Optional
+from typing_extensions import runtime
 from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship  #upm package(steamship)
 from steamship.agents.schema import Action, AgentContext, FinishAction, OutputParser, Tool  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 import re
-
+import json
 
 class ReACTOutputParser(OutputParser):
     'Parse LLM output expecting structure matching ReACTAgent default prompt'
@@ -30,10 +31,17 @@ class ReACTOutputParser(OutputParser):
         run_tool = {}
         run_tool_input = {}
         if response is not None:
-            text = response.get("reply", {})
+            text = response.get("message",{}).get("content","")
             text = text.replace(current_name+": ", "")
-            run_tool = response.get("run_tool", {})
-            run_tool_input = response.get("run_tool_input", {})
+            text = text.replace("As "+current_name+", ", "")
+            run_tool = response.get("message", {}).get("function_call")
+            if run_tool is not None:
+                run_tool = run_tool.get("name","")
+            #print("run_tool", run_tool)
+            run_tool_input = response.get("message", {}).get("function_call",{})
+            if run_tool_input is not None:
+                run_tool_input = run_tool_input.get("tool_input","")
+            #print("run_tool_input", run_tool_input)
 
 
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
@@ -71,27 +79,12 @@ class ReACTOutputParser(OutputParser):
                     selfie_tool = ReACTOutputParser.tools_lookup_dict.get(
                         tool_name, None)
                     if selfie_tool:
-                        # Call the tool with the input
-                        image_block = selfie_tool.run([Block(
-                            text=tool_input)], context) if tool_input else None
-                        if image_block:
-                            result_blocks.append(image_block[0])
+                        #print(tool_input)
+                        if tool_input:
+                            # Call the tool with the input
+                            image_block = selfie_tool.run([Block(
+                                text=tool_input)], context) if tool_input else None  # Pass image description as string
+                            if image_block:
+                                result_blocks.append(image_block[0])
         return result_blocks
 
-    @staticmethod
-    def _remove_block_prefix(candidate: str) -> str:
-        removed = candidate
-        if removed.endswith("(Block") or removed.endswith(
-                "[Block") or removed.endswith("<Block"):
-            removed = removed[len("Block") + 1:]
-        elif removed.endswith("Block"):
-            removed = removed[len("Block"):]
-        return removed
-
-    @staticmethod
-    def _remove_block_suffix(candidate: str) -> str:
-        removed = candidate
-        if removed.startswith(")") or removed.endswith(
-                "]") or removed.endswith(">"):
-            removed = removed[1:]
-        return removed

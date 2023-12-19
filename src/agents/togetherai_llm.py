@@ -60,7 +60,7 @@ class Llama(LLM):
         """
         options = {}
         options["stop"] = [
-            "</s>", "<|im_end|>", "<|", "\n#", "\n\n", "Human:"
+            "</s>", "<|im_end|>", "<|", "\n#", "\n\n", "\nHuman:"
         ]
         if stop:
             options["stop"] = [stop]
