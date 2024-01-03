@@ -225,7 +225,7 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatOpenAI(self.client,
                                    model_name=self.config.llm_model,
-                                   temperature=0.65,
+                                   temperature=0.8,
                                    max_tokens=300,
                                    moderate_output=False),
                     message_selector=MessageWindowMessageSelector(
@@ -239,9 +239,9 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.65,
+                        temperature=0.8,
                         #top_p=0.7,
-                        max_tokens=300,
+                        max_tokens=400,
                         max_retries=4),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
@@ -254,8 +254,8 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.65,
-                        #top_p=0.6,
+                        temperature=0.8,
+                        #top_p=0.7,
                         max_tokens=400,
                         max_retries=4),
                     message_selector=MessageWindowMessageSelector(

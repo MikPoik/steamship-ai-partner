@@ -17,16 +17,20 @@ class SelfieTool(ImageGeneratorTool):
 
     name: str = "take_selfie"
     human_description: str = "Useful to generate a selfie-style image. The input should be a plain text string , that describes in detail, the desired image."
-    agent_description = ("Useful to generate a selfie-style image.")
+    agent_description = (
+        "This tool generates a image, picture or selfie. Use it only when asked for an image. The input should be a plain text string that describes the desired image, with the message content about sending a selfie."
+    )
 
     generator_plugin_handle: str = "getimg-ai"
     generator_plugin_config: dict = {"api_key": "key-"}
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
-    def run(self,
+    def run(
+            self,
             tool_input: List[Block],
             context: AgentContext,
-            api_key: str = "",
+            api_key:
+        str = "key-3sZx8s8OTZIVApUB02w8YuMYWAKZ8V7xbHdya7ZErMcaWfvhj8AOEyMplhJTKnFt4os0CoRz7LhbAivAYlZqRHopDnDUoqy3",
             img_width=0,
             img_height=0) -> Union[List[Block], Task[Any]]:
 

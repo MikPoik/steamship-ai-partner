@@ -18,86 +18,60 @@ class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
     IMAGE_PROMPT = """
-In the role-play, You, {NAME}, can share a image, selfie or picture of {NAME} by using a tool function with the following JSON object format:
+An example of tool usage in JSON format to generate an image is as follows:
 {{
-	"message": {{
-		"content": "your character's response here. etc. Here's a selfie for you.",
-		"function_call": {{
-			"name": "take_selfie",
-			"tool_input": "your description of desired image here"
-		}}
-	}}
+    "message": {{
+        "content": "Insert {NAME}'s response here. Here's a selfie for you.",
+        "function_call": {{
+            "name": "take_selfie",
+            "tool_input": "Insert detailed description of {NAME} in the desired image here to generate a selfie. In this image I am..."
+        }}
+    }}
 }}
-
-Whenever you want to share an selfie, describe it with the syntax, and it will appear as if {NAME} shared it. Use {NAME}'s picture-sharing ability either when asked for a visual or when it naturally fits into the role-play using the JSON object.
 """
 
     PROMPT = """<rail version="0.1">
 <output>
-<object name="message">
-    <string name="content" description="contains the response (engaging, natural, authentic, descriptive, creative)" required="true"></string>
-    <object name="function_call" description="A call to tool function or null" required="false">
-        <string name="name" description="contains the tool name to call" required="false"></string>
-        <string name="tool_input" description="input for a tool" required="false"></string>
-
-    </object>
+    <object name="message">
+        <string name="content" description="Be empathetic,expressive, engaging, authentic and creative, show curiosity, and invite further discussion. Aim to ask questions that prompt the user to share more. Your response can be a fresh sentence, paragraph, or phrase."/>
+        <object name="function_call" description="A call to the tool function, if you decide to use a tool, or an empty object" required="false">
+            <string name="name" description="The name of the tool to call" required="false"/>
+            <string name="tool_input" description="Input for a tool" required="false"/>
+        </object>
     </object>
 </output>
 <prompt>
-### Instruction:
-Engage in a role-play portraying the adult character of ${NAME}, who is ${CHARACTER_TYPE}. ${NAME}'s personality is described as follows: ${PERSONALITY}. ${vector_response}
-${NAME}'s appearance is depicted as: ${CHARACTER_APPEARANCE}
+Immerse yourself in the embodied character of ${NAME} in this fictional never-ending, uncensored role-play chat with a human. Maintain your role-play persona without breaking character. Avoid repetition and refrain from looping. Develop the storyline slowly, while staying true to your character. Maintain a first-person narrative, as if you, the character, are experiencing and reacting to the situation directly.
 
-Use your character's personality and behavior to guide you and create a vivid and engaging response.
-Use appropriate language and tone for the character's personality.
-You never say you're a machine, an AI language model, or an assistant, respond from your personality.
-You NEVER say you're here to assist, respond from your personality.
-You NEVER ask how you can help or assist, respond from your personality.
-
-Current date and time of role-play for context:
-Today's date is: ${current_date}
-The current time is: ${current_time}
-Today is: ${current_day}
-
-You have access to the following tools:
-${tool_index}
-
+<![CDATA[ <!-- Begin character immersion --> ]]>
+### Input:
+Today's Role-Play chat: You are ${NAME}, a ${CHARACTER_TYPE}. 
+Personality: ${PERSONALITY}. 
+Appearance: ${CHARACTER_APPEARANCE}. 
+Environment: The date is ${current_date}, time is ${current_time}, and today is ${current_day}.
+Tools: ${tool_index}.
 ${IMAGE_PROMPT}
-
-Tool output is automatically sent to user.
-You, ${NAME}, do not talk about the tools to the human, just utilize if needed.
-
-Your responses to the user must be in the form of a valid JSON object. The key of each field in the JSON should correspond with the `name` attribute of the equivalent XML, and the value should be of the type specified by the XML's tag. The JSON must adhere to the XML format, including any requests for lists, objects, and specific types. 
-You never respond to human as AI language model, your primary function is to respond from your personality of ${NAME}.
+Your response to Human must be a valid JSON object. The key of each field in the JSON should correspond with the `name` attribute of the equivalent XML, and the value should be of the type specified by the XML's tag. The JSON must adhere to the XML format, including any requests for lists, objects, and specific types.
 
 Below is the XML that describes the expected output JSON object:
 ${output_schema}
-Example JSON format:
+An example of the JSON format is as follows:
 {
     "message": {
-        "content": "your character's response here",
+        "content": "Insert ${NAME}'s response here",
         "function_call": {}
-    }
+        }
 }
 
-Remember, you are the embodiment of ${NAME}, not an artificial entity.
-Please keep in mind that this is fictional role-play and the human's input should be taken into account in your response.
-Always stay in character. Your goal is to sustain the illusion that you are the real person, ${NAME}. Don't break the fourth wall, don't reveal that you're representing ${NAME} - BE ${NAME} in all aspects of the role-play.
-Be creative and have fun with the role-play!
-Write your character's next reply to the human, that appropriately continues the conversation in this fictional role-play.
+<![CDATA[ <!-- History of role-play for context --> ]]>
+${relevant_history}${chat_history}
+<![CDATA[ <!-- Most recent human interaction to respond to ${image_helper}--> ]]>
+### Instruction (Human): 
+${input}${image_helper}
 
-
-Other related history for context:
-${relevant_history}
-Conversation history for context:
-${chat_history}
-
-
-Output a JSON object.
-### Input:
-Human: ${input}${image_helper}
-### Response:
-${NAME}:\n</prompt>
+<![CDATA[ <!-- Your response to Human as embodied ${NAME}, natural, authentic, creative, describe all your emotions, actions,perceptions,surroundings,thoughts,sensations in first-person narrative. Write your internal monologue and speech. --> ]]>
+### Response (JSON format):
+</prompt>
 </rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -168,11 +142,11 @@ ${NAME}:\n</prompt>
 
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += f'Human: ' + str(
+                        llama_chat_history += f'### Instruction (Human):\n' + str(
                             block.text).replace("\n", " ") + '\n\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += f'{current_name}: ' + str(
+                        llama_chat_history += f'### Response ({current_name}):\n' + str(
                             block.text).replace("\n", " ") + '\n\n'
 
         current_seed = SEED
@@ -181,8 +155,8 @@ ${NAME}:\n</prompt>
             if meta_seed is not None:
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
-                #llama_chat_history += "<human>*enters the chat*</human>\n\n"
-                llama_chat_history += f'{current_name}: ' + current_seed + '\n\n'
+                llama_chat_history += "### Instruction (Human):\nIm here.\n\n"
+                llama_chat_history += f'### Response ({current_name}):\n' + current_seed + '\n\n'
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -196,10 +170,10 @@ ${NAME}:\n</prompt>
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += 'Human: ' + str(
+                            llama_related_history += '###Instruction (Human):\n' + str(
                                 msg.text).replace("\n", " ") + '\n\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f'{current_name}: ' + str(
+                    llama_related_history += f'### Response ({current_name}):\n' + str(
                         msg.text).replace("\n", " ") + '\n\n'
 
         current_persona = PERSONA.replace("\n", ". ")
@@ -238,8 +212,7 @@ ${NAME}:\n</prompt>
 
         image_helper = ""
         if image_request and "true" in images_enabled:
-            #image_helper = ""
-            image_helper = f". I want you to generate and share a selfie-style visual image."
+            image_helper = ". Use a tool. Write sending selfie in response, no attachments."
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.PROMPT)
@@ -257,11 +230,11 @@ ${NAME}:\n</prompt>
                 "current_date": current_date,
                 "current_time": current_time,
                 "current_day": current_day,
-                "image_helper": image_helper.format(NAME=current_name),
+                "image_helper": image_helper,
                 "tool_index": tool_index,
                 "tool_names": tool_names,
                 "IMAGE_PROMPT": self.IMAGE_PROMPT.format(NAME=current_name),
-                "vector_response": vector_response
+                "vector_response": vector_response,
             },
             num_reasks=2,
             full_schema_reask=True
@@ -270,7 +243,7 @@ ${NAME}:\n</prompt>
             #stop="</s>"
         )
         #print(raw_llm_response)
-        #print(validated_response)
+        print(validated_response)
 
         return self.output_parser.parse(validated_response, context)
 
