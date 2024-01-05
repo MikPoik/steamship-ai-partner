@@ -28,12 +28,10 @@ class SelfieTool(ImageGeneratorTool):
     }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
-    def run(
-            self,
+    def run(self,
             tool_input: List[Block],
             context: AgentContext,
-            api_key:
-        str = "key-3sZx8s8OTZIVApUB02w8YuMYWAKZ8V7xbHdya7ZErMcaWfvhj8AOEyMplhJTKnFt4os0CoRz7LhbAivAYlZqRHopDnDUoqy3",
+            api_key: str = "key-",
             img_width=0,
             img_height=0) -> Union[List[Block], Task[Any]]:
 
