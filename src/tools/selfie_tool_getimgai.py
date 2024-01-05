@@ -22,10 +22,7 @@ class SelfieTool(ImageGeneratorTool):
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {
-        "api_key":
-        "key-3sZx8s8OTZIVApUB02w8YuMYWAKZ8V7xbHdya7ZErMcaWfvhj8AOEyMplhJTKnFt4os0CoRz7LhbAivAYlZqRHopDnDUoqy3"
-    }
+    generator_plugin_config: dict = {"api_key": "key-"}
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,
