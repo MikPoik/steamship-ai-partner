@@ -31,7 +31,7 @@ class SelfieTool(ImageGeneratorTool):
     def run(self,
             tool_input: List[Block],
             context: AgentContext,
-            api_key: str = "key-",
+            api_key: str = "",
             img_width=0,
             img_height=0) -> Union[List[Block], Task[Any]]:
 
