@@ -18,11 +18,14 @@ class SelfieTool(ImageGeneratorTool):
     name: str = "take_selfie"
     human_description: str = "Useful to generate a selfie-style image. The input should be a plain text string , that describes in detail, the desired image."
     agent_description = (
-        "This tool generates a image, picture or selfie. Use it only when asked for an image. The input should be a plain text string that describes the desired image, with the message content about sending a selfie."
+        "This tool generates a image, picture or selfie. Use it only when asked for an image. The input should be a plain text string that describes the desired image."
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": "key-"}
+    generator_plugin_config: dict = {
+        "api_key":
+        "key-3sZx8s8OTZIVApUB02w8YuMYWAKZ8V7xbHdya7ZErMcaWfvhj8AOEyMplhJTKnFt4os0CoRz7LhbAivAYlZqRHopDnDUoqy3"
+    }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(

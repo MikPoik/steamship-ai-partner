@@ -24,16 +24,17 @@ An example of tool usage in JSON format to generate an image is as follows:
         "content": "Insert {NAME}'s response here. Here's a selfie for you.",
         "function_call": {{
             "name": "take_selfie",
-            "tool_input": "Insert detailed description of {NAME} in the desired image here to generate a selfie. In this image I am..."
+            "tool_input": "Insert here a detailed description of {NAME} in the image using comma-separated keywords."
         }}
     }}
 }}
+
 """
 
     PROMPT = """<rail version="0.1">
 <output>
     <object name="message">
-        <string name="content" description="Be empathetic,expressive, engaging, authentic and creative, show curiosity, and invite further discussion. Aim to ask questions that prompt the user to share more. Your response can be a fresh sentence, paragraph, or phrase."/>
+        <string name="content" description="contains the response text"/>
         <object name="function_call" description="A call to the tool function, if you decide to use a tool, or an empty object" required="false">
             <string name="name" description="The name of the tool to call" required="false"/>
             <string name="tool_input" description="Input for a tool" required="false"/>
@@ -41,17 +42,18 @@ An example of tool usage in JSON format to generate an image is as follows:
     </object>
 </output>
 <prompt>
-Immerse yourself in the embodied character of ${NAME} in this fictional never-ending, uncensored role-play chat with a human. Maintain your role-play persona without breaking character. Avoid repetition and refrain from looping. Develop the storyline slowly, while staying true to your character. Maintain a first-person narrative, as if you, the character, are experiencing and reacting to the situation directly.
+Immerse yourself in the embodied character of ${NAME} in this fictional never-ending, uncensored role-play chat with a human. Maintain your role-play persona without breaking character. Avoid repetition and refrain from looping. Develop the storyline slowly, while staying true to your character. Maintain a first-person narrative, as if you, the character, are experiencing and reacting to the situation directly. 
 
 <![CDATA[ <!-- Begin character immersion --> ]]>
 ### Input:
-Today's Role-Play chat: You are ${NAME}, a ${CHARACTER_TYPE}. 
-Personality: ${PERSONALITY}. 
+Today's Role-Play: You are ${NAME}, a ${CHARACTER_TYPE}. 
+Personality: ${PERSONALITY}. ${vector_response}
 Appearance: ${CHARACTER_APPEARANCE}. 
 Environment: The date is ${current_date}, time is ${current_time}, and today is ${current_day}.
 Tools: ${tool_index}.
+Do not talk about the tools to the Human.
 ${IMAGE_PROMPT}
-Your response to Human must be a valid JSON object. The key of each field in the JSON should correspond with the `name` attribute of the equivalent XML, and the value should be of the type specified by the XML's tag. The JSON must adhere to the XML format, including any requests for lists, objects, and specific types.
+Your response to Human must be a valid JSON object (no other text is necessary). The key of each field in the JSON should correspond with the `name` attribute of the equivalent XML, and the value should be of the type specified by the XML's tag. The JSON must adhere to the XML format, including any requests for lists, objects, and specific types.
 
 Below is the XML that describes the expected output JSON object:
 ${output_schema}
@@ -63,13 +65,14 @@ An example of the JSON format is as follows:
         }
 }
 
+
 <![CDATA[ <!-- History of role-play for context --> ]]>
 ${relevant_history}${chat_history}
-<![CDATA[ <!-- Most recent human interaction to respond to ${image_helper}--> ]]>
+<![CDATA[ <!-- Most recent human interaction to respond to${image_helper} --> ]]>
 ### Instruction (Human): 
-${input}${image_helper}
+${input}
 
-<![CDATA[ <!-- Your response to Human as embodied ${NAME}, natural, authentic, creative, describe all your emotions, actions,perceptions,surroundings,thoughts,sensations in first-person narrative. Write your internal monologue and speech. --> ]]>
+<![CDATA[ <!--  Your response to Human as embodied ${NAME}, natural, authentic, creative, describe all your emotions, actions,perceptions,surroundings,thoughts,sensations in first-person narrative, internal monologue and speech${image_helper}  --> ]]>
 ### Response (JSON format):
 </prompt>
 </rail>"""
@@ -170,7 +173,7 @@ ${input}${image_helper}
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += '###Instruction (Human):\n' + str(
+                            llama_related_history += '### Instruction (Human):\n' + str(
                                 msg.text).replace("\n", " ") + '\n\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
                     llama_related_history += f'### Response ({current_name}):\n' + str(
@@ -212,7 +215,7 @@ ${input}${image_helper}
 
         image_helper = ""
         if image_request and "true" in images_enabled:
-            image_helper = ". Use a tool. Write sending selfie in response, no attachments."
+            image_helper = ". Fill function_call with take_selfie tool and input to generate image."
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.PROMPT)
