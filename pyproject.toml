@@ -6,10 +6,10 @@ authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.10.0,<3.11"
-steamship = "2.17.25"
 termcolor = "~=2.3.0"
 pytransloadit = "0.2.1"
 pydantic = "~=1.10.2"
+steamship = "2.17.33"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md

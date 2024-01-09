@@ -256,7 +256,7 @@ class MyAssistant(AgentService):
                         model_name=self.config.llm_model,
                         temperature=0.8,
                         #top_p=0.7,
-                        max_tokens=800,
+                        max_tokens=400,
                         max_retries=4),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))

@@ -82,8 +82,9 @@ class ReACTOutputParser(OutputParser):
                         #print(tool_input)
                         if tool_input:
                             # Call the tool with the input
+                            str_tool_input = ','.join(tool_input)
                             image_block = selfie_tool.run([Block(
-                                text=tool_input)], context) if tool_input else None  # Pass image description as string
+                                text=str_tool_input)], context) if tool_input else None  # Pass image description as string
                             if image_block:
                                 result_blocks.append(image_block[0])
         return result_blocks
