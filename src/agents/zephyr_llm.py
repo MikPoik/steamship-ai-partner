@@ -59,9 +59,12 @@ class Zephyr(LLM):
         - `max_tokens` (controls the size of LLM responses)
         """
         options = {}
-        options["stop"] = ["\n\n\n", "\n\n{", "\n\n###","\n\n<!--"]
         if stop:
-            options["stop"] = stop
+            stop = stop.split(" ")[0]
+            options["stop"] = ["\n\n", "\n###", "\nHuman", f"\n{stop}"]
+        else:
+            options["stop"] = ["\n\n\n", "\n###", "\n\nHuman", "<|"]
+        #print(options)
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]

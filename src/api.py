@@ -33,6 +33,7 @@ from steamship.agents.schema.message_selectors import MessageWindowMessageSelect
 from tools.lemonfox_tts_tool import LemonfoxTTSTool  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
 import os
+from json import loads
 
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
@@ -487,6 +488,33 @@ class MyAssistant(AgentService):
     def clear_history(self, context_id: Optional[str] = None):
         context = self.build_default_context(context_id)
         context.chat_history.clear()
+        return "OK"
+
+    @post("append_history")
+    def append_history(self,
+                       prompt: Optional[str] = None,
+                       context_id: Optional[str] = None):
+        logging.warning(prompt)
+        context = self.build_default_context(context_id)
+
+        if prompt:
+            try:
+                # Parse the JSON string to extract messages
+                messages = loads(prompt)
+                context = self.build_default_context(context_id)
+
+                # Loop through each message and add it to chat history
+                for message in messages:
+                    if message['role'] == 'assistant':
+                        context.chat_history.append_assistant_message(
+                            message['content'])
+                    elif message['role'] == 'user':
+                        context.chat_history.append_user_message(
+                            message['content'])
+            except Exception as e:
+                logging.warning(
+                    "Failed to parse prompt or append to chat history: " +
+                    str(e))
         return "OK"
 
     @post("prompt")

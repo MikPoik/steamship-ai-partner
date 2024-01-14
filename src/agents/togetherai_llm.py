@@ -59,11 +59,11 @@ class Llama(LLM):
         - `max_tokens` (controls the size of LLM responses)
         """
         options = {}
-        options["stop"] = [
-            "</s>", "\n\n\n", "<|", "\n#", "\n\n//", "\n<!--"
-        ]
         if stop:
-            options["stop"] = [stop]
+            stop = stop.split(" ")[0]
+            options["stop"] = ["</s>", "\n\n", "<|", "\n#","\n\nHuman",f"\n\n{stop}"]
+        else:
+            options["stop"] = ["\n\n\n", "\n###","\n\nHuman","<|","</s>"]
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]

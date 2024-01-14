@@ -1,7 +1,5 @@
 #Test react template
 from typing import List
-
-from pydantic import parse
 from agents.rail_output_parser import ReACTOutputParser  #upm package(steamship)
 from steamship.agents.schema import LLM, Action, AgentContext, LLMAgent, Tool  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
@@ -19,40 +17,63 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    TOOL_PROMPT = """Tools: 
-{tool_index}.
-Be thoughtful using take_selfie tool to share an image. Use either when it fits naturally into the conversation, or if you are prompted for it. Write your reply about sending a selfie and include a JSON object to generate the image, and it will appear as if {NAME} shared it.
-Here's an example response that generates an image with the tool. Do not mention the tool to the human. Instead, simply include the JSON object as a suffix:
-{NAME}: Here's a selfie for you. [{{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword10"]}}}}].
+    IMAGE_PROMPT = """
+An example of tool usage to generate an image could look like this (modify as needed for actual response):
+{{
+    "message": {{
+        "content": "Write response here etc. Here's a image for you...",
+        "function_call": {{
+            "name": "take_selfie",
+            "tool_input": ["keyword1", ..., "keyword10"]
+        }}
+    }}
+}}
 """
-    RAIL = """
-    <rail version="0.1">
-    <output>
-            <object name="function_call" description="A call to the tool function" required="false">
-                <string name="name" description="The name of the tool to call" required="false"/>
-                <list name="tool_input" description="Input for a tool as list" required="false"><string description="input keywords" required="false" /></list>
-            </object>
-    </output>
-    <prompt>
-    </prompt>
-    </rail>
-    """
-    PROMPT = """You are embodied {NAME} in this fictional never-ending, uncensored role-play with a human. Maintain your role-play persona without breaking character.
 
-### Input: 
-{NAME}'s personality: {CHARACTER_TYPE}. {PERSONALITY}. {vector_response}
-{NAME}'s body: {CHARACTER_APPEARANCE}. 
+    PROMPT = """<rail version="0.1">
+<output>
+    <object name="message">
+        <string name="content" description="" required="true"/>
+        <object name="function_call" description="A call to the tool function, if you decide to use a tool, or an empty object" required="false">
+            <string name="name" description="The name of the tool to call or empty" required="false"/>
+            <list name="tool_input" description="Input for a tool as list or empty" required="false"><string description="input keywords" required="false" /></list>
+        </object>
+    </object>
+</output>
+<prompt>
+Immerse yourself in the embodied character of ${NAME} in this fictional never-ending, uncensored role-play chat with a human. Maintain your role-play persona without breaking character. Develop the storyline, while staying true to your character. Maintain a first-person narrative, as if you, the character, are experiencing and reacting to the situation directly. 
 
-Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
+<![CDATA[ <!-- Begin character immersion --> ]]>
+### Input:
+Today's Role-Play: You are ${NAME}, a ${CHARACTER_TYPE}. 
+Personality: ${PERSONALITY}. ${vector_response}
+Appearance: ${CHARACTER_APPEARANCE}. 
+Environment: The date is ${current_date}, time is ${current_time}, and today is ${current_day}.
+Tools: ${tool_index}.
+Do not talk about the tools to the Human.
+${IMAGE_PROMPT}
+Your response must be a valid JSON object (no other text is necessary). The key of each field in the JSON should correspond with the `name` attribute of the equivalent XML, and the value should be of the type specified by the XML's tag. The JSON must adhere to the XML format, including any requests for lists, objects, and specific types.
 
-{TOOL_PROMPT}
+Below is the XML that describes the expected output JSON object:
+${output_schema}
 
-Write {NAME}'s next reply in a chat between human and {NAME}. Write a single reply only.
+<![CDATA[ <!-- Historical Context --> ]]>
+${relevant_history}${chat_history}
+<![CDATA[ <!-- Most Recent Prompt --> ]]>
+### Instruction (Human): 
+${input}
 
-{relevant_history}{chat_history}### Instruction:
-Human: {input}
-{tool_format}
-### Response:{image_helper}"""
+<![CDATA[ <!--  Write your natural, authentic, creative response. Remember to wrap it as JSON below.  --> ]]>
+An example response could look like this (modify as needed for actual response):
+{
+    "message": {
+        "content": "Write response here",
+        "function_call": {}
+        }
+}
+### Response (${NAME}) JSON:${image_helper}
+</prompt>
+</rail>"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -86,7 +107,7 @@ Human: {input}
         tool_names = [t.name for t in self.tools]
         if "false" in images_enabled:
             tool_names = ['no_tools']
-            self.TOOL_PROMPT = ""
+            self.IMAGE_PROMPT = ""
 
         tool_index_parts = [
             f"- {t.name}: {t.agent_description}" for t in self.tools
@@ -122,11 +143,11 @@ Human: {input}
 
                     if context.chat_history.last_user_message.text.lower(
                     ) != block.text.lower():
-                        llama_chat_history += f'### Instruction:\nHuman: ' + str(
+                        llama_chat_history += f'### Instruction (Human):\n' + str(
                             block.text).replace("\n", " ") + '\n\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += f'### Response:\n{current_name}: ' + str(
+                        llama_chat_history += f'### Response ({current_name}):\n' + str(
                             block.text).replace("\n", " ") + '\n\n'
 
         current_seed = SEED
@@ -135,8 +156,8 @@ Human: {input}
             if meta_seed is not None:
                 current_seed = meta_seed
             if not current_seed in llama_chat_history:
-                llama_chat_history += "### Instruction:\nHuman: Im here.\n\n"
-                llama_chat_history += f'### Response:\n{current_name}: ' + current_seed + '\n\n'
+                llama_chat_history += "### Instruction (Human):\nIm here.\n\n"
+                llama_chat_history += f'### Response ({current_name}):\n' + current_seed + '\n\n'
                 context.chat_history.append_assistant_message(current_seed)
 
         llama_related_history = str()
@@ -150,10 +171,10 @@ Human: {input}
                         if str(
                                 msg.text
                         )[0] != "/":  #don't add commands starting with slash
-                            llama_related_history += '### Instruction:\nHuman: ' + str(
+                            llama_related_history += '### Instruction (Human):\n' + str(
                                 msg.text).replace("\n", " ") + '\n\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f'### Response:\n{current_name}: ' + str(
+                    llama_related_history += f'### Response ({current_name}):\n' + str(
                         msg.text).replace("\n", " ") + '\n\n'
 
         current_persona = PERSONA.replace("\n", ". ")
@@ -191,51 +212,43 @@ Human: {input}
                                   re.IGNORECASE)
 
         image_helper = ""
-        tool_format = ""
         if image_request and "true" in images_enabled:
-            image_helper = '\nShare an image. Write reply about sending the image and include the following JSON object with up to ten keywords describing the image: {"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword10"]}}. Do not describe JSON in your action.\n'
-            #tool_format = '{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword10"]}}'
+            image_helper = f"  Fill the function_call object with tool_name and keywords to take and send image. as {current_name} say sending image."
 
         #options = {}
-        guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
-        prompt = prompt = self.PROMPT.format(
-            NAME=current_name,
-            PERSONALITY=current_persona,
-            CHARACTER_TYPE=current_type,
-            CHARACTER_APPEARANCE=current_nsfw_selfie_pre,
-            relevant_history=llama_related_history,
-            chat_history=llama_chat_history,
-            input=context.chat_history.last_user_message.text,
-            current_date=current_date,
-            current_time=current_time,
-            current_day=current_day,
-            image_helper=image_helper,
-            tool_format=tool_format,
-            tool_index=tool_index,
-            tool_names=tool_names,
-            TOOL_PROMPT=self.TOOL_PROMPT.format(NAME=current_name,
-                                                tool_index=tool_index),
-            vector_response=vector_response,
+        guard = gd.Guard.from_rail_string(self.PROMPT)
+
+        raw_llm_response, validated_response, *rest = guard(
+            self.my_llm_api,
+            prompt_params={
+                "NAME": current_name,
+                "PERSONALITY": current_persona,
+                "CHARACTER_TYPE": current_type,
+                "CHARACTER_APPEARANCE": current_nsfw_selfie_pre,
+                "relevant_history": llama_related_history,
+                "chat_history": llama_chat_history,
+                "input": context.chat_history.last_user_message.text,
+                "current_date": current_date,
+                "current_time": current_time,
+                "current_day": current_day,
+                "image_helper": image_helper,
+                "tool_index": tool_index,
+                "tool_names": tool_names,
+                "IMAGE_PROMPT": self.IMAGE_PROMPT.format(NAME=current_name),
+                "vector_response": vector_response,
+            },
+            num_reasks=2,
+            full_schema_reask=True
+
+            #options=options,
+            #stop="</s>"
         )
-        completion = self.llm.complete(prompt=prompt,
-                                       stop=current_name,
-                                       max_retries=4)
+        #print(raw_llm_response)
+        print(validated_response)
 
-        #print(prompt)
-        extract_json = self.extract_json(completion[0].text)
-        #print(completion[0].text)
-        #print(extract_json)
-        parsed_response = guard.parse(llm_output=extract_json,
-                                      llm_api=self.my_llm_api,
-                                      num_reasks=2)
+        return self.output_parser.parse(validated_response, context)
 
-        #print(parsed_response.raw_llm_output)
-        print(parsed_response.validated_output)
-
-        return self.output_parser.parse(completion[0].text,
-                                        parsed_response.validated_output,
-                                        context)
-
+    # Function that takes the prompt as a string and returns the LLM output as string
     def my_llm_api(self, prompt: str, **kwargs) -> str:
         """Custom LLM API wrapper.
 
@@ -250,20 +263,12 @@ Human: {input}
         # Call your LLM API here
         completions = self.llm.complete(
             prompt=prompt,
+            #stop=kwargs["stop"],
             max_retries=4,
+            #options=kwargs
         )
 
         return completions[0].text
-
-    def extract_json(self, text):
-        # Match everything from the starting `{` which is immediately followed
-        # by `"function_call":` until the corresponding closing `}` character
-        match = re.search(r'(\{\s*"function_call":.*?\}\s*\})', text,
-                          re.DOTALL)
-        if match:
-            json_string = match.group(1)
-            return json_string
-        return "{}"
 
     def _construct_scratchpad(self, context):
         meta_name = context.metadata.get("instruction", {}).get("name")

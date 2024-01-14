@@ -9,7 +9,6 @@ from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 import re
 import json
 
-
 class ReACTOutputParser(OutputParser):
     'Parse LLM output expecting structure matching ReACTAgent default prompt'
 
@@ -23,35 +22,31 @@ class ReACTOutputParser(OutputParser):
         }
         super().__init__(**kwargs)
 
-    def parse(self, response: str, function_call: Dict,
-              context: AgentContext) -> Action:
+    def parse(self, response: Dict, context: AgentContext) -> Action:
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
-            current_name = meta_name
-        text = ""
+                current_name = meta_name
+        text = {}
         run_tool = {}
         run_tool_input = {}
         if response is not None:
-            text = response.split("{")[0] #split possible json
-            text = text.replace(current_name + ": ", "")
-            text = text.replace("As " + current_name + ", ", "")
-            text = text.strip()
-            # Remove a single quote sign from text, if it is present
-            if text.count('"') == 1:
-                text = text.replace('"', '')
-            if text.endswith('['):  # Check if text ends with "["
-                text = text[:-1]  # Remove it
-            if function_call is not None:
-                run_tool_func = function_call.get("function_call")
-                if run_tool_func is not None:
-                    run_tool = run_tool_func.get("name", "")
-                    #print("run_tool", run_tool)
-                    run_tool_input = run_tool_func.get("tool_input", "")
-                    #print("run_tool_input", run_tool_input)
+            text = response.get("message",{}).get("content","")
+            text = text.replace(current_name+": ", "")
+            text = text.replace("As "+current_name+", ", "")
+            run_tool = response.get("message", {}).get("function_call")
+            if run_tool is not None:
+                run_tool = run_tool.get("name","")
+            #print("run_tool", run_tool)
+            run_tool_input = response.get("message", {}).get("function_call",{})
+            if run_tool_input is not None:
+                run_tool_input = run_tool_input.get("tool_input","")
+            #print("run_tool_input", run_tool_input)
+
 
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
-            context.client, text, run_tool, run_tool_input, context),
+            context.client, text, run_tool, run_tool_input,
+            context),
                             context=context)
 
     @staticmethod
@@ -88,9 +83,9 @@ class ReACTOutputParser(OutputParser):
                         if tool_input:
                             # Call the tool with the input
                             str_tool_input = ','.join(tool_input)
-                            image_block = selfie_tool.run(
-                                [Block(text=str_tool_input)], context
-                            ) if tool_input else None  # Pass image description as string
+                            image_block = selfie_tool.run([Block(
+                                text=str_tool_input)], context) if tool_input else None  # Pass image description as string
                             if image_block:
                                 result_blocks.append(image_block[0])
         return result_blocks
+

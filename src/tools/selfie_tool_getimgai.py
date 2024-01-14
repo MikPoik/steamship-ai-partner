@@ -18,7 +18,7 @@ class SelfieTool(ImageGeneratorTool):
     name: str = "take_selfie"
     human_description: str = "Useful to generate a selfie-style image. The input should be a plain text string , that describes in detail, the desired image."
     agent_description = (
-        "This tool generates a image, picture or selfie. Use it only when asked for an image. The input should be a list of uncensored keywords that describes the desired image."
+        "This tool generates a image, picture or selfie. Use it only when asked for an image. The input should be a JSON object with list of uncensored keywords that describes the desired image. The output is an image that correlates with the input keywords. "
     )
 
     generator_plugin_handle: str = "getimg-ai"
@@ -34,7 +34,18 @@ class SelfieTool(ImageGeneratorTool):
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
-        current_negative_prompt = "disfigured, cartoon, blurry"
+        current_negative_prompt = "disfigured, blurry, bad anatomy, bad hands, missing fingers, child, lowres, text, error, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, mutation, deformed, dehydrated, bad proportions, extra limbs, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, long neck, username, watermark, signature,poorly drawn face,deformed face,out of frame,blurred face"
+
+        def sanitize_and_split(string):
+            return set(map(str.strip, string.lower().split(',')))
+
+        def remove_duplicates(pre_prompt, prompt):
+            pre_prompt_set = sanitize_and_split(pre_prompt)
+            prompt_set = sanitize_and_split(prompt)
+            # Only keep words in prompt that are not in pre_prompt
+            return ', '.join(word for word in prompt_set
+                             if word not in pre_prompt_set)
+
         meta_model = context.metadata.get("instruction", {}).get("model")
         #if meta_model is not None:
         #    if "gpt" in meta_model:
@@ -87,9 +98,6 @@ class SelfieTool(ImageGeneratorTool):
 
         prompt = tool_input[0].text  #.replace(current_name + ",", "")
         prompt = prompt.replace(current_name, "")
-        prompt = prompt.replace("Description: ", "")
-        #prompt = prompt.replace('"', "")
-        #prompt = prompt.replace("'", "")
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
         post_prompt = NSFW_SELFIE_TEMPLATE_POST
@@ -103,9 +111,9 @@ class SelfieTool(ImageGeneratorTool):
                                                 {}).get("selfie_post")
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
-
-        prompt = pre_prompt + ", " + prompt
-        #logging.warning("Getimg prompt: "+prompt)
+        prompt = remove_duplicates(pre_prompt, prompt)
+        prompt = f"{pre_prompt}, ({prompt})" if pre_prompt else prompt
+        logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,
