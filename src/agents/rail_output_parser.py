@@ -34,8 +34,9 @@ class ReACTOutputParser(OutputParser):
         run_tool_input = {}
         if response is not None:
             text = response.split("{")[0] #split possible json
-            text = text.replace(current_name + ": ", "")
-            text = text.replace("As " + current_name + ", ", "")
+            text = text.replace(current_name + "`", "")
+            text = re.sub(re.escape(current_name) + r": ", "", text, flags=re.IGNORECASE)
+            
             text = text.strip()
             # Remove a single quote sign from text, if it is present
             if text.count('"') == 1:
@@ -79,11 +80,13 @@ class ReACTOutputParser(OutputParser):
 
             create_images = context.metadata.get("instruction",
                                                  {}).get("create_images")
+            image_request = False
             if create_images == "true":
                 if tool_name:
                     selfie_tool = ReACTOutputParser.tools_lookup_dict.get(
                         tool_name, None)
                     if selfie_tool:
+                        image_request = True
                         #print(tool_input)
                         if tool_input:
                             # Call the tool with the input
@@ -93,4 +96,20 @@ class ReACTOutputParser(OutputParser):
                             ) if tool_input else None  # Pass image description as string
                             if image_block:
                                 result_blocks.append(image_block[0])
+                if not image_request:                    
+                    #Another way to check for image generation, if agent forgets to use a tool
+                    pattern = r'.*\b(?:here|sent|takes)\b(?=.*?(?:selfie|picture|photo|image|peek)).*'
+                    compiled_pattern = re.compile(pattern, re.IGNORECASE)
+                    if compiled_pattern.search(text):
+                      check_image_block = context.metadata.get("blocks",
+                                                               {}).get("image")
+                      if check_image_block is None:
+                        #logging.warning("Create selfie for prompt")
+                        create_images = context.metadata.get("instruction",
+                                                             {}).get("create_images")
+                        if create_images == "true":
+                          selfie = SelfieTool()
+                          image_block = selfie.run([Block(text=text)],
+                                                   context)
+                          result_blocks.append(image_block[0])
         return result_blocks

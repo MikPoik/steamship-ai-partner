@@ -21,9 +21,9 @@ class ReACTAgent(LLMAgent):
 
     TOOL_PROMPT = """Tools: 
 {tool_index}.
-Be thoughtful using take_selfie tool to share an image. Use either when it fits naturally into the conversation, or if you are prompted for it. Write your reply about sending a selfie and include a JSON object to generate the image, and it will appear as if {NAME} shared it.
+Use take_selfie tool to share an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image.
 Here's an example response that generates an image with the tool. Do not mention the tool to the human. Instead, simply include the JSON object as a suffix:
-{NAME}: Here's a selfie for you. [{{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword10"]}}}}].
+{NAME}: Here's a selfie for you. {{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}.
 """
     RAIL = """
     <rail version="0.1">
@@ -51,8 +51,8 @@ Write {NAME}'s next reply in a chat between human and {NAME}. Write a single rep
 
 {relevant_history}{chat_history}### Instruction:
 Human: {input}
-{tool_format}
-### Response:{image_helper}"""
+
+### Response{image_helper}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -185,16 +185,15 @@ Human: {input}
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
 
         #help some models to send images
-        pattern = r"^(?!.*can't)(?!.*cant).*\bsend\b.*?(?:picture|photo|image|selfie|nude|pic)"
+        pattern = r"^(?!.*can't)(?!.*cant).*(\bsend\b|\btake\b).*?(?:picture|photo|image|selfie|nude|pic)"
         image_request = re.search(pattern,
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
 
-        image_helper = ""
-        tool_format = ""
+        image_helper = ":\n"
         if image_request and "true" in images_enabled:
-            image_helper = '\nShare an image. Write reply about sending the image and include the following JSON object with up to ten keywords describing the image: {"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword10"]}}. Do not describe JSON in your action.\n'
-            #tool_format = '{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword10"]}}'
+            image_helper = f' (Include the following JSON object suffix. With up to five keywords describing the image {{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}):\n'
+            
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
@@ -210,7 +209,6 @@ Human: {input}
             current_time=current_time,
             current_day=current_day,
             image_helper=image_helper,
-            tool_format=tool_format,
             tool_index=tool_index,
             tool_names=tool_names,
             TOOL_PROMPT=self.TOOL_PROMPT.format(NAME=current_name,
@@ -223,14 +221,14 @@ Human: {input}
 
         #print(prompt)
         extract_json = self.extract_json(completion[0].text)
-        #print(completion[0].text)
+        print(completion[0].text)
         #print(extract_json)
         parsed_response = guard.parse(llm_output=extract_json,
                                       llm_api=self.my_llm_api,
                                       num_reasks=2)
 
         #print(parsed_response.raw_llm_output)
-        print(parsed_response.validated_output)
+        #print(parsed_response.validated_output)
 
         return self.output_parser.parse(completion[0].text,
                                         parsed_response.validated_output,
@@ -246,7 +244,6 @@ Human: {input}
             Returns:
                 str: The output of the LLM API
             """
-        #print(prompt)
         # Call your LLM API here
         completions = self.llm.complete(
             prompt=prompt,
@@ -258,10 +255,10 @@ Human: {input}
     def extract_json(self, text):
         # Match everything from the starting `{` which is immediately followed
         # by `"function_call":` until the corresponding closing `}` character
-        match = re.search(r'(\{\s*"function_call":.*?\}\s*\})', text,
-                          re.DOTALL)
+        pattern = r'(\[\s*)?(\{\s*"function_call":.*?\}\s*\})(\s*\])?'
+        match = re.search(pattern, text, re.DOTALL)
         if match:
-            json_string = match.group(1)
+            json_string = match.group(2)
             return json_string
         return "{}"
 

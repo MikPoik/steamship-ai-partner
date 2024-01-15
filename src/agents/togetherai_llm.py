@@ -61,7 +61,7 @@ class Llama(LLM):
         options = {}
         if stop:
             stop = stop.split(" ")[0]
-            options["stop"] = ["</s>", "\n\n", "<|", "\n#","\n\nHuman",f"\n\n{stop}"]
+            options["stop"] = ["</s>", "\n\n", "<|", "\n###","\n\nHuman",f"\n\n{stop}"]
         else:
             options["stop"] = ["\n\n\n", "\n###","\n\nHuman","<|","</s>"]
 

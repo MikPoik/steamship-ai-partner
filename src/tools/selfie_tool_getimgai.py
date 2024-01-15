@@ -34,7 +34,7 @@ class SelfieTool(ImageGeneratorTool):
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
-        current_negative_prompt = "disfigured, blurry, bad anatomy, bad hands, missing fingers, child, lowres, text, error, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, mutation, deformed, dehydrated, bad proportions, extra limbs, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, long neck, username, watermark, signature,poorly drawn face,deformed face,out of frame,blurred face"
+        current_negative_prompt = "disfigured, blurry, bad anatomy, bad hands, missing fingers, child, lowres, text, error, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, mutation, deformed, dehydrated, bad proportions, extra limbs, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, long neck, username, watermark, signature,poorly drawn face,deformed face,ugly eyes,deformed iris"
 
         def sanitize_and_split(string):
             return set(map(str.strip, string.lower().split(',')))
@@ -112,7 +112,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
         prompt = remove_duplicates(pre_prompt, prompt)
-        prompt = f"{pre_prompt}, ({prompt})" if pre_prompt else prompt
+        prompt = f"{pre_prompt}, {prompt}" if pre_prompt else prompt
         logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,

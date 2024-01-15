@@ -11,4 +11,5 @@ data = {
     'kwargs': 'VALUE'
 }
 response = requests.post(url, json=data, headers=headers)
+print(response)
 print(response.text)
