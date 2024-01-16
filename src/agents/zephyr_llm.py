@@ -63,7 +63,7 @@ class Zephyr(LLM):
             stop = stop.split(" ")[0]
             options["stop"] = ["\n\n", "\n###", "\nHuman", f"\n{stop}"]
         else:
-            options["stop"] = ["\n\n\n", "\n###", "\n\nHuman", "<|"]
+            options["stop"] = ["\n\n\n", "\n###", "\nHuman", "<|"]
         #print(options)
 
         if "max_tokens" in kwargs:

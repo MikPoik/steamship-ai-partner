@@ -21,9 +21,11 @@ class ReACTAgent(LLMAgent):
 
     TOOL_PROMPT = """Tools: 
 {tool_index}.
-Use take_selfie tool to share an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image.
-Here's an example response that generates an image with the tool. Do not mention the tool to the human. Instead, simply include the JSON object as a suffix:
-{NAME}: Here's a selfie for you. {{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}.
+You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image.
+Here's an example response that generates an image with the tool, simply include the JSON as in brackets:
+'Here's a selfie for you. [{{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}]'
+
+Do not talk about the tools to the human.
 """
     RAIL = """
     <rail version="0.1">
@@ -192,7 +194,7 @@ Human: {input}
 
         image_helper = ":\n"
         if image_request and "true" in images_enabled:
-            image_helper = f' (Include the following JSON object suffix. With up to five keywords describing the image {{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}):\n'
+            image_helper = ' Say here is the image and generate a image appending the following example JSON object in brackets. With up to five keywords describing the image [{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}]:\n'
             
 
         #options = {}
@@ -221,7 +223,7 @@ Human: {input}
 
         #print(prompt)
         extract_json = self.extract_json(completion[0].text)
-        print(completion[0].text)
+        #print(completion[0].text)
         #print(extract_json)
         parsed_response = guard.parse(llm_output=extract_json,
                                       llm_api=self.my_llm_api,

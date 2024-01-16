@@ -41,8 +41,16 @@ class ReACTOutputParser(OutputParser):
             # Remove a single quote sign from text, if it is present
             if text.count('"') == 1:
                 text = text.replace('"', '')
+            if text.startswith("'"):
+                text = text[1:]                
             if text.endswith('['):  # Check if text ends with "["
                 text = text[:-1]  # Remove it
+            if text.endswith('('):  # Check if text ends with "("
+                text = text[:-1]  # Remove it
+
+            if "json" in text.lower():
+                text = "Here's a selfie for you."
+                
             if function_call is not None:
                 run_tool_func = function_call.get("function_call")
                 if run_tool_func is not None:

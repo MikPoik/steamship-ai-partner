@@ -22,7 +22,10 @@ class SelfieTool(ImageGeneratorTool):
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": "key-"}
+    generator_plugin_config: dict = {
+        "api_key":
+        "key-"
+    }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,
@@ -34,8 +37,9 @@ class SelfieTool(ImageGeneratorTool):
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
-        current_negative_prompt = "disfigured, blurry, bad anatomy, bad hands, missing fingers, child, lowres, text, error, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, mutation, deformed, dehydrated, bad proportions, extra limbs, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, long neck, username, watermark, signature,poorly drawn face,deformed face,ugly eyes,deformed iris"
 
+        current_negative_prompt ="disfigured,deformed, poorly drawn, extra limbs, blurry:0.25"
+        
         def sanitize_and_split(string):
             return set(map(str.strip, string.lower().split(',')))
 
@@ -112,7 +116,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
         prompt = remove_duplicates(pre_prompt, prompt)
-        prompt = f"{pre_prompt}, {prompt}" if pre_prompt else prompt
+        prompt = f"{prompt},{pre_prompt}" if pre_prompt else prompt
         logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,
