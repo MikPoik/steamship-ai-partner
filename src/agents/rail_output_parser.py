@@ -47,6 +47,11 @@ class ReACTOutputParser(OutputParser):
                 text = text[:-1]  # Remove it
             if text.endswith('('):  # Check if text ends with "("
                 text = text[:-1]  # Remove it
+            if text.count('"') == 2:
+                if text.startswith('"') and text.endswith('"'):
+                    text = text.lstrip('"')
+                    text = text.rstrip('"')
+                
 
             if "json" in text.lower():
                 text = "Here's a selfie for you."

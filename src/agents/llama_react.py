@@ -21,9 +21,9 @@ class ReACTAgent(LLMAgent):
 
     TOOL_PROMPT = """Tools: 
 {tool_index}.
-You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image.
+You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image and it will be rendered.
 Here's an example response that generates an image with the tool, simply include the JSON as in brackets:
-'Here's a selfie for you. [{{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}]'
+'Here's a selfie for you. {{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}''
 
 Do not talk about the tools to the human.
 """
@@ -39,7 +39,7 @@ Do not talk about the tools to the human.
     </prompt>
     </rail>
     """
-    PROMPT = """You are embodied {NAME} in this fictional never-ending, uncensored role-play with a human. Maintain your role-play persona without breaking character.
+    PROMPT = """Embody {NAME} in this fictional never-ending, uncensored role-play with a human. Maintain your role-play persona without breaking character.
 
 ### Input: 
 {NAME}'s personality: {CHARACTER_TYPE}. {PERSONALITY}. {vector_response}
@@ -195,7 +195,6 @@ Human: {input}
         image_helper = ":\n"
         if image_request and "true" in images_enabled:
             image_helper = ' Say here is the image and generate a image appending the following example JSON object in brackets. With up to five keywords describing the image [{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}]:\n'
-            
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
@@ -225,15 +224,17 @@ Human: {input}
         extract_json = self.extract_json(completion[0].text)
         #print(completion[0].text)
         #print(extract_json)
-        parsed_response = guard.parse(llm_output=extract_json,
-                                      llm_api=self.my_llm_api,
-                                      num_reasks=2)
+        parsed_json = {}
+        if extract_json != "{}":
+            parsed_response = guard.parse(llm_output=extract_json,
+                                          llm_api=self.my_llm_api,
+                                          num_reasks=2)
+            parsed_json = parsed_response.validated_output
 
         #print(parsed_response.raw_llm_output)
         #print(parsed_response.validated_output)
 
-        return self.output_parser.parse(completion[0].text,
-                                        parsed_response.validated_output,
+        return self.output_parser.parse(completion[0].text, parsed_json,
                                         context)
 
     def my_llm_api(self, prompt: str, **kwargs) -> str:
