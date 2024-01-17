@@ -42,7 +42,7 @@ class LemonfoxTTSTool(Tool):
         if meta_voice_id is not None:
             if meta_voice_id != "none":
                 self.generator_plugin_config["voice"] = meta_voice_id
-                print("meta_voice_id", meta_voice_id)
+                #print("meta_voice_id", meta_voice_id)
 
         text_input = ""
         for block in tool_input:

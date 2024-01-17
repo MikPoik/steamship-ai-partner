@@ -281,9 +281,10 @@ class MyAssistant(AgentService):
                     agent_service=self,
                     set_payment_plan=self.set_payment_plan))
 
-        self.usage = UsageTracker(self.client,
-                                  n_free_messages=self.config.n_free_messages,
-                                  usd_balance=self.config.usd_balance)
+        #disable usage tracker, causes slowness
+        #self.usage = UsageTracker(self.client,
+        #                          n_free_messages=self.config.n_free_messages,
+        #                          usd_balance=self.config.usd_balance)
 
     #Customized run_agent
     def run_agent(self,
@@ -379,13 +380,10 @@ class MyAssistant(AgentService):
 
                 self.append_response(context=context, action=action)
                 return
-
             #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
-            if not self.check_usage(chat_id=chat_id, context=context):
-                return
-
-        #If balance low, guide answer length (not used currently)
-        words_left = self.usage.get_available_words(chat_id=str(chat_id))
+            #Disabled usage check, slows down the bot
+            #if not self.check_usage(chat_id=chat_id, context=context):
+            #    return
 
         action = self.next_action(
             agent=agent,
@@ -415,7 +413,6 @@ class MyAssistant(AgentService):
             number_of_actions_run += 1
             if action.tool:
                 actions_per_tool[action.tool] += 1
-
             if action.is_final:
                 break
             action = self.next_action(agent=agent,
@@ -441,14 +438,14 @@ class MyAssistant(AgentService):
             f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
         )
 
-        #Increase message count
-        if self.config.n_free_messages > 0:
-            self.usage.increase_message_count(str(chat_id))
+        #Increase message count, disabled, slows down the bot
+        #if self.config.n_free_messages > 0:
+        #    self.usage.increase_message_count(str(chat_id))
         #increase used tokens and reduce balance
-        if self.config.usd_balance > 0:
-            self.usage.increase_token_count(action.output,
-                                            chat_id=str(chat_id),
-                                            use_voice=self.config.use_voice)
+        #if self.config.usd_balance > 0:
+        #    self.usage.increase_token_count(action.output,
+        #                                    chat_id=str(chat_id),
+        #                                    use_voice=self.config.use_voice)
 
         current_voice_config = self.config.use_voice
         meta_voice_id = context.metadata.get("instruction", {}).get("voice_id")

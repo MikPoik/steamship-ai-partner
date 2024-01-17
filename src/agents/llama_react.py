@@ -94,7 +94,6 @@ Human: {input}
             f"- {t.name}: {t.agent_description}" for t in self.tools
         ]
         tool_index = "\n".join(tool_index_parts)
-
         #Searh response hints for role-play character from vectorDB, if any related text is indexed
         vector_response = ""
         raw_vector_response = ""
@@ -105,7 +104,6 @@ Human: {input}
         if len(raw_vector_response[0].text) > 1:
             vector_response = raw_vector_response[0].text.replace("\n", ". ")
             #logging.warning(vector_response)
-
         messages_from_memory = []
         # get prior conversations
         if context.chat_history.is_searchable():
@@ -219,7 +217,6 @@ Human: {input}
         completion = self.llm.complete(prompt=prompt,
                                        stop=current_name,
                                        max_retries=4)
-
         #print(prompt)
         extract_json = self.extract_json(completion[0].text)
         #print(completion[0].text)
