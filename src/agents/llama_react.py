@@ -22,8 +22,8 @@ class ReACTAgent(LLMAgent):
     TOOL_PROMPT = """Tools: 
 {tool_index}.
 You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image and it will be rendered.
-Here's an example response that generates an image with the tool, simply include the JSON as in brackets:
-'Here's a selfie for you. {{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}''
+Here's an example response that generates an image with the tool, simply include the JSON in brackets:
+'Here's a selfie for you. [{{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}]'
 
 Do not talk about the tools to the human.
 """
@@ -192,7 +192,7 @@ Human: {input}
 
         image_helper = ":\n"
         if image_request and "true" in images_enabled:
-            image_helper = ' Say here is the image and generate a image appending the following example JSON object in brackets. With up to five keywords describing the image [{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}]:\n'
+            image_helper = ':\nResponding with the following JSON in brackets to render image. With up to five tool_input keywords describing the image details [{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]}}]:\n'+current_name+':'
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
@@ -217,9 +217,9 @@ Human: {input}
         completion = self.llm.complete(prompt=prompt,
                                        stop=current_name,
                                        max_retries=4)
-        #print(prompt)
+        print(prompt)
         extract_json = self.extract_json(completion[0].text)
-        #print(completion[0].text)
+        print(completion[0].text)
         #print(extract_json)
         parsed_json = {}
         if extract_json != "{}":

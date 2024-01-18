@@ -22,7 +22,10 @@ class SelfieTool(ImageGeneratorTool):
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": "key-"}
+    generator_plugin_config: dict = {
+        "api_key":
+        "key-"
+    }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,
@@ -55,7 +58,9 @@ class SelfieTool(ImageGeneratorTool):
 
         meta_image_model = context.metadata.get("instruction",
                                                 {}).get("image_model")
+        
 
+            
         if meta_image_model is not None:
             current_model = meta_image_model
             #backwards compatibility
@@ -97,6 +102,16 @@ class SelfieTool(ImageGeneratorTool):
         if meta_name is not None:
             current_name = meta_name
 
+        current_type = TYPE
+        meta_type = context.metadata.get("instruction", {}).get("type")
+        if meta_type is not None:
+            current_type = meta_type
+            if len(current_type) < 70:
+                current_type = current_type.replace(current_name, "")
+            else:
+                current_type = ""
+            
+        
         prompt = tool_input[0].text  #.replace(current_name + ",", "")
         prompt = prompt.replace(current_name, "")
 
@@ -113,7 +128,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
         prompt = remove_duplicates(pre_prompt, prompt)
-        prompt = f"{prompt},{pre_prompt}" if pre_prompt else prompt
+        prompt = f"{current_type}, {prompt}, {pre_prompt}" if pre_prompt else prompt
         logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,
