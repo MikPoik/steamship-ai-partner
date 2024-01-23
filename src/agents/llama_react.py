@@ -19,17 +19,22 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    TOOL_PROMPT = """Tools: 
+    TOOL_PROMPT_TEMPLATE = """
+Tools: 
 {tool_index}.
-You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Include a JSON object to generate the image and it will be rendered.
-Here's an example response that generates an image with the tool, simply include the JSON in brackets:
-'Here's a selfie for you. [{{"function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword5"]}}}}]'
+You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Use a JSON object to generate the image and it will be rendered.
+Use the the following JSON format:
+{{"response": "[Insert here {NAME}'s response, sending image]","function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]}}}}
 
-Do not talk about the tools to the human.
-"""
+Do not talk about the tools to the human. Do not make up other tools.
+Generate a image for response saying here is the image for human.
+Respond with the JSON object."""
+
+    TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
     RAIL = """
     <rail version="0.1">
     <output>
+            <string name="response" required="false" />
             <object name="function_call" description="A call to the tool function" required="false">
                 <string name="name" description="The name of the tool to call" required="false"/>
                 <list name="tool_input" description="Input for a tool as list" required="false"><string description="input keywords" required="false" /></list>
@@ -47,14 +52,15 @@ Do not talk about the tools to the human.
 
 Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
 
-{TOOL_PROMPT}
+
 
 Write {NAME}'s next reply in a chat between human and {NAME}. Write a single reply only.
 
 {relevant_history}{chat_history}### Instruction:
 Human: {input}
-
-### Response{image_helper}"""
+{TOOL_PROMPT}
+### Response{image_helper}:
+"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -190,9 +196,12 @@ Human: {input}
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
 
-        image_helper = ":\n"
+        image_helper = ""
         if image_request and "true" in images_enabled:
-            image_helper = ':\nResponding with the following JSON in brackets to render image. With up to five tool_input keywords describing the image details [{"function_call": {"name": "take_selfie","tool_input": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]}}]:\n'+current_name+':'
+            self.TOOL_PROMPT = self.TOOL_PROMPT_TEMPLATE
+            image_helper="```json"
+        else:
+            self.TOOL_PROMPT = ""
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
@@ -217,10 +226,10 @@ Human: {input}
         completion = self.llm.complete(prompt=prompt,
                                        stop=current_name,
                                        max_retries=4)
-        print(prompt)
+        #print(prompt)
         extract_json = self.extract_json(completion[0].text)
-        print(completion[0].text)
-        #print(extract_json)
+        #print("completion: ", completion[0].text)
+        #print("extracted:",extract_json)
         parsed_json = {}
         if extract_json != "{}":
             parsed_response = guard.parse(llm_output=extract_json,
@@ -228,8 +237,8 @@ Human: {input}
                                           num_reasks=2)
             parsed_json = parsed_response.validated_output
 
-        #print(parsed_response.raw_llm_output)
-        #print(parsed_response.validated_output)
+            #print(parsed_response.raw_llm_output)
+            #print(parsed_response.validated_output)
 
         return self.output_parser.parse(completion[0].text, parsed_json,
                                         context)
@@ -255,12 +264,13 @@ Human: {input}
     def extract_json(self, text):
         # Match everything from the starting `{` which is immediately followed
         # by `"function_call":` until the corresponding closing `}` character
-        pattern = r'(\[\s*)?(\{\s*"function_call":.*?\}\s*\})(\s*\])?'
-        match = re.search(pattern, text, re.DOTALL)
+        pattern = r'(?s)\{.*"function_call".*?:.*?\}(?![^{}]*\})'
+        match = re.search(pattern, text)
         if match:
-            json_string = match.group(2)
+            json_string = match.group(0)
             return json_string
         return "{}"
+
 
     def _construct_scratchpad(self, context):
         meta_name = context.metadata.get("instruction", {}).get("name")

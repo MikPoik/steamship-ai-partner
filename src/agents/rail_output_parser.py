@@ -34,7 +34,10 @@ class ReACTOutputParser(OutputParser):
         run_tool_input = {}
         if response is not None:
             text = response.split("{")[0] #split possible json
+            text = text.split("#")[0] #split possible hashtags
+            text = text.split("Xoxo")[0]
             text = text.replace(current_name + "`", "")
+            
             text = re.sub(re.escape(current_name) + r": ", "", text, flags=re.IGNORECASE)
             
             text = text.strip()
@@ -63,6 +66,14 @@ class ReACTOutputParser(OutputParser):
                     #print("run_tool", run_tool)
                     run_tool_input = run_tool_func.get("tool_input", "")
                     #print("run_tool_input", run_tool_input)
+                    
+                    run_tool_text = function_call.get("response")
+                    if run_tool_text is not None:
+                        text = run_tool_text
+                        text = text.split("[")[0] #split possible extra
+                        text = text.split("#")[0] #split possible extra
+                        text = text.split("(")[0] #split possible extra
+        
 
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             context.client, text, run_tool, run_tool_input, context),
