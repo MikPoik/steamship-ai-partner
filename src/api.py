@@ -3,7 +3,7 @@ from steamship.agents.logging import AgentLogging  #upm package(steamship)
 from steamship.agents.service.agent_service import AgentService  #upm package(steamship)
 from steamship.invocable import Config, post  #upm package(steamship)
 from steamship import Block, Task, MimeTypes, Steamship, SteamshipError  #upm package(steamship)
-from steamship.agents.llms.openai import ChatOpenAI  #upm package(steamship)
+from agents.openai import ChatOpenAI, OpenAI  #upm package(steamship)
 from steamship.utils.repl import AgentREPL  #upm package(steamship)
 from steamship.agents.utils import with_llm  #upm package(steamship)
 from steamship.agents.mixins.transports.steamship_widget import SteamshipWidgetTransport  #upm package(steamship)
@@ -27,7 +27,7 @@ from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMix
 from tools.active_companion import *  #upm package(steamship)
 from utils import send_file_from_local  #upm package(steamship)
 from agents.togetherai_llm import ChatLlama  #upm package(steamship)
-from agents.llama_react import ReACTAgent  #upm package(steamship)
+from agents.react import ReACTAgent  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.lemonfox_tts_tool import LemonfoxTTSTool  #upm package(steamship)
@@ -222,17 +222,16 @@ class MyAssistant(AgentService):
 
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
-                FunctionsBasedAgent(
-                    tools,
-                    llm=ChatOpenAI(self.client,
-                                   model_name=self.config.llm_model,
-                                   temperature=0.8,
-                                   max_tokens=300,
-                                   moderate_output=False),
-                    message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
+                ReACTAgent(tools,
+                           llm=OpenAI(self.client,
+                                      model_name=self.config.llm_model,
+                                      temperature=0.8,
+                                      max_tokens=256,
+                                      moderate_output=False),
+                           message_selector=MessageWindowMessageSelector(
+                               k=MESSAGE_COUNT)))
 
-        if not "zephyr-chat" in self.config.llm_model:
+        if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
             self.set_default_agent(
                 ReACTAgent(
                     tools,
@@ -242,7 +241,7 @@ class MyAssistant(AgentService):
                         model_name=self.config.llm_model,
                         temperature=0.8,
                         #top_p=0.7,
-                        max_tokens=400,
+                        max_tokens=256,
                         max_retries=4),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
@@ -257,7 +256,7 @@ class MyAssistant(AgentService):
                         model_name=self.config.llm_model,
                         temperature=0.8,
                         #top_p=0.7,
-                        max_tokens=400,
+                        max_tokens=256,
                         max_retries=4),
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
@@ -535,7 +534,9 @@ class MyAssistant(AgentService):
         with self.build_default_context(context_id, **kwargs) as context:
             prompt = prompt or kwargs.get("question")
             #context = self.build_default_context(context_id, **kwargs)
-            context.chat_history.append_user_message(prompt)
+
+            if seed is None:
+                seed = SEED
 
             context.metadata["instruction"] = {
                 "name": name or None,
@@ -552,6 +553,14 @@ class MyAssistant(AgentService):
                 "is_pro": is_pro or None,
             }
 
+            last_agent_msg = context.chat_history.last_agent_message
+            if not last_agent_msg:
+                meta_seed = context.metadata.get("instruction", {}).get("seed")
+                if meta_seed is not None:
+                    context.chat_history.append_assistant_message(meta_seed +
+                                                                  "\n\n")
+
+            context.chat_history.append_user_message(prompt)
             meta_name = context.metadata.get("instruction", {}).get("name")
             #split the name if it contains spaces
             if meta_name is not None:

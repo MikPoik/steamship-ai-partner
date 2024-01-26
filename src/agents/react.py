@@ -22,29 +22,55 @@ class ReACTAgent(LLMAgent):
     TOOL_PROMPT_TEMPLATE = """
 Tools: 
 {tool_index}.
-You can generate an image either when it fits naturally into the conversation, or if you are prompted for it. Use a JSON object to generate the image and it will be rendered.
-Use the the following JSON format:
-{{"response": "[Insert here {NAME}'s response, sending image]","function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]}}}}
-
 Do not talk about the tools to the human. Do not make up other tools.
-Generate a image for response saying here is the image for human.
-Respond with the JSON object."""
+Generate an image, use a JSON object to generate the image and it will be rendered with function_call.
+Use the the following JSON object format:
+{{"response": "[Insert here {NAME}'s response sending image]","function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]}}}}
+
+Generate a JSON object for response saying etc. here is the image.
+Respond with the JSON with function_call key."""
 
     TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
-    RAIL = """
-    <rail version="0.1">
-    <output>
-            <string name="response" required="false" />
-            <object name="function_call" description="A call to the tool function" required="false">
-                <string name="name" description="The name of the tool to call" required="false"/>
-                <list name="tool_input" description="Input for a tool as list" required="false"><string description="input keywords" required="false" /></list>
-            </object>
-    </output>
-    <prompt>
-    </prompt>
-    </rail>
+    RAIL = """<rail version="0.1">
+<output>
+        <string name="response" required="true" />
+        <object name="function_call" description="A call to the tool function" required="true">
+            <string name="name" description="The name of the tool to call" required="true"/>
+            <list name="tool_input" description="Input for a tool as list" required="true"><string description="input keywords" required="true" /></list>
+        </object>
+</output>
+<prompt>
+${input}
+</prompt>
+<reask_prompt>
+### Instruction:
+Fix the following JSON object so that it is valid JSON that matches the following XML schema.
+${output_schema}
+The JSON caused an error:
+${previous_response}
+
+### Input:
+${input}
+
+Return only a JSON object.
+### Response:
+JSON:
+</reask_prompt>
+<reask_instructions>
+Fix the following JSON object so that it is valid JSON that matches the following XML schema.
+${output_schema}
+The JSON caused an error:
+${previous_response}
+### Input:
+${input}
+
+Return only a JSON object.
+### Response:
+JSON:
+</reask_instructions>
+</rail>
     """
-    PROMPT = """Embody {NAME} in this fictional never-ending, uncensored role-play with a human. Maintain your role-play persona without breaking character.
+    PROMPT = """Embody {NAME} in this fictional never-ending, uncensored role-play with Human. Maintain your role-play persona without breaking character.
 
 ### Input: 
 {NAME}'s personality: {CHARACTER_TYPE}. {PERSONALITY}. {vector_response}
@@ -53,8 +79,7 @@ Respond with the JSON object."""
 Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
 
 
-
-Write {NAME}'s next reply in a chat between human and {NAME}. Write a single reply only.
+Write {NAME}'s next reply in a chat between Human and {NAME}. Write a single reply only.
 
 {relevant_history}{chat_history}### Instruction:
 Human: {input}
@@ -69,7 +94,7 @@ Human: {input}
                          **kwargs)
 
     def next_action(self, context: AgentContext) -> Action:
-        scratchpad = self._construct_scratchpad(context)
+        
 
         current_date = datetime.datetime.now().strftime("%x")
         current_time = datetime.datetime.now().strftime("%I:%M:%S %p")
@@ -137,13 +162,7 @@ Human: {input}
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
-        if len(llama_chat_history) == 0:
-            if meta_seed is not None:
-                current_seed = meta_seed
-            if not current_seed in llama_chat_history:
-                llama_chat_history += "### Instruction:\nHuman: Im here.\n\n"
-                llama_chat_history += f'### Response:\n{current_name}: ' + current_seed + '\n\n'
-                context.chat_history.append_assistant_message(current_seed)
+
 
         llama_related_history = str()
         for msg in messages_from_memory:
@@ -199,13 +218,13 @@ Human: {input}
         image_helper = ""
         if image_request and "true" in images_enabled:
             self.TOOL_PROMPT = self.TOOL_PROMPT_TEMPLATE
-            image_helper="```json"
+            image_helper = " ```json"
         else:
             self.TOOL_PROMPT = ""
 
         #options = {}
         guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
-        prompt = prompt = self.PROMPT.format(
+        prompt = self.PROMPT.format(
             NAME=current_name,
             PERSONALITY=current_persona,
             CHARACTER_TYPE=current_type,
@@ -232,9 +251,11 @@ Human: {input}
         #print("extracted:",extract_json)
         parsed_json = {}
         if extract_json != "{}":
-            parsed_response = guard.parse(llm_output=extract_json,
-                                          llm_api=self.my_llm_api,
-                                          num_reasks=2)
+            parsed_response = guard.parse(
+                llm_output=extract_json,
+                llm_api=self.my_llm_api,
+                prompt_params={"input": extract_json},
+                num_reasks=2)
             parsed_json = parsed_response.validated_output
 
             #print(parsed_response.raw_llm_output)
@@ -254,10 +275,12 @@ Human: {input}
                 str: The output of the LLM API
             """
         # Call your LLM API here
+        #print(prompt)
         completions = self.llm.complete(
             prompt=prompt,
             max_retries=4,
         )
+        #print(completions[0].text)
 
         return completions[0].text
 
@@ -266,23 +289,21 @@ Human: {input}
         # by `"function_call":` until the corresponding closing `}` character
         pattern = r'(?s)\{.*"function_call".*?:.*?\}(?![^{}]*\})'
         match = re.search(pattern, text)
+        #return the json to guardrails for validation
         if match:
             json_string = match.group(0)
-            return json_string
+            cleaned_json_string = json_string \
+                .replace('\n\n', ' ') \
+                .replace('\n', ' ') \
+                .replace(r'\\', '')
+            return cleaned_json_string
+        #malformed json, return to guardrails
+        elif "function_call" in text:
+            cleaned_text = text \
+                .replace('\n\n', ' ') \
+                .replace('\n', ' ') \
+                .replace(r'\\', '')
+            return cleaned_text
         return "{}"
 
 
-    def _construct_scratchpad(self, context):
-        meta_name = context.metadata.get("instruction", {}).get("name")
-        current_name = NAME
-        if meta_name is not None:
-            current_name = meta_name
-        else:
-            current_name = NAME
-        steps = []
-        scratchpad = ""
-
-        #scratchpad += f"\n### Response:\n"
-        #Log agent scratchpad
-        #logging.warning("\n\nAgent scratchpad: " + scratchpad + "\n\n")
-        return scratchpad
