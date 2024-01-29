@@ -23,12 +23,12 @@ class ReACTAgent(LLMAgent):
 Tools: 
 {tool_index}.
 Do not talk about the tools to the human. Do not make up other tools.
-Generate an image, use a JSON object to generate the image and it will be rendered with function_call.
+Generate an image, use a JSON to generate the image and it will be rendered with function_call.
 Use the the following JSON object format:
-{{"response": "[Insert here {NAME}'s response sending image]","function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]}}}}
+{{"response": "[Insert here {NAME}'s response text sending image]","function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]}}}}
 
-Generate a JSON object for response saying etc. here is the image.
-Respond with the JSON with function_call key."""
+Generate a JSON for response describing the image.
+Respond with the JSON with response and function_call key."""
 
     TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
     RAIL = """<rail version="0.1">
@@ -44,7 +44,7 @@ ${input}
 </prompt>
 <reask_prompt>
 ### Instruction:
-Fix the following JSON object so that it is valid JSON that matches the following XML schema.
+Fix the following JSON object so that it is valid JSON that matches the following XML schema. Where the key of the field in JSON is the `name` attribute of the corresponding XML.
 ${output_schema}
 The JSON caused an error:
 ${previous_response}
@@ -57,10 +57,12 @@ Return only a JSON object.
 JSON:
 </reask_prompt>
 <reask_instructions>
-Fix the following JSON object so that it is valid JSON that matches the following XML schema.
+Fix the following JSON object so that it is valid JSON that matches the following XML schema. Where the key of the field in JSON is the `name` attribute of the corresponding XML.
 ${output_schema}
+
 The JSON caused an error:
 ${previous_response}
+
 ### Input:
 ${input}
 
@@ -218,7 +220,7 @@ Human: {input}
         image_helper = ""
         if image_request and "true" in images_enabled:
             self.TOOL_PROMPT = self.TOOL_PROMPT_TEMPLATE
-            image_helper = " ```json"
+            image_helper = " json:"
         else:
             self.TOOL_PROMPT = ""
 
