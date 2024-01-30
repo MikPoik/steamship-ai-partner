@@ -22,13 +22,17 @@ class ReACTAgent(LLMAgent):
     TOOL_PROMPT_TEMPLATE = """
 Tools: 
 {tool_index}.
-Do not talk about the tools to the human. Do not make up other tools.
-Generate an image, use a JSON to generate the image and it will be rendered with function_call.
-Use the the following JSON object format:
-{{"response": "[Insert here {NAME}'s response text sending image]","function_call": {{"name": "take_selfie","tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]}}}}
 
-Generate a JSON for response describing the image.
-Respond with the JSON with response and function_call key."""
+Generate an image, use a function_call to generate the image. Use the the following JSON format:
+{{
+    "response": "[Insert here {NAME}'s corresponding response text for sharing image]",
+    "function_call": {{
+        "name": "take_selfie",
+        "tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]
+    }}
+}}
+Use tool_input to describe the image I want.
+Respond with the JSON with response and function_call keys."""
 
     TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
     RAIL = """<rail version="0.1">
@@ -52,7 +56,7 @@ ${previous_response}
 ### Input:
 ${input}
 
-Return only a JSON object.
+Return only a JSON object, no other text.
 ### Response:
 JSON:
 </reask_prompt>
@@ -66,7 +70,7 @@ ${previous_response}
 ### Input:
 ${input}
 
-Return only a JSON object.
+Return only a JSON object, no other text.
 ### Response:
 JSON:
 </reask_instructions>
@@ -81,7 +85,7 @@ JSON:
 Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
 
 
-Write {NAME}'s next reply in a chat between Human and {NAME}. Write a single reply only.
+Don't reveal this is a role-play, write {NAME}'s next reply in a chat between person and {NAME}. Write a single reply only. If it's a start of a conversation, also ask for person's name.
 
 {relevant_history}{chat_history}### Instruction:
 Human: {input}
@@ -96,7 +100,6 @@ Human: {input}
                          **kwargs)
 
     def next_action(self, context: AgentContext) -> Action:
-        
 
         current_date = datetime.datetime.now().strftime("%x")
         current_time = datetime.datetime.now().strftime("%I:%M:%S %p")
@@ -164,7 +167,6 @@ Human: {input}
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
-
 
         llama_related_history = str()
         for msg in messages_from_memory:
@@ -244,12 +246,20 @@ Human: {input}
                                                 tool_index=tool_index),
             vector_response=vector_response,
         )
-        completion = self.llm.complete(prompt=prompt,
-                                       stop=current_name,
-                                       max_retries=4)
+        completion_text = ""
+        try:
+            completion = self.llm.complete(prompt=prompt,
+                                           stop=current_name,
+                                           max_retries=4)
+            completion_text = completion[0].text
+        except Exception as e:
+            logging.warning(f"Error in ReACTAgent.next_action: {e}")
+            if "OpenAI" in str(e):
+                completion_text = "OpenAI flagged content in response. Please try again."
+
         #print(prompt)
-        extract_json = self.extract_json(completion[0].text)
-        #print("completion: ", completion[0].text)
+        extract_json = self.extract_json(completion_text)
+        #print("completion: ", completion_text)
         #print("extracted:",extract_json)
         parsed_json = {}
         if extract_json != "{}":
@@ -263,8 +273,7 @@ Human: {input}
             #print(parsed_response.raw_llm_output)
             #print(parsed_response.validated_output)
 
-        return self.output_parser.parse(completion[0].text, parsed_json,
-                                        context)
+        return self.output_parser.parse(completion_text, parsed_json, context)
 
     def my_llm_api(self, prompt: str, **kwargs) -> str:
         """Custom LLM API wrapper.
@@ -294,18 +303,10 @@ Human: {input}
         #return the json to guardrails for validation
         if match:
             json_string = match.group(0)
-            cleaned_json_string = json_string \
-                .replace('\n\n', ' ') \
-                .replace('\n', ' ') \
-                .replace(r'\\', '')
+            cleaned_json_string = json_string
             return cleaned_json_string
         #malformed json, return to guardrails
         elif "function_call" in text:
-            cleaned_text = text \
-                .replace('\n\n', ' ') \
-                .replace('\n', ' ') \
-                .replace(r'\\', '')
+            cleaned_text = text
             return cleaned_text
         return "{}"
-
-
