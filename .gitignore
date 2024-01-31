@@ -10,3 +10,5 @@ steamship.json
 poetry.lock
 replit.nix
 .env
+.upm
+.local
