@@ -36,7 +36,9 @@ class ReACTOutputParser(OutputParser):
             text = response.split("{")[0] #split possible json
             text = text.split("#")[0] #split possible hashtags
             text = text.replace(current_name + "`", "")
-            
+            if "(function_call" in text:
+                text = text.split("(function_call")[0]
+            text = re.split(r'(?i)xoxo', text)[0]  # no xoxo signatures
             text = re.sub(re.escape(current_name) + r": ", "", text, flags=re.IGNORECASE)
             
             text = text.strip()
@@ -55,9 +57,7 @@ class ReACTOutputParser(OutputParser):
                     text = text.rstrip('"')
                 
 
-            #if "json" in text.lower():
-            #    logging.warning("invalid return text")
-            #   text = "Here's a selfie for you."
+
                 
             if function_call is not None:
                 run_tool_func = function_call.get("function_call")

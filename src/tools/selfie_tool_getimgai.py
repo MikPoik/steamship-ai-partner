@@ -37,15 +37,6 @@ class SelfieTool(ImageGeneratorTool):
 
         current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25"
 
-        def sanitize_and_split(string):
-            return set(map(str.strip, string.lower().split(',')))
-
-        def remove_duplicates(pre_prompt, prompt):
-            pre_prompt_set = sanitize_and_split(pre_prompt)
-            prompt_set = sanitize_and_split(prompt)
-            # Only keep words in pre_prompt that are not in prompt
-            return ', '.join(word for word in pre_prompt_set
-                             if word not in prompt_set)
 
         meta_model = context.metadata.get("instruction", {}).get("model")
         #if meta_model is not None:
@@ -110,6 +101,7 @@ class SelfieTool(ImageGeneratorTool):
         prompt = prompt.replace(current_name, "")
         prompt = prompt.replace("close-up", "")
         prompt = prompt.replace("closeup", "")
+        prompt = prompt.replace("close up", "")
         #print(prompt)
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
@@ -125,8 +117,8 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
 
-        pre_prompt = remove_duplicates(pre_prompt, prompt)
-        prompt = f"{prompt},{pre_prompt}" if pre_prompt else prompt
+
+        prompt = f"{prompt},{pre_prompt}"
         #logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,

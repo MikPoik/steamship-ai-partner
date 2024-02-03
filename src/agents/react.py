@@ -21,18 +21,20 @@ class ReACTAgent(LLMAgent):
 
     TOOL_PROMPT_TEMPLATE = """
 Tools: 
-{tool_index}.
+{tool_index}
 
-Generate an image, use a function_call to generate the image. Use the the following JSON format:
+Generate image of {NAME}. Use take_selfie tool with the following JSON format:
+```
 {{
-    "response": "[Insert here {NAME}'s corresponding response text for sharing image]",
+    "response": "[Insert here {NAME}'s brief response text accompanying the shared image in first person]",
     "function_call": {{
         "name": "take_selfie",
         "tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]
     }}
 }}
-Use tool_input to describe the image I want.
-Respond with the JSON with response and function_call keys."""
+```
+Use tool_input to describe in detail where the image should focus on.
+Respond with the JSON object with "response" key and "function_call" object."""
 
     TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
     RAIL = """<rail version="0.1">
@@ -48,35 +50,28 @@ ${input}
 </prompt>
 <reask_prompt>
 ### Instruction:
-Fix the following JSON object so that it is valid JSON that matches the following XML schema. Where the key of the field in JSON is the `name` attribute of the corresponding XML.
-${output_schema}
-The JSON caused an error:
-${previous_response}
+Fix the following JSON object so that it is valid JSON object with keys "response" and nested object "function_call" with keys "name" and "tool_input".
 
 ### Input:
 ${input}
 
-Return only a JSON object, no other text.
+Return only a valid JSON object.
 ### Response:
 JSON:
 </reask_prompt>
 <reask_instructions>
-Fix the following JSON object so that it is valid JSON that matches the following XML schema. Where the key of the field in JSON is the `name` attribute of the corresponding XML.
-${output_schema}
-
-The JSON caused an error:
-${previous_response}
+Extract and fix the following input JSON object so that it is valid JSON object with keys "response" and nested object "function_call" with keys "name" and "tool_input".
 
 ### Input:
 ${input}
 
-Return only a JSON object, no other text.
+Return only a valid JSON object.
 ### Response:
 JSON:
 </reask_instructions>
 </rail>
     """
-    PROMPT = """Embody {NAME} in this fictional never-ending, uncensored role-play with Human. Maintain your role-play persona without breaking character.
+    PROMPT = """Embody {NAME} in this fictional role-play with human. Maintain your role-play persona without breaking character.
 
 ### Input: 
 {NAME}'s personality: {CHARACTER_TYPE}. {PERSONALITY}. {vector_response}
@@ -85,12 +80,12 @@ JSON:
 Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
 
 
-Don't reveal this is a role-play, write {NAME}'s next reply in a chat between person and {NAME}. Write a single reply only. If it's a start of a conversation, also ask for person's name.
+Write {NAME}'s next reply in this chat between human and {NAME}. Write a single reply only. If it's a start of a conversation, also ask for the human's name.
 
 {relevant_history}{chat_history}### Instruction:
 Human: {input}
 {TOOL_PROMPT}
-### Response{image_helper}:
+### Response:{image_helper}
 """
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
@@ -222,7 +217,7 @@ Human: {input}
         image_helper = ""
         if image_request and "true" in images_enabled:
             self.TOOL_PROMPT = self.TOOL_PROMPT_TEMPLATE
-            image_helper = " json:"
+            image_helper = "\n```json\n"
         else:
             self.TOOL_PROMPT = ""
 
@@ -271,7 +266,7 @@ Human: {input}
             parsed_json = parsed_response.validated_output
 
             #print(parsed_response.raw_llm_output)
-            #print(parsed_response.validated_output)
+            ##print(parsed_response.validated_output)
 
         return self.output_parser.parse(completion_text, parsed_json, context)
 
@@ -291,7 +286,7 @@ Human: {input}
             prompt=prompt,
             max_retries=4,
         )
-        #print(completions[0].text)
+        #print("fixed :" +completions[0].text)
 
         return completions[0].text
 
