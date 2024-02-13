@@ -43,6 +43,7 @@ LLAMA2_HERMES13B = "NousResearch/Nous-Hermes-Llama2-13b"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
 MYTHOMAX = "Gryphe/MythoMax-L2-13b"
+MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
 
 os.environ["GUARDRAILS_PROCESS_COUNT"] = "1"
 
@@ -670,7 +671,7 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="partner-ai-dev3-ws")
+    client = Steamship(workspace="partner-ai-dev2-ws")
     #context_id = uuid.uuid4()
     #context_id="89f3946d-4bf3-4177-9abe-3a9024c5428c"
     #print("chat id " + str(context_id))

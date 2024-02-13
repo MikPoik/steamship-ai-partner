@@ -3,7 +3,7 @@ from typing import List, Optional
 from steamship import Block, File, PluginInstance, Steamship  #upm package(steamship)
 from steamship.agents.schema import LLM, ChatLLM, Tool  #upm package(steamship)
 
-PLUGIN_HANDLE = "together-ai-llm"
+PLUGIN_HANDLE = "together-ai-generator"
 DEFAULT_MAX_TOKENS = 256
 
 
@@ -39,7 +39,7 @@ class Llama(LLM):
 
         generator = client.use_plugin(
             PLUGIN_HANDLE,
-            version="1.0.20",
+            version="1.0.1",
             config={
                 "api_key": api_key,
                 "model": model_name,
@@ -61,7 +61,7 @@ class Llama(LLM):
         options = {}
         if stop:
             stop = stop.split(" ")[0]
-            options["stop"] = ["</s>", "\n\n", "<|", "\n###","\nHuman",f"\n\n{stop}"]
+            options["stop"] = ["</s>", "\n\n", "<|", "\n###","\nHuman",f"\n\n{stop}","\nUser"]
         else:
             options["stop"] = ["\n\n\n", "\n###","\nHuman","<|","</s>"]
 

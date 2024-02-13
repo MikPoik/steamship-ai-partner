@@ -7,6 +7,7 @@ from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship, Task  #upm package(steamship)
 import logging
 import os
+import re
 
 #NSFW_SELFIE_TEMPLATE_PRE =""
 
@@ -36,7 +37,6 @@ class SelfieTool(ImageGeneratorTool):
         #current_model = "dark-sushi-mix-v2-25"
 
         current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25"
-
 
         meta_model = context.metadata.get("instruction", {}).get("model")
         #if meta_model is not None:
@@ -78,8 +78,8 @@ class SelfieTool(ImageGeneratorTool):
             "model": current_model,
             "width": image_width,
             "height": image_height,
-            "steps": 25,
-            "guidance": 7.5,
+            "steps": 30,
+            "guidance": 7,
             "negative_prompt": current_negative_prompt
         }
 
@@ -99,9 +99,9 @@ class SelfieTool(ImageGeneratorTool):
 
         prompt = tool_input[0].text  #.replace(current_name + ",", "")
         prompt = prompt.replace(current_name, "")
-        prompt = prompt.replace("close-up", "")
-        prompt = prompt.replace("closeup", "")
-        prompt = prompt.replace("close up", "")
+        prompt = re.sub(re.escape("closeup"), "", prompt, flags=re.IGNORECASE)
+        prompt = re.sub(re.escape("close up"), "", prompt, flags=re.IGNORECASE)
+        prompt = re.sub(re.escape("close-up"), "", prompt, flags=re.IGNORECASE)
         #print(prompt)
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
@@ -116,7 +116,6 @@ class SelfieTool(ImageGeneratorTool):
                                                 {}).get("selfie_post")
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
-
 
         prompt = f"{prompt},{pre_prompt}"
         #logging.warning("Getimg prompt: " + prompt)

@@ -15,7 +15,7 @@ with Steamship.temporary_workspace() as steamship:
                                      "api_key": os.environ['TOGETHER_KEY'],
                                      #"api_key": os.environ['LEMONFOX_KEY'],
                                      #"model": "zephyr-chat",
-                                     "model": "teknium/OpenHermes-2-Mistral-7B",
+                                     "model": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
                                      "max_tokens": 3500,
                                      "temperature": 1,
                                      "top_p": 0.9

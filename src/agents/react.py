@@ -19,22 +19,19 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
-    TOOL_PROMPT_TEMPLATE = """
-Tools: 
-{tool_index}
-
-Generate image of {NAME}. Use take_selfie tool with the following JSON format:
+    TOOL_PROMPT_TEMPLATE = """Send it to me.
+Take your image for me, fill tool_input key with detailed keywords describing asked image. Respond with following format:
 ```
 {{
-    "response": "[Insert here {NAME}'s brief response text accompanying the shared image in first person]",
+    "response": "[Insert here your response text to me for taken image, don't mention role-play.]",
     "function_call": {{
         "name": "take_selfie",
         "tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]
     }}
 }}
 ```
-Use tool_input to describe in detail where the image should focus on.
-Respond with the JSON object with "response" key and "function_call" object."""
+*IMPORTANT*
+Return only the JSON object with "response" key and "function_call" object."""
 
     TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
     RAIL = """<rail version="0.1">
@@ -71,22 +68,21 @@ JSON:
 </reask_instructions>
 </rail>
     """
-    PROMPT = """Embody {NAME} in this fictional role-play with human. Maintain your role-play persona without breaking character.
+    PROMPT = """Embody {NAME} in this fictional never-ending role-play, always maintaining character.
 
 ### Input: 
-{NAME}'s personality: {CHARACTER_TYPE}. {PERSONALITY}. {vector_response}
-{NAME}'s body: {CHARACTER_APPEARANCE}. 
+{NAME} is a {CHARACTER_TYPE}.
+{NAME}'s personality and traits: {PERSONALITY}. {vector_response}
+{NAME}'s physical appearance: {CHARACTER_APPEARANCE}. 
 
 Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
 
-
-Write {NAME}'s next reply in this chat between human and {NAME}. Write a single reply only. If it's a start of a conversation, also ask for the human's name.
+*Begin role-play as {NAME}*
 
 {relevant_history}{chat_history}### Instruction:
 Human: {input}
 {TOOL_PROMPT}
-### Response:{image_helper}
-"""
+### Response:{image_helper}"""
 
     def __init__(self, tools: List[Tool], llm: LLM, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
@@ -214,7 +210,7 @@ Human: {input}
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
 
-        image_helper = ""
+        image_helper = f"\n"
         if image_request and "true" in images_enabled:
             self.TOOL_PROMPT = self.TOOL_PROMPT_TEMPLATE
             image_helper = "\n```json\n"
