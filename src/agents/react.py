@@ -23,7 +23,7 @@ class ReACTAgent(LLMAgent):
 Take your image for me, fill tool_input key with detailed keywords describing asked image. Respond with following format:
 ```
 {{
-    "response": "[Insert here your response text to me for taken image, don't mention role-play.]",
+    "response": "[Insert here your response text to me for shared image, don't mention role-play.]",
     "function_call": {{
         "name": "take_selfie",
         "tool_input": ["keyword1", "keyword2","keyword3","keyword4","keyword5"]
@@ -76,6 +76,7 @@ JSON:
 {NAME}'s physical appearance: {CHARACTER_APPEARANCE}. 
 
 Role-play environment: The date is {current_date}, time is {current_time}, and today is {current_day}.
+Write your next reply.
 
 *Begin role-play as {NAME}*
 

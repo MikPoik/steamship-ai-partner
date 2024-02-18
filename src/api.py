@@ -32,6 +32,7 @@ from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
 from tools.lemonfox_tts_tool import LemonfoxTTSTool  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
+from tools.selfie_tool_fal_ai import SelfieToolFalAi  #upm package(steamship)
 import os
 from json import loads
 
@@ -69,14 +70,18 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
-                                     description="llm model to use")
+    llm_model: Optional[str] = Field(MIXTRAL, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
-        "", description="Together.ai api key")
+        "",
+        description="Together.ai api key")
 
-    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
+    zephyr_api_key: Optional[str] = Field("",
+                                          description="Lemonfox api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
+    image_model: Optional[str] = Field(
+        "realistic-vision-v3",
+        description="CivitAI URL or getimg.ai model name, for cli testing")
 
 
 def build_context_appending_emit_func(
@@ -219,7 +224,7 @@ class MyAssistant(AgentService):
 
         tools = []
         if "true" in self.config.create_images:
-            tools = [SelfieTool()]
+            tools = [SelfieTool(), SelfieToolFalAi()]
 
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
@@ -548,7 +553,7 @@ class MyAssistant(AgentService):
                 "selfie_post": selfie_post or None,
                 "seed": seed or None,
                 "model": self.config.llm_model or None,
-                "image_model": image_model or None,
+                "image_model": image_model or self.config.image_model,
                 "voice_id": voice_id or None,
                 "create_images": self.config.create_images or None,
                 "is_pro": is_pro or None,
@@ -565,7 +570,6 @@ class MyAssistant(AgentService):
             meta_name = context.metadata.get("instruction", {}).get("name")
             #split the name if it contains spaces
             if meta_name is not None:
-                #meta_name = meta_name.split(" ")[0]
                 context.metadata["instruction"]["name"] = meta_name
 
             #logging.warning("prompt inputs: " +

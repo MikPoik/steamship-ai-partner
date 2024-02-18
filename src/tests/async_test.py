@@ -2,13 +2,13 @@ import requests
 import os
 from steamship import Steamship, Block, File
 import json
-url = "https://mpoikkilehto.steamship.run/space-e8e478e81283a12e0baa1cdbca0f3739/backend-test-bot-7e964b49bc5d0ead5ad85cdd84393713/async_prompt"
+url = "https://mpoikkilehto.steamship.run/space-0087514f9327b1afd85a1dd9f028c024/backend-test-bot-eb54c731b1e3a4497c2a1d5e38936362/async_prompt"
 headers = {
     'Content-Type': 'application/json',
     'Authorization': f'Bearer {os.environ["STEAMSHIP_API_KEY"]}'
 }
 data = {
-    'prompt': 'Whats cooking',
+    'prompt': 'send me a selfie',
 }
 response = requests.post(url, json=data, headers=headers)
 
@@ -25,7 +25,7 @@ if task_data.get("state") == "failed":
 chat_file_id = file_data.get("id")
 request_id = task_data.get("requestId")
 
-def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
+def stream_chat(response, access_token, stream_timeout=300, format="markdown"):
     if "status" in response and response["status"]["state"] == "failed":
         raise Exception(f"Exception from server: {json.dumps(response)}")
 
@@ -34,7 +34,7 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
 
     query_args = {
         "requestId": request_id,
-        "timeoutSeconds": 30,
+        "timeoutSeconds": 300,
     }
 
     query_string = "&".join([f"{key}={value}" for key, value in query_args.items()])
@@ -46,7 +46,7 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
         "Authorization": f"Bearer {access_token}",
         "Accept": "text/event-stream",
     }
-    client = Steamship(api_key=access_token, workspace="space-e8e478e81283a12e0baa1cdbca0f3739")
+    client = Steamship(api_key=access_token, workspace="space-0087514f9327b1afd85a1dd9f028c024")
     with requests.get(sse_url, headers=headers, stream=True) as response:
         for event in response.iter_lines():
             if event is None:
@@ -66,6 +66,7 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
                 print(block.text,flush=True)
                 print(block.mime_type)
                 if block.mime_type == 'image/png':
+                    File.get()
                     print(block)
                     print(f"https://api.steamship.com/api/v1/block/{block.id}/raw")
                     file = File.get(client=client, _id=block.id)

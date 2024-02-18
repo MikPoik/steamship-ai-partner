@@ -6,6 +6,7 @@ from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship  #upm package(steamship)
 from steamship.agents.schema import Action, AgentContext, FinishAction, OutputParser, Tool  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
+from tools.selfie_tool_fal_ai import SelfieToolFalAi #upm package(steamship)
 import re
 import json
 
@@ -107,9 +108,25 @@ class ReACTOutputParser(OutputParser):
 
             create_images = context.metadata.get("instruction",
                                                  {}).get("create_images")
+            get_img_ai_models = ["realistic-vision-v3",
+                                 "dark-sushi-mix-v2-25",
+                                 "absolute-reality-v1-8-1",
+                                 "van-gogh-diffusion",
+                                 "neverending-dream",
+                                 "mo-di-diffusion",
+                                 "synthwave-punk-v2",
+                                 "dream-shaper-v8"]
+            
             image_request = False
             if create_images == "true":
                 if tool_name:
+                    image_model = context.metadata.get("instruction",
+                         {}).get("image_model")
+                    
+                    if image_model is not None:
+                        if image_model not in get_img_ai_models:
+                            tool_name = tool_name + "_fal_ai" #change to fal.ai tool
+                            
                     selfie_tool = ReACTOutputParser.tools_lookup_dict.get(
                         tool_name, None)
                     if selfie_tool:
@@ -135,8 +152,14 @@ class ReACTOutputParser(OutputParser):
                         create_images = context.metadata.get("instruction",
                                                              {}).get("create_images")
                         if create_images == "true":
-                          selfie = SelfieTool()
-                          image_block = selfie.run([Block(text=text)],
-                                                   context)
-                          result_blocks.append(image_block[0])
+                            selfie = SelfieTool()
+                            image_model = context.metadata.get("instruction",
+                                 {}).get("image_model")
+                            if image_model is not None:
+                                if image_model not in get_img_ai_models:
+                                    selfie = SelfieToolFalAi()
+                          
+                                    image_block = selfie.run([Block(text=text)],
+                                                               context)
+                                    result_blocks.append(image_block[0])
         return result_blocks
