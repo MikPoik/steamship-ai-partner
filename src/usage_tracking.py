@@ -12,6 +12,9 @@ class UsageEntry(BaseModel):
     message_limit: int = 0
     usd_balance: float = 0
     indexed:int = 0
+    level:int = 1
+    mood:str = "neutral"
+
     
 
 
@@ -21,10 +24,12 @@ class UsageTracker:
     elevenlabs_price_per_thousand_chars = 1        #Calculate price based on generated voice, default price 0.30c/1000 chars
     chars_per_minute = 1010
 
-    def __init__(self, client: Steamship, n_free_messages: Optional[int] = 0,usd_balance: Optional[float] = 0):
+    def __init__(self, client: Steamship, n_free_messages: Optional[int] = 0,usd_balance: Optional[float] = 0,level: Optional[int] = 1,mood: Optional[str] = "neutral"):
         self.kv_store = KeyValueStore(client, store_identifier="usage_tracking")
         self.n_free_messages = n_free_messages
         self.usd_balance = usd_balance
+        self.level = level
+        self.mood = mood
 
     def increase_token_count(self, blocks: [Block], chat_id: str,use_voice:bool ):
         usage_entry = self.get_usage(chat_id)
@@ -73,10 +78,31 @@ class UsageTracker:
         return round(usage_entry.usd_balance,2)
 
     def get_usage(self, chat_id) -> UsageEntry:
-        if not self.exists(chat_id):
-            self.add_user(chat_id)
-        return UsageEntry.parse_obj(self.kv_store.get(chat_id))
-    
+        usage_data = self.kv_store.get(chat_id)
+        if usage_data is None:
+            # Initialize with default or specified values if no data is found.
+            self.add_user(chat_id)  # Ensure there's an entry for the new user.
+            usage_data = self.kv_store.get(chat_id)  # Attempt to get the newly added entry.
+        return UsageEntry.parse_obj(usage_data)
+
+    def set_level(self, chat_id, level):
+        usage_entry = self.get_usage(chat_id)
+        usage_entry.level = level
+        self._set_usage(chat_id, usage_entry)
+
+    def get_level(self, chat_id):
+        usage_data = self.get_usage(chat_id)
+        return usage_data.level
+
+    def set_mood(self, chat_id, mood):
+        usage_entry = self.get_usage(chat_id)
+        usage_entry.mood = mood
+        self._set_usage(chat_id, usage_entry)
+
+    def get_mood(self, chat_id):
+        usage_entry = self.get_usage(chat_id)
+        return usage_entry.mood
+        
     def set_index_status(self,chat_id):
         usage_entry = self.get_usage(chat_id)   
         usage_entry.indexed = 1
@@ -85,8 +111,13 @@ class UsageTracker:
     def get_index_status(self,chat_id):      
          usage_entry = self.get_usage(chat_id)
          return usage_entry.indexed
+        
     def _set_usage(self, chat_id, usage: UsageEntry) -> None:
-        self.kv_store.set(chat_id, usage.dict())
+        try:
+            self.kv_store.set(chat_id, usage.dict())
+        except Exception:  # Broad exception handling; consider specifying exceptions based on your KV store's error responses
+            self.add_user(chat_id)
+            self.kv_store.set(chat_id, usage.dict())
 
     def usage_exceeded(self, chat_id: str):
         usage_entry = self.kv_store.get(chat_id)

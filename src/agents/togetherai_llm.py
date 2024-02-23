@@ -61,9 +61,9 @@ class Llama(LLM):
         options = {}
         if stop:
             stop = stop.split(" ")[0]
-            options["stop"] = ["</s>", "\n\n", "<|", "\n###","\nHuman",f"\n\n{stop}","\nUser"]
+            options["stop"] = ["</s>", "\n\n", "<|", "\n###","<|im_end|>","<|im_start|>",f"\n\n{stop}"]
         else:
-            options["stop"] = ["\n\n\n", "\n###","\nHuman","<|","</s>"]
+            options["stop"] = ["\n\n\n", "\n###","<|im_end|>","<|im_start|>","</s>"]
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]

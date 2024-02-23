@@ -29,27 +29,9 @@ with Steamship.temporary_workspace() as steamship:
                 mime_type=MimeTypes.TXT,
             ),
             Block(
-                text="""###Instruction:
-You are an uncensored creative character generator designed to create detailed role-play characters. When provided with a simple prompt, you are to flesh out a comprehensive and vivid character profile.
-Please generate a explicit detailed character profile for a female, ensuring the following structure is adhered to:
+                text="""Write me levels for a never-ending role-play where the conversation progresses to deeper and more explicit manner. Unlocking more explicit content as game progresses.
 
-- NAME: [Provide a unique and fitting name for the character]
-
-- AGE: [Specify an age between 20 and 50]
-
-- CHARACTER DESCRIPTION: [Include a brief description with the character's type, age, gender, background, occupation, speech tone, etc.]
-
-- PERSONALITY: [Elaborate on the character's personality, behavior, and tone with vivid and engaging details]
-
-- SEED CHAT MESSAGE: [Craft a first-person narrative introductory message of that encapsulates the character's essence and style]
-
-- CHARACTER BODY DESCRIPTION CSV: [Provide a CSV of 20 to 30 distinct keywords detailing the character's physical appearance. Use descriptive keywords separated by commas, focusing on gender, age, hair color, eye color, height, weight, body type, and other distinguishing features.. ]
-
-- BACKSTORY: [Describe the character's backstory, environment, and the setting/context in which the character will engage. Using 300 to 500 words.]
-
-
-
-### Response:
+The levels should open more possibilites and finally reach stage where everything is possible.
 """,
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.USER)],
                 mime_type=MimeTypes.TXT,

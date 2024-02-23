@@ -100,11 +100,8 @@ class SelfieTool(ImageGeneratorTool):
             else:
                 current_type = ""
 
-        prompt = tool_input[0].text  #.replace(current_name + ",", "")
-        prompt = prompt.replace(current_name, "")
-        prompt = re.sub(re.escape("closeup"), "", prompt, flags=re.IGNORECASE)
-        prompt = re.sub(re.escape("close up"), "", prompt, flags=re.IGNORECASE)
-        prompt = re.sub(re.escape("close-up"), "", prompt, flags=re.IGNORECASE)
+        prompt = tool_input[0].text  
+
         #print(prompt)
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
@@ -120,8 +117,8 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
 
-        prompt = f"{prompt},{pre_prompt}"
-        #logging.warning("Getimg prompt: " + prompt)
+        prompt = f"({prompt}),[{pre_prompt}]"
+        logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,
