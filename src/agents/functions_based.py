@@ -237,8 +237,8 @@ Write {NAME}'s next reply."""
         # Build the Chat History that we'll provide as input to the action
         messages = self.build_chat_history_for_tool(context)
 
-        for msg in messages:              
-            print("role: "+msg.chat_role +" text: "+msg.text+"\n")
+        #for msg in messages:              
+        #    print("role: "+msg.chat_role +" text: "+msg.text+"\n")
         
         # Run the default LLM on those messages
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)
