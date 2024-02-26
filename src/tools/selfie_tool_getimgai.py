@@ -38,8 +38,13 @@ class SelfieTool(ImageGeneratorTool):
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
-
-        current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25"
+        negative_post = ""
+        meta_current_level = context.metadata.get("instruction", {}).get("level")
+        if meta_current_level is not None:
+            if int(meta_current_level) < 3:
+                negative_post = "((nude,naked,lingerie,nsfw,porn,sexual))"
+        current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25,"+negative_post
+        print(current_negative_prompt)
 
         meta_model = context.metadata.get("instruction", {}).get("model")
         #if meta_model is not None:
@@ -100,7 +105,7 @@ class SelfieTool(ImageGeneratorTool):
             else:
                 current_type = ""
 
-        prompt = tool_input[0].text  
+        prompt = tool_input[0].text
 
         #print(prompt)
 
@@ -117,7 +122,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
 
-        prompt = f"({prompt}),[{pre_prompt}]"
+        prompt = f"[{pre_prompt}],({prompt}),"
         logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,

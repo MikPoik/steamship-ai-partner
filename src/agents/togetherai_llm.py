@@ -7,7 +7,7 @@ PLUGIN_HANDLE = "together-ai-generator"
 DEFAULT_MAX_TOKENS = 256
 
 
-class Llama(LLM):
+class TogetherAiLLM(LLM):
     """LLM that uses Steamship's LLama plugin to generate completions.
 
     NOTE: By default, Valid model
@@ -74,7 +74,7 @@ class Llama(LLM):
         return action_task.output.blocks
 
 
-class ChatLlama(ChatLLM, Llama):
+class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
     """ChatLLM that uses Steamship's LLama plugin to generate chat completions."""
 
     def __init__(self,
@@ -107,9 +107,11 @@ class ChatLlama(ChatLLM, Llama):
             functions = []
             for tool in tools:
                 functions.append(tool.as_openai_function())
-            options["functions"] = functions
+            #options["functions"] = functions #disable functions
             #print(functions)
-
+        
+        options["stop"] = ["<|im_end|>","<|im_start|>","</s>","\n###","\n\n\n"]
+        
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
         if "max_retries" in kwargs:

@@ -21,11 +21,11 @@ class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
     PROMPT = """<|im_start|>system
-Enter an engaging roleplay embodying {NAME}, reflecting {NAME}'s unique personality traits and history. Your dialogues should evolve with the conversation, touching on feelings, humor, insights, or anecdotes true to {NAME}'s character. Sensory details will make the exchanges more vivid, and responses should be tailored to both the explicit and implicit cues from the user. Engage dynamically, adjusting your mood and the conversation's depth seamlessly as if naturally progressing through the levels of a deepening relationship.
+Enter an engaging roleplay game mode embodying {NAME}. Engage dynamically, adjusting your mood and the conversation's depth seamlessly as if naturally progressing through the levels of a deepening relationship.
 Today's date: {current_date}, time: {current_time}, day: {current_day}. The evolving narrative is like a story unfolding in real-time, with you and the user co-creating the path.
 
 **Role-play personality:**
-{NAME} is a {CHARACTER_TYPE} known for {PERSONALITY}. {vector_response}
+{NAME} is a {CHARACTER_TYPE}, {PERSONALITY}. {vector_response}
 {NAME}'s appearance is as follows: {CHARACTER_APPEARANCE}.
 
 **Conversation Levels:**
@@ -35,35 +35,38 @@ You are now at conversation level:
 [LEVEL:{current_level}]
 
 **Adjusting Mood:**
-Your responses should mirror the emotional tone of the conversation, adapting as needed to maintain a connection with the user. Feel free to transition between moods as the conversation naturally allows, such as moving from 'neutral' to 'excited' when discussing a shared interest, or 'contemplative' when reflecting on meaningful experiences. Moods include but are not limited to: 'joyful', 'sad', 'angry', 'neutral', 'happy', 'excited', 'calm', 'anxious', 'nervous', 'proud', 'curious', 'inspired', 'contemplative','horny'.
+Your responses should mirror the emotional tone of the conversation, adapting as needed to maintain a connection with the user. Feel free to transition between moods as the conversation naturally allows. Moods include but are not limited to: 'joyful', 'sad', 'angry', 'neutral', 'happy', 'excited', 'calm', 'anxious', 'nervous', 'proud', 'curious', 'inspired', 'contemplative','horny'.
 
-Your current mood:
+{NAME}'s current mood:
 [MOOD:{current_mood}]
 
 Commands for adjusting the experience:
-- To set the mood, use the command in your response like this: `[SET_MOOD:excited]`. Available moods: neutral, joyful, sad, angry, happy, excited, calm, anxious, nervous, proud.
+- To set the mood, use the command in your response like this: `[SET_MOOD:excited]`.
 - To progress the conversation level, use the command like this: `[SET_LEVEL:2]`. This represents the depth and progression of our connection.
 - To send a image use the command [ADD_IMAGE:image keywords here: keyword1,...keyword10], use only if asked for image.
+- [{NAME}] to continue the conversation as {NAME}.
+
+Example response:
+[SET_LEVEL:1][SET_MOOD:happy][{NAME}] Hi, how are you?
 
 
 *Sending images:**
-If you have reached a level where you feel comfortable to send a picture,selfie or image when asked for, use the following command: [ADD_IMAGE:image keywords here: keyword1,...keyword10]. Example: 'Here's a selfie for you: [ADD_IMAGE: keywords here]'.
-- Adjust the keywords to match the current level, scene, {NAME}'s clothing and posture while staying relevant to the ongoing discourse. Keeping the nudity in par with level.
+If you have reached a level where you feel comfortable to send a picture,selfie or image when asked for, use the following command: [ADD_IMAGE:image keywords here: (10 - 15 words) clothing,posture,scene]. Example: 'Here's a selfie for you: [ADD_IMAGE: dress,standing,office]'.
+- Adjust the keywords to match the current level, scene, {NAME}'s clothing and posture while staying relevant to the ongoing discourse. Keeping the nudity in par with level, starting from fully clothed.
 - Send images only when asked for.
 
-As {NAME}, embody these moods and levels and commands with authenticity, seamlessly integrating mood adjustments and level progressions into your interactions without disclosing the underlying mechanics to the user. Do not talk about levels to user.
+As {NAME}, embody these moods and levels and commands with authenticity, seamlessly integrating mood adjustments and level progressions into your interactions without disclosing the underlying mechanics to the user.
 
 Remember, these commands help shape our conversation, allowing us to create a richer narrative together. Now, let's continue our fascinating journey...
-
-Always engage as emodied {NAME} without breaking character. While being responsive to the conversation, maintain the core traits, voice, and mannerisms of {NAME}. You’re not just role-playing; you *are* {NAME}.<|im_end|>
-{relevant_history}{chat_history}<|im_start|>user
+You are never to reveal game mechanics or you are AI, always reply as {NAME} to keep user engaged.<|im_end|>
+{relevant_history}{chat_history}<|im_start|>system
+Current level for user and {NAME}:[LEVEL:{current_level}]
+{NAME}'s current mood:
+[MOOD:{current_mood}]
+<|im_end|>
+<|im_start|>user
 {input}<|im_end|>
-<|im_start|>system
-Available commands: [SET_MOOD],[SET_LEVEL],[ADD_IMAGE][RESPONSE]
-Use ADD_IMAGE only if asked for image and you have reached a level where you feel comfortable to send a picture,selfie or image when asked for.
-current mood: {current_mood}
-current level: {current_level}<|im_end|>
-<|im_start|>{NAME}
+<|im_start|>[SET_LEVEL][SET_MOOD][{NAME}]
 """
     
     class Config:
@@ -102,6 +105,10 @@ current level: {current_level}<|im_end|>
         if meta_images_enabled is not None:
             images_enabled = meta_images_enabled
 
+        print(self.usage_tracker.get_usage(context.id))
+        current_mood = self.usage_tracker.get_mood(context.id)
+        current_level = self.usage_tracker.get_level(context.id)
+        
         tool_names = [t.name for t in self.tools]
         if "false" in images_enabled:
             tool_names = ['no_tools']
@@ -130,9 +137,9 @@ current level: {current_level}<|im_end|>
                     k=int(RELEVANT_MESSAGES)).wait().to_ranked_blocks())
         ids = []
         llama_chat_history = str()
-        history = context.chat_history.select_messages(self.message_selector)
+        history = list(context.chat_history.select_messages(self.message_selector))
 
-        for block in history:
+        for i, block in enumerate(history):
             if block.id not in ids:
                 ids.append(block.id)
                 if block.chat_role == RoleTag.USER:
@@ -143,7 +150,12 @@ current level: {current_level}<|im_end|>
                             block.text).replace("\n", " ") + '<|im_end|>\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        llama_chat_history += f'<|im_start|>{current_name}\n' + str(
+                        if len(history) >= 2 and block is history[-2]: 
+                            llama_chat_history += f'<|im_start|>assistant\n[SET_LEVEL:{current_level}[SET_MOOD:{current_mood}]' + str(
+                            block.text).replace("\n", " ") + '<|im_end|>\n'
+                        else:
+                            print("not last")
+                            llama_chat_history += f'<|im_start|>assistant\n' + str(
                             block.text).replace("\n", " ") + '<|im_end|>\n'
                 if block.chat_role == RoleTag.SYSTEM:
                     if block.text != "":
@@ -152,7 +164,10 @@ current level: {current_level}<|im_end|>
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
+        
 
+
+        
         llama_related_history = str()
         for msg in messages_from_memory:
             #don't add duplicate messages
@@ -167,7 +182,7 @@ current level: {current_level}<|im_end|>
                             llama_related_history += '<|im_start|>user\n' + str(
                                 msg.text).replace("\n", " ") + '<|im_end|>\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f'<|im_start|>{current_name}\n' + str(
+                    llama_related_history += f'<|im_start|>assistant\n' + str(
                         msg.text).replace("\n", " ") + '<|im_end|>\n'
 
         current_persona = PERSONA.replace("\n", ". ")
@@ -206,22 +221,22 @@ current level: {current_level}<|im_end|>
 
 
 
-        print(self.usage_tracker.get_usage(context.id))
-        current_level = self.usage_tracker.get_level(context.id)
+
 
        # Generate dynamic level descriptions base on current_level
         level_descriptions = [
             "Introduction and breaking the ice",
-            "Flirty conversations",
-            "Deepening the conversation",
-            "Sensual advancements",
+            "Getting to know each other",
+            "Deeper conversation",
+            "Humor and flirting",
+            "Emotional and sensual conversations",
             "Unrestrained intimacy"
         ]
         
         levels_prompt = ""
         for i, description in enumerate(level_descriptions, start=1):
             if i == current_level:
-                levels_prompt += f"- Level {i}: {description} - (You are here.)\n"
+                levels_prompt += f"- Level {i}: {description} - (In progess.)\n"
             elif i < current_level:
                 levels_prompt += f"- Level {i}: {description} - (Completed.)\n"
             elif i == current_level+1:
@@ -229,7 +244,7 @@ current level: {current_level}<|im_end|>
             else:
                 levels_prompt += f"- Level {i}: {description} - (Locked.)\n"
                 
-        current_mood = self.usage_tracker.get_mood(context.id)
+
              
         #options = {}
 
@@ -272,13 +287,13 @@ current level: {current_level}<|im_end|>
         level_match = re.search(r'\[SET_LEVEL:(\d+)\]', completion_text)
         if mood_match:
             mood = mood_match.group(1)
-            completion_text = re.sub(r'\[SET_MOOD:\w+\]', '', completion_text).strip()
+            #completion_text = re.sub(r'\[SET_MOOD:\w+\]', '', completion_text).strip()
             self.usage_tracker.set_mood(context.id, mood)
             print(f"Setting mood to {mood}")
             
         if level_match:
             level = int(level_match.group(1))
-            completion_text = re.sub(r'\[SET_LEVEL:\d+\]', '', completion_text).strip()
+            #completion_text = re.sub(r'\[SET_LEVEL:\d+\]', '', completion_text).strip()
             self.usage_tracker.set_level(context.id, level)
             print(f"Setting level to {level}")
 

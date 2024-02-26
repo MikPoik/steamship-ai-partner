@@ -61,9 +61,9 @@ class Zephyr(LLM):
         options = {}
         if stop:
             stop = stop.split(" ")[0]
-            options["stop"] = ["\n\n\n", "\n###", "<|im_end|>"]
+            options["stop"] = ["\n\n", "\n###", "<|im_end|>","\n\nUser"]
         else:
-            options["stop"] = ["\n\n\n", "\n###", "<|im_end|>"]
+            options["stop"] = ["\n\n", "\n###", "<|im_end|>", "\n\nUser"]
         #print(options)
 
         if "max_tokens" in kwargs:
@@ -108,7 +108,8 @@ class ChatZephyr(ChatLLM, Zephyr):
             functions = []
             for tool in tools:
                 functions.append(tool.as_openai_function())
-            options["functions"] = functions
+            #options["functions"] = functions
+        options["stop"] = [ "\n###", "<|im_end|>","\n\n\n","User"]
             #print(functions)
 
         if "max_tokens" in kwargs:

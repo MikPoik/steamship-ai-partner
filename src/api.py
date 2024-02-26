@@ -1,4 +1,4 @@
-from agents.gpt_functions_based import FunctionsBasedAgent  #upm package(steamship)
+from agents.functions_based import FunctionsBasedAgent  #upm package(steamship)
 from steamship.agents.logging import AgentLogging  #upm package(steamship)
 from steamship.agents.service.agent_service import AgentService  #upm package(steamship)
 from steamship.invocable import Config, post  #upm package(steamship)
@@ -26,7 +26,7 @@ from steamship.invocable.mixins.indexer_mixin import IndexerMixin  #upm package(
 from steamship.invocable.mixins.indexer_pipeline_mixin import IndexerPipelineMixin  #upm package(steamship)
 from tools.active_companion import *  #upm package(steamship)
 from utils import send_file_from_local  #upm package(steamship)
-from agents.togetherai_llm import ChatLlama  #upm package(steamship)
+from agents.togetherai_llm import ChatTogetherAiLLM  #upm package(steamship)
 from agents.react import ReACTAgent  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
@@ -67,7 +67,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MIXTRAL, description="llm model to use")
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
         description="Together.ai api key")
@@ -147,24 +147,25 @@ class MyAssistant(AgentService):
 
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgent(tools,
-                           llm=OpenAI(self.client,
+                FunctionsBasedAgent(tools,
+                           llm=ChatOpenAI(self.client,
                                       model_name=self.config.llm_model,
-                                      temperature=0.8,
+                                      temperature=0.7,
                                       max_tokens=256,
                                       moderate_output=False),
-                           message_selector=MessageWindowMessageSelector(
+                            client=self.client,
+                            message_selector=MessageWindowMessageSelector(
                                k=MESSAGE_COUNT)))
 
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgent(
+                FunctionsBasedAgent(
                     tools,
-                    llm=ChatLlama(
+                    llm=ChatTogetherAiLLM(
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.8,
+                        temperature=0.7,
                         #top_p=0.7,
                         max_tokens=256,
                         max_retries=4),
@@ -174,16 +175,17 @@ class MyAssistant(AgentService):
 
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
-                ReACTAgent(
+                FunctionsBasedAgent(
                     tools,
                     llm=ChatZephyr(
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.8,
+                        temperature=0.7,
                         #top_p=0.7,
                         max_tokens=256,
                         max_retries=4),
+                    client=self.client,
                     message_selector=MessageWindowMessageSelector(
                         k=MESSAGE_COUNT)))
 
@@ -208,7 +210,7 @@ class MyAssistant(AgentService):
                   context: AgentContext,
                   msg_chat_id: str = "",
                   callback_args: dict = None):
-
+        self.usage.set_kv_store(self.client,storage_identifier=context.id)
         context.completed_steps = []
 
         
@@ -364,15 +366,15 @@ class MyAssistant(AgentService):
                is_pro: Optional[str] = None,
                **kwargs) -> List[Block]:
         """Run an agent with the provided text as the input."""
+        #print("context_id: "+context_id)
         with self.build_default_context(context_id, **kwargs) as context:
-            prompt = prompt or kwargs.get("question")
-            #context = self.build_default_context(context_id, **kwargs)
+            prompt = prompt or kwargs.get("question")            
 
             if seed is None:
                 seed = SEED
 
             context.metadata["instruction"] = {
-                "name": name or None,
+                "name": name or NAME,
                 "personality": personality or None,
                 "type": description or None,
                 "behaviour": behaviour or None,
@@ -384,14 +386,15 @@ class MyAssistant(AgentService):
                 "voice_id": voice_id or None,
                 "create_images": self.config.create_images or None,
                 "is_pro": is_pro or None,
+                "context_id": context_id
             }
 
             last_agent_msg = context.chat_history.last_agent_message
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
-                    context.chat_history.append_assistant_message(meta_seed +
-                                                                  "\n\n")
+                    context.chat_history.append_assistant_message(f""+meta_seed)
+            #print("context_id: "+context.id)                                                     
 
             context.chat_history.append_user_message(prompt)
             meta_name = context.metadata.get("instruction", {}).get("name")
@@ -502,12 +505,13 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="partner-ai-dev2-ws")
-    #context_id = uuid.uuid4()
-    #context_id="89f3946d-4bf3-4177-9abe-3a9024c5428c"
+    client = Steamship(workspace="partner-ai-dev3-ws")
+    context_id = uuid.uuid4()
+    #context_id="mipotest1"
     #print("chat id " + str(context_id))
     AgentREPL(MyAssistant,
               method="prompt",
               agent_package_config={
                   'botToken': 'not-a-real-token-for-local-testing'
-              }).run_with_client(client=client)
+              },
+              context_id=context_id).run_with_client(client=client)
