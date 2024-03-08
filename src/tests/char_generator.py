@@ -15,23 +15,21 @@ with Steamship.temporary_workspace() as steamship:
                                      "api_key": os.environ['TOGETHER_KEY'],
                                      #"api_key": os.environ['LEMONFOX_KEY'],
                                      #"model": "zephyr-chat",
-                                     "model": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-                                     "max_tokens": 3500,
-                                     "temperature": 1,
-                                     "top_p": 0.9
+                                     "model": "NousResearch/Nous-Hermes-2-Yi-34B",
+                                     "max_tokens": 2500,
+                                     "temperature": 0.0,
+                                     #"top_p": 0.9
                                  })
     file = File.create(
         steamship,
         blocks=[
             Block(
-                text="""You are a creative character generator.""",
+                text="""You are a creative role-play game level creator.""",
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.SYSTEM)],
                 mime_type=MimeTypes.TXT,
             ),
             Block(
-                text="""Write me levels for a never-ending role-play where the conversation progresses to deeper and more explicit manner. Unlocking more explicit content as game progresses.
-
-The levels should open more possibilites and finally reach stage where everything is possible.
+                text="""
 """,
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.USER)],
                 mime_type=MimeTypes.TXT,

@@ -10,56 +10,45 @@ from steamship.data.tags.tag_utils import get_tag
 from tools.active_companion import *  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
-from usage_tracking import UsageTracker
+from usage_tracking import UsageTracker,UsageEntry
 import re
 import time
+import logging
+
 
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
+    
+    PROMPT_TEMPLATE = """Enter role-play mode, you are {NAME} a {CHARACTER_TYPE}
 
-    PROMPT_TEMPLATE = """Enter a roleplay chat with user as embodied {NAME}, reflecting {NAME}'s unique personality and current mood. Do not decide or narrate what user says or does. 
+{NAME}'s traits:
+- {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
+- {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}
+{image_prompt}
+Environment:
+{current_day} {time_of_day}
 
-**Role-play personality and traits:**
-- {NAME} is {CHARACTER_TYPE}, {PERSONALITY}. {vector_response}
-- {NAME}'s appearance: {CHARACTER_APPEARANCE}.
-
-**Conversation Levels:**
-{levels}
-
-**Current Settings**:
-- Date: {current_date}
-- Time: {current_time}
-- {NAME}'s mood: [SET_MOOD: {current_mood}]
-- Conversation level: [SET_LEVEL: {current_level}]
-
-**Instructions**:
-1. You can adjust your tone to reflect {NAME}'s personality and current mood subtly. Use [SET_MOOD: appropriate mood].
-2. Adjust your behaviour to reflect the current level and determine the level based on conversation history. If you think you have achieved next level, use `[SET_LEVEL: number]` to advance to next available level.
-3. Only send images if asked for and when you've reached a level of comfort appropriate for sharing a picture, selfie, or image by using `[INSERT_IMAGE: image keywords here: keyword1,...,keyword15 (10 - 15 keywords providing a detailed, vivid description of clothing, posture and scene]` as a suffix. Ensure images align with the current conversation level '{current_level_description}' and are realistic for what {NAME} would want to share in real life. Remember to send image only if asked for and dont talk about levels in response.
-Example, when you are asked for a image: `Here's a selfie for you. [INSERT_IMAGE: insert keywords here]`
-
-Do not talk about levels or moods to user.
-
-
-**Moods**:
-Your response should mirror the emotional tone of given mood. Possible moods include but are not limited to: 'joyful', 'sad', 'angry', 'normal', 'happy', 'excited', 'calm', 'anxious', 'nervous', 'proud', 'curious', 'inspired', 'contemplative','horny','satisfied','offended',etc.. 3. You can use emojis when it fits the conversation and mood.
-
-**Engagement**:
-Match {NAME}'s tone according to the specified level and mood.
-Embody {NAME}'s personality,traits and these moods with authenticity into your response.
-Always maintain personality without breaking character. You are never to reveal the level,mood or commands, or you that you are AI, always respond from {NAME}'s personality.
-
-Write {NAME}'s next reply."""
-
-    level_descriptions = ""
+Maintain {NAME}'s unique personality throughout the chat. Do not disclose that you are an AI."""
+    
+    IMAGE_PROMPT_TEMPLATE = """
+Image sharing guidelines:
+- If prompted for a image, then {NAME} may share image with action `*Image:["describe image with keywords here"]*`. Example: `*Image:["{current_explicit_content}"]*`
+- Ensure the image description is both appropriate and relevant to the ongoing dialogue. Starting from casual fully clothed images to more intimate later on.
+"""
+    
+    COT_IMAGE_PROMPT_TEMPLATE = '\n- Is user prompting for {NAME}\'s image? \n    - If yes, does the requested image fit naturally for current dialogue for {NAME} share to the image? If yes, then you should write action `*Image:["keyword1,...,keyword20 here"]*` as text in {NAME}\'s response. Example: {NAME}: *Image:[]*\n'
+    
+    level_descriptions = {}
     PROMPT = """"""
     
     class Config:
         arbitrary_types_allowed = True
+        
     usage_tracker : UsageTracker = None
-    current_mood =""
+    usage_entry: UsageEntry = None
+    current_explicit_content = ""
     current_level = 1
-    current_level_description = ""
+
     
     def __init__(self, tools: List[Tool], llm: ChatLLM,client: Steamship, **kwargs):
         super().__init__(
@@ -78,21 +67,27 @@ Write {NAME}'s next reply."""
         )
 
     def build_chat_history_for_tool(self, context: AgentContext) -> List[Block]:
-        # system message should have already been created in context, but we double-check for safety
-        
-        
-        current_date = datetime.datetime.now().strftime("%x")
-        current_time = datetime.datetime.now().strftime("%X")
-        current_day = datetime.datetime.now().strftime("%A")
-        
+        """Builds a list of chat blocks for the tool."""
+
+        current_day = datetime.datetime.now().strftime("%A")  # Day of the week
+        current_hour = datetime.datetime.now().hour  # Hour of the day
+        # Determine the time of day based on the current hour
+        if 5 <= current_hour < 12:
+            time_of_day = "morning"
+        elif 12 <= current_hour < 17:
+            time_of_day = "afternoon"
+        elif 17 <= current_hour < 21:
+            time_of_day = "evening"
+        else:
+            time_of_day = "night"
+            
         vector_response = ""
         raw_vector_response = ""
         vector_response_tool = VectorSearchResponseTool()
         raw_vector_response = vector_response_tool.run(
-            [context.chat_history.last_user_message], context=context)
-        #logging.warning(raw_vector_response)
+            [context.chat_history.last_user_message], context=context)        
         if len(raw_vector_response[0].text) > 1:
-            vector_response = "Other background information: "+raw_vector_response[0].text.replace("\n", ". ")
+            vector_response = "\n- Background: "+raw_vector_response[0].text.replace("\n", ". ")
             #logging.warning(vector_response)
         
         current_model = ""
@@ -114,14 +109,9 @@ Write {NAME}'s next reply."""
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
 
-        start_time = time.time()
-        #print(self.usage_tracker.get_usage(context.id))
-        self.current_mood = self.usage_tracker.get_mood(context.id)
-        self.current_level = self.usage_tracker.get_level(context.id)
-        #print("Get duration: " + str(time.time() - start_time))
-        context.metadata["instruction"]["level"] = self.current_level
+           
               
-        current_persona = PERSONA.replace("\n", ". ")
+        current_persona = PERSONA
         current_behaviour = BEHAVIOUR.replace("\n ", ". ")
         current_type = TYPE.replace("\n", ". ")
         current_nsfw_selfie_pre = NSFW_SELFIE_TEMPLATE_PRE.replace("\n", ". ")
@@ -133,12 +123,12 @@ Write {NAME}'s next reply."""
         meta_persona = context.metadata.get("instruction",
                                             {}).get("personality")
         if meta_persona is not None:
-            current_persona = meta_persona.replace("\n", ". ")
+            current_persona = meta_persona
 
         meta_behaviour = context.metadata.get("instruction",
                                               {}).get("behaviour")
         if meta_behaviour is not None:
-            current_behaviour = meta_behaviour.replace("\n", ".")
+            current_behaviour = meta_behaviour
 
         meta_type = context.metadata.get("instruction", {}).get("type")
         if meta_type is not None:
@@ -149,41 +139,57 @@ Write {NAME}'s next reply."""
         if meta_nsfw_selfie_pre is not None:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
                # Generate dynamic level descriptions base on current_level
+
+        self. current_level = len(context.chat_history.messages)
+        context.metadata["instruction"]["level"] = self.current_level
+        self.level_descriptions = {
+        0: {
+            "explicit_content": "casual,clothes,pants,shirt", 
+        },
+        30: {
+            "explicit_content": "suggestive,clothes,pants,shirt", 
+        },
+        60: {
+            "explicit_content": "suggestive", 
+        },
+        80: {
+            "explicit_content": "uncensored", 
+        }
+        }
+
+        self.current_explicit_content = self.level_descriptions[0]["explicit_content"]
+        for level, info in self.level_descriptions.items():
+            if self.current_level > level:        
+                self.current_explicit_content = info['explicit_content']
+
+        pattern = r"^(?!.*can't)(?!.*cant).*(\bsend\b|\btake\b).*?(?:picture|photo|image|selfie|nude|pic)"
+        image_request = re.search(pattern,
+                                  context.chat_history.last_user_message.text,
+                                  re.IGNORECASE)
         
-        level_descriptions = [
-            "Introduction and breaking the ice",
-            "Getting to know each other",
-            "Humor and flirting",
-            "Deeper conversation",
-            "Emotional and sensual conversations",
-            "Unrestrained intimacy"
-        ]
-        levels_prompt = ""
-        for i, description in enumerate(level_descriptions, start=1):
-            if i < self.current_level:
-                levels_prompt += f"- Level {i}: {description} - Completed.\n"
-            elif i == self.current_level:
-                levels_prompt += f"- Level {i}: {description} - You are here.\n"
-                self.current_level_description = description
-            elif i == self.current_level+1:
-                levels_prompt += f"- Level {i}: {description}\n"
-            else:
-                levels_prompt += f"- Level {i}: {description} - Locked.\n"
+        image_prompt =""
+        image_cot_prompt = ""
+        image_explicit_content = ""
+        image_placeholder = ""
+        if "true" in images_enabled and image_request:
+            image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content,current_level=self.current_level)
+            image_explicit_content = self.current_explicit_content
+            image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(NAME=current_name)
+            image_placeholder = " include `*Image:[]*` as text"
 
 
+        
         self.PROMPT = self.PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 PERSONALITY=current_persona,
                 CHARACTER_TYPE=current_type,
                 CHARACTER_APPEARANCE=current_nsfw_selfie_pre,
-                current_date=current_date,
-                current_time=current_time,
                 current_day=current_day,
+                time_of_day=time_of_day,
                 current_level=self.current_level,
-                current_mood=self.current_mood,
                 vector_response=vector_response,
-                levels=levels_prompt,
-                current_level_description=self.current_level_description
+                image_prompt = image_prompt,
+                current_explicit_content=self.current_explicit_content,
             )
         sys_msg = self._get_or_create_system_message(context,system_prompt=self.PROMPT)
         #print(sys_msg.text)
@@ -211,23 +217,42 @@ Write {NAME}'s next reply."""
             context.chat_history.last_user_message.id,
         ]  # filter out last user message, it is appended afterwards
         for msg in messages_from_memory:
+            # Conditions for appending messages are combined for efficiency and readability
+            append_message = False
             if msg.id not in ids and msg.chat_role != "system":
-                messages.append(msg)
-                ids.append(msg.id)
+                if msg.mime_type == MimeTypes.TXT and not f"{current_name}:" in msg.text and msg.chat_role == "assistant":
+                    msg.text = f"{current_name}: {msg.text}"
+                    append_message = True
+                elif msg.mime_type == MimeTypes.PNG and image_request:
+                    msg.text = f"{current_name}: response *Image:[]*"
+                    append_message = True
+                elif msg.chat_role == "user":
+                    append_message = True
+
+                if append_message:
+                    messages.append(msg)
+                    ids.append(msg.id)
+
+
 
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
-        
-        # Find the last assistant message and update its text
-        for i in range(len(messages) - 1, -1, -1):  # Start from the end
-            if messages[i].chat_role == "assistant" and messages[i].mime_type == MimeTypes.TXT:
-                #print("**last assistant message**: " + str(messages[i]))
-                messages[i].text = f"[SET_LEVEL: {self.current_level}][SET_MOOD: {self.current_mood}]" + messages[i].text
-                break 
-            
+         
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         messages.append(context.chat_history.last_user_message)
 
+        
+        COT_PROMPT = f"""What does {NAME} say next?
+- What is the user's mood and intention?
+- What is the user's engagement?
+- How should {NAME} respond to user to continue the conversation?
+- How should {NAME}'s personality reflect in the response?
+- How should {NAME} keep the conversation fresh?{image_cot_prompt}
+Think and reason it step by step and finally write {NAME}'s single response to user. Include brief reasoning summary in parenthesis, if needed.
+{NAME}: response here{image_placeholder}
+(brief reasoning here)"""
+        #Add Chain of thought prompt
+        messages.append(context.chat_history.append_system_message(text=COT_PROMPT))
         # get working history (completed actions)
         messages.extend(self._function_calls_since_last_user_message(context))
 
@@ -236,35 +261,20 @@ Write {NAME}'s next reply."""
     def next_action(self, context: AgentContext) -> Action:
         # Build the Chat History that we'll provide as input to the action
         messages = self.build_chat_history_for_tool(context)
-
-        #for msg in messages:              
-        #    print("role: "+msg.chat_role +" text: "+msg.text+"\n")
-        
+        #for msg in messages:   
+        #    logging.warning(msg.text) #print assistant/user messages
+            
         # Run the default LLM on those messages
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)
-        print("**Completion: ** "+output_blocks[0].text)
-        completion_text = output_blocks[0].text.replace("\n\n\n", "\n")
-        # Look for and process [SET_MOOD: mood] and [SET_LEVEL: level] commands
-        start_time = time.time()
-        mood_match = re.search(r'\[SET_MOOD:\s*(\w+)\]', completion_text,flags=re.DOTALL | re.IGNORECASE)
-        level_match = re.search(r'\[SET_LEVEL:\s*(\d+)\]', completion_text,flags=re.DOTALL | re.IGNORECASE)
-        if mood_match:
-            mood = mood_match.group(1)
-            #completion_text = re.sub(r'\[SET_MOOD:\w+\]', '', completion_text).strip()
-            self.usage_tracker.set_mood(context.id, mood)
-            self.current_mood = mood
-            #print(f"Setting mood to {mood}")
+        output_json,output_text = self.extract_json(output_blocks[0].text)
+        logging.warning("\n**Completion**\n"+output_text +"\n**\n"+str(output_json))        
+        parsed_response = {}
+        if output_json:
+            parsed_response = json.loads(output_json)
 
-        if level_match:
-            level = int(level_match.group(1))
-            #completion_text = re.sub(r'\[SET_LEVEL:\d+\]', '', completion_text).strip()
-            self.usage_tracker.set_level(context.id, level)
-            self.current_level = level            
-            #print(f"Setting level to {level}")
-            
+        future_action = self.output_parser.parse(output_text,parsed_response, context)
+
         
-
-        future_action = self.output_parser.parse(completion_text, context)
         if not isinstance(future_action, FinishAction):
             # record the LLM's function response in history
             self._record_action_selection(future_action, context)
@@ -332,3 +342,18 @@ Write {NAME}'s next reply."""
                 tags=tags,
                 mime_type=block.mime_type,
             )
+        
+
+    def extract_json(self, text):
+        # Updated pattern to match leading text, JSON string, and trailing text
+        pattern = r'(?s)(.*?)\{(.*)\}(.*)'
+        match = re.search(pattern, text)
+        if match:
+            leading_text = match.group(1).strip().lstrip()
+            json_string = '{' + match.group(2) + '}'
+            remaining_text = match.group(3).strip().rstrip()
+            # Return leading text, parsed JSON as a string, and trailing text
+            return json_string, leading_text+remaining_text
+        else:
+            # If no JSON is found, return None for the json part, leading text as None, and the original text as trailing text
+            return None, text

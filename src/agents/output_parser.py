@@ -10,6 +10,7 @@ from tools.selfie_tool_fal_ai import SelfieToolFalAi #upm package(steamship)
 import re
 import json
 from typing import List, Optional, Union
+
 class ReACTOutputParser(OutputParser):
     'Parse LLM output expecting structure matching ReACTAgent default prompt'
     tools_lookup_dict: Optional[Dict[str, Tool]] = None
@@ -33,34 +34,48 @@ class ReACTOutputParser(OutputParser):
             )
             func(output, context.metadata)
 
-    def parse(self, response: str, 
+    def parse(self, response: str,response_json:Dict, 
               context: AgentContext) -> Action:
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
         if meta_name is not None:
             current_name = meta_name
-        text = ""
+        text = response
         run_tool = None
         run_tool_input = None
-        if response is not None:
-            text = response
-            text = text.strip()
-            #add regex to strip all [*] from text
 
+
+        if response_json.get("image",None):
+            run_tool_input = response_json.get(
+                "image", "")
+            logging.warning(
+                f"run_tool_input: {run_tool_input}")
+
+        # Updated regex to match requested format and check for optional []
+        image_action = re.findall(r'\*Image:\s*\[\s*(.*?)\s*\]\*', text, flags=re.DOTALL | re.IGNORECASE)  
+        if image_action:
+            function_call = True
+            run_tool = "selfie_tool"
+            run_tool_input = image_action[0].split(",")  # Parses the inner words into run_tool_input
+            text = re.sub(r'\*Image:\s*\[\s*.*?\s*\]\*', '', text)
             
-            image_match = re.search(r'\[INSERT_IMAGE: (.*?)\]', text,re.IGNORECASE)
-            if image_match:
-                run_tool_input = image_match.group(1)
-                run_tool = "take_selfie"
-                # Remove the matched [IMAGE:] pattern from the text
-                #text = re.sub(r'\[ADD_IMAGE:.*?\]', '', text).strip()
-
+        text = re.sub(r'\(.*?\)|$', '', text,flags=re.DOTALL | re.IGNORECASE).strip().replace("  "," ")
+        text = text.replace(f"{current_name}:","").strip()
+        text = text.rstrip()      
+        text = text.replace("Image:","").strip()
+        text = text.replace("\n","").strip()
+        text = text.split("Note:")[0].strip()
+        text = text.replace('""',"")
+        text = text.replace(" .",".")
+        text = re.sub(r'\`', '', text,flags=re.DOTALL | re.IGNORECASE)
+        if text.count('"') == 2:
+            text = text.lstrip('"').rstrip('"')
         return FinishAction(output=ReACTOutputParser._blocks_from_text(self,
             context.client, text, run_tool, run_tool_input, context),
                             context=context)
     @staticmethod
     def _blocks_from_text(self,client: Steamship, text: str, tool_name: str,
-                          tool_input: str,
+                          tool_input: List[str],
                           context: AgentContext) -> List[Block]:
         current_name = NAME
         meta_name = context.metadata.get("instruction", {}).get("name")
@@ -68,15 +83,8 @@ class ReACTOutputParser(OutputParser):
             current_name = meta_name
         result_blocks: List[Block] = []
         block_found = 0
-        # Checking and appending text block if text is present.
         if text:
-            #result_blocks.append(Block(text=text))
-            #clean_text = re.sub(r'\[[^]]*\]', '', text)
-            clean_text = re.sub(r'\[(SET_|INSERT_)[^\]]*\]', '', text,flags=re.DOTALL | re.IGNORECASE)
-            clean_text = clean_text.replace(f"{current_name}:", "")
-            clean_text = clean_text.lstrip("\n").strip()
-            clean_text = clean_text.replace(f"[{current_name}]", " ").strip()
-            self.emit(clean_text, context)
+            self.emit(text, context)
 
         saved_block = context.metadata.get("blocks", {}).get("image")
         if saved_block is not None:
@@ -94,18 +102,16 @@ class ReACTOutputParser(OutputParser):
                                  "dream-shaper-v8"]
 
             if create_images == "true":  
-                #self.emit(text, context)
                 if tool_name:
                     image_model = context.metadata.get("instruction", {}).get("image_model")
                     if image_model is not None and image_model not in get_img_ai_models:
                         tool_name = tool_name + "_fal_ai" #change to fal.ai tool
 
                     selfie_tool = ReACTOutputParser.tools_lookup_dict.get(tool_name, None)
-                    if selfie_tool and tool_input:
-                        # Call the tool with the input
-                        image_block = selfie_tool.run([Block(text=tool_input)], context)
+                    if selfie_tool and tool_input is not None:
+                        image_block = selfie_tool.run([Block(text=','.join(tool_input))], context)
                         if image_block:
                             result_blocks.extend(image_block)
-                            #context.chat_history.append_assistant_message(text=text+"[INSERT_IMAGE:]")
+                            context.chat_history.append_user_message("I received the image! Don't send new unless I ask for.")
 
         return result_blocks

@@ -93,7 +93,7 @@ class ChatOpenAI(ChatLLM, OpenAI):
             functions = []
             for tool in tools:
                 functions.append(tool.as_openai_function().dict())
-            options["functions"] = functions
+            #options["functions"] = functions #disable functions
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
@@ -118,7 +118,7 @@ class ChatOpenAI(ChatLLM, OpenAI):
 
         # for streaming use cases, we want to always use the existing file
         # the way to detect this would be if all messages were from the same file
-        if self._from_same_existing_file(blocks=messages):
+        if self._from_same_existing_file(blocks=messages): #disabled for now, always new file
             file_id = messages[0].file_id
             block_indices = [b.index_in_file for b in messages]
             block_indices.sort()
@@ -143,6 +143,7 @@ class ChatOpenAI(ChatLLM, OpenAI):
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
+        return False #always return False for now
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id

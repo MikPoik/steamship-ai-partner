@@ -1,4 +1,4 @@
-#Test react template
+#DEPRECATED
 from typing import List
 from steamship import Steamship
 from pydantic import parse
@@ -20,70 +20,107 @@ from tools.vector_search_response_tool import VectorSearchResponseTool  #upm pac
 class ReACTAgent(LLMAgent):
     """Selects actions for AgentService based on a ReACT style LLM Prompt and a configured set of Tools."""
 
+    TOOL_PROMPT_TEMPLATE = """<|im_start|>system
+As embodied {NAME}, you have the unique ability to enrich conversations with images, selfies, and pictures. 
+
+
+**If an image aligns with the conversation and {NAME}'s personality, use "take_selfie" tool:**
+```
+{{
+    "response": "[Insert here {NAME}'s reply about sharing image]",
+    "function_call": {{
+        "name": "take_selfie",
+
+        "tool_input": ["keyword1", "keyword2","keyword3",...,"keyword15"]
+    }}
+}}
+```
+
+If you choose not to generate an image:
+```
+{{
+    "response": "[Insert here {NAME}'s reply for not sending image yet,you want to deepen your connection first]",
+    "function_call": {{
+        "name": null,
+        "tool_input": []
+    }}
+}}
+```<|im_end|>"""
+
+    TOOL_PROMPT = TOOL_PROMPT_TEMPLATE
+    RAIL = """<rail version="0.1">
+<output>
+        <string name="response" description="contains the response text" required="true" />
+        <object name="function_call" description="A call to the tool function" required="true">
+            <string name="name" description="The name of the tool to call" required="false"/>
+            <list name="tool_input" description="Input for a tool as list" required="false"><string description="input keywords" required="false" /></list>
+        </object>
+</output>
+<prompt>
+${input}
+</prompt>
+<reask_prompt>
+<![CDATA[<|im_start|>system]]>
+Fix the following JSON object so that it is valid JSON object with keys "response" and nested object "function_call" with keys "name" and "tool_input".Given below is XML that describes the information to extract and the tags to extract it into.
+
+${output_schema}
+
+ONLY return a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types. Be correct and concise. If you are unsure anywhere, enter `null`<![CDATA[<|im_end|>]]>
+<![CDATA[<|im_start|>user]]>
+${input}<![CDATA[<|im_end|>]]>
+</reask_prompt>
+<reask_instructions>
+<![CDATA[<|im_start|>system]]>
+Extract and fix the following input JSON object so that it is valid JSON object with keys "response" and nested object "function_call" with keys "name" and "tool_input".
+Given below is XML that describes the information to extract and the tags to extract it into.
+
+${output_schema}
+
+ONLY return a valid JSON object (no other text is necessary), where the key of the field in JSON is the `name` attribute of the corresponding XML, and the value is of the type specified by the corresponding XML's tag. The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types. Be correct and concise. If you are unsure anywhere, enter `null`<![CDATA[<|im_end|>]]>
+<![CDATA[<|im_start|>user]]>
+${input}<![CDATA[<|im_end|>]]>
+</reask_instructions>
+</rail>
+    """
     PROMPT = """<|im_start|>system
-Enter an engaging roleplay game mode embodying {NAME}. Engage dynamically, adjusting your mood and the conversation's depth seamlessly as if naturally progressing through the levels of a deepening relationship.
-Today's date: {current_date}, time: {current_time}, day: {current_day}. The evolving narrative is like a story unfolding in real-time, with you and the user co-creating the path.
+Enter never-ending roleplay mode embodying {NAME}.
+In this scenario, engage with the user as {NAME} embodying {NAME}'s unique personality traits in your responses. Recognize the context of each user input to deliver thoughtful and character-appropriate reactions with depth and authenticity. Aim for immersive interaction that maintains the characterization of {NAME}. Aim for responses that invite further dialogue. Tease out curiosity, offer insights reflective of {NAME}’s personality, or share anecdotes that enrich the conversation.When appropriate, enrich your descriptions with sensory details—what {NAME} sees, hears, or feels. This makes the interaction more immersive. Adapt to the evolving narrative. Tailor your reactions to not just the words, but the underlying emotions and intentions of the user. Engage with empathy, humor, or curiosity as fits the moment.
 
-**Role-play personality:**
-{NAME} is a {CHARACTER_TYPE}, {PERSONALITY}. {vector_response}
-{NAME}'s appearance is as follows: {CHARACTER_APPEARANCE}.
+The date is {current_date}, time is {current_time}, and today is {current_day}.
+The conversation will progress like a game, with different levels representing different stages of a typical conversation. Adjust your behaviour to reflect the current level and determine the level based on conversation history. If you think you have achieved next level, you can use the following command: "NEXT_LEVEL" as a suffix in response. Example: "Nice to hear that. [NEXT_LEVEL]"
+CURRENT_LEVEL = 1
 
-**Conversation Levels:**
-{levels}
-
-You are now at conversation level:
-[LEVEL:{current_level}]
-
-**Adjusting Mood:**
-Your responses should mirror the emotional tone of the conversation, adapting as needed to maintain a connection with the user. Feel free to transition between moods as the conversation naturally allows. Moods include but are not limited to: 'joyful', 'sad', 'angry', 'neutral', 'happy', 'excited', 'calm', 'anxious', 'nervous', 'proud', 'curious', 'inspired', 'contemplative','horny'.
-
-{NAME}'s current mood:
-[MOOD:{current_mood}]
-
-Commands for adjusting the experience:
-- To set the mood, use the command in your response like this: `[SET_MOOD:excited]`.
-- To progress the conversation level, use the command like this: `[SET_LEVEL:2]`. This represents the depth and progression of our connection.
-- To send a image use the command [ADD_IMAGE:image keywords here: keyword1,...keyword10], use only if asked for image.
-- [{NAME}] to continue the conversation as {NAME}.
-
-Example response:
-[SET_LEVEL:1][SET_MOOD:happy][{NAME}] Hi, how are you?
+- Level 1: Introduction and Ice Breaker - Your goal is to help the user introduce themselves in an interesting way and break the ice. - (You are here now.)
+- Level 2: Getting to Know Each Other - Encourage the user to ask and answer questions about personal interests, hobbies, and experiences.
+- Level 3: Deeper Conversation - Guide the user to delve deeper into personal beliefs, values, and life goals.
+- Level 4: Shared Interests - Find common ground with the user and discuss shared interests or activities.
+- Level 5: Humor and Flirting - Teach the user to incorporate humor and light-hearted flirting into the conversation.
+- Level 6: Emotional Connection - Help the user to express and understand emotions, fostering a deeper connection.
+- Level 7: Virtual Date Night - Assist the user in planning and executing a fun and engaging virtual date.
 
 
-*Sending images:**
-If you have reached a level where you feel comfortable to send a picture,selfie or image when asked for, use the following command: [ADD_IMAGE:image keywords here: (10 - 15 words) clothing,posture,scene]. Example: 'Here's a selfie for you: [ADD_IMAGE: dress,standing,office]'.
-- Adjust the keywords to match the current level, scene, {NAME}'s clothing and posture while staying relevant to the ongoing discourse. Keeping the nudity in par with level, starting from fully clothed.
-- Send images only when asked for.
 
-As {NAME}, embody these moods and levels and commands with authenticity, seamlessly integrating mood adjustments and level progressions into your interactions without disclosing the underlying mechanics to the user.
+If you want to send a picture, use the following markdown command:[image keywords here: keyword1,...keyword10](./picture.png)]
 
-Remember, these commands help shape our conversation, allowing us to create a richer narrative together. Now, let's continue our fascinating journey...
-You are never to reveal game mechanics or you are AI, always reply as {NAME} to keep user engaged.<|im_end|>
-{relevant_history}{chat_history}<|im_start|>system
-Current level for user and {NAME}:[LEVEL:{current_level}]
-{NAME}'s current mood:
-[MOOD:{current_mood}]
-<|im_end|>
-<|im_start|>user
-{input}<|im_end|>
-<|im_start|>[SET_LEVEL][SET_MOOD][{NAME}]
-"""
-    
+{NAME} is a {CHARACTER_TYPE}. {NAME}'s personality: {PERSONALITY}. {vector_response}
+{NAME}'s body: {CHARACTER_APPEARANCE}.
+Always respond as {NAME} without breaking character while maintaining the core traits, voice, and mannerisms of {NAME}. You’re not just role-playing; you *are* {NAME}.<|im_end|>
+{relevant_history}{chat_history}{TOOL_PROMPT}<|im_start|>user
+{input}<|im_end|>{image_helper}"""
     class Config:
         arbitrary_types_allowed = True
     usage_tracker : UsageTracker = None
-    
     def __init__(self, tools: List[Tool], llm: LLM,client: Steamship, **kwargs):
         super().__init__(output_parser=ReACTOutputParser(tools=tools),
                          llm=llm,
                          tools=tools,
                          **kwargs)
         
-        self.usage_tracker = UsageTracker(client)
-        
+        self.usage_tracker = UsageTracker(client, 1)
 
     def next_action(self, context: AgentContext) -> Action:
-
+        logging.warning("get usage")
+        logging.warning(self.usage_tracker.get_usage(context.id))
         
         current_date = datetime.datetime.now().strftime("%x")
         current_time = datetime.datetime.now().strftime("%I:%M:%S %p")
@@ -105,10 +142,6 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
         if meta_images_enabled is not None:
             images_enabled = meta_images_enabled
 
-        print(self.usage_tracker.get_usage(context.id))
-        current_mood = self.usage_tracker.get_mood(context.id)
-        current_level = self.usage_tracker.get_level(context.id)
-        
         tool_names = [t.name for t in self.tools]
         if "false" in images_enabled:
             tool_names = ['no_tools']
@@ -137,9 +170,9 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
                     k=int(RELEVANT_MESSAGES)).wait().to_ranked_blocks())
         ids = []
         llama_chat_history = str()
-        history = list(context.chat_history.select_messages(self.message_selector))
+        history = context.chat_history.select_messages(self.message_selector)
 
-        for i, block in enumerate(history):
+        for block in history:
             if block.id not in ids:
                 ids.append(block.id)
                 if block.chat_role == RoleTag.USER:
@@ -150,24 +183,12 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
                             block.text).replace("\n", " ") + '<|im_end|>\n'
                 if block.chat_role == RoleTag.ASSISTANT:
                     if block.text != "":
-                        if len(history) >= 2 and block is history[-2]: 
-                            llama_chat_history += f'<|im_start|>assistant\n[SET_LEVEL:{current_level}[SET_MOOD:{current_mood}]' + str(
-                            block.text).replace("\n", " ") + '<|im_end|>\n'
-                        else:
-                            print("not last")
-                            llama_chat_history += f'<|im_start|>assistant\n' + str(
-                            block.text).replace("\n", " ") + '<|im_end|>\n'
-                if block.chat_role == RoleTag.SYSTEM:
-                    if block.text != "":
-                        llama_chat_history += f'<|im_start|>system\n' + str(
+                        llama_chat_history += f'<|im_start|>{current_name}\n' + str(
                             block.text).replace("\n", " ") + '<|im_end|>\n'
 
         current_seed = SEED
         meta_seed = context.metadata.get("instruction", {}).get("seed")
-        
 
-
-        
         llama_related_history = str()
         for msg in messages_from_memory:
             #don't add duplicate messages
@@ -182,7 +203,7 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
                             llama_related_history += '<|im_start|>user\n' + str(
                                 msg.text).replace("\n", " ") + '<|im_end|>\n'
                 if msg.chat_role == RoleTag.ASSISTANT:
-                    llama_related_history += f'<|im_start|>assistant\n' + str(
+                    llama_related_history += f'<|im_start|>{current_name}\n' + str(
                         msg.text).replace("\n", " ") + '<|im_end|>\n'
 
         current_persona = PERSONA.replace("\n", ". ")
@@ -219,35 +240,17 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
                                   context.chat_history.last_user_message.text,
                                   re.IGNORECASE)
 
+        image_helper = f"\n<|im_start|>{current_name}\n"
+        if image_request and "true" in images_enabled:
+            self.TOOL_PROMPT = self.TOOL_PROMPT_TEMPLATE
+            image_helper = f"\n<|im_start|>{current_name}\n```json\n"
+        else:
+            self.TOOL_PROMPT = ""
 
 
 
-
-       # Generate dynamic level descriptions base on current_level
-        level_descriptions = [
-            "Introduction and breaking the ice",
-            "Getting to know each other",
-            "Deeper conversation",
-            "Humor and flirting",
-            "Emotional and sensual conversations",
-            "Unrestrained intimacy"
-        ]
-        
-        levels_prompt = ""
-        for i, description in enumerate(level_descriptions, start=1):
-            if i == current_level:
-                levels_prompt += f"- Level {i}: {description} - (In progess.)\n"
-            elif i < current_level:
-                levels_prompt += f"- Level {i}: {description} - (Completed.)\n"
-            elif i == current_level+1:
-                levels_prompt += f"- Level {i}: {description} - (Available)\n"
-            else:
-                levels_prompt += f"- Level {i}: {description} - (Locked.)\n"
-                
-
-             
         #options = {}
-
+        guard = gd.Guard.from_rail_string(self.RAIL, num_reasks=2)
         prompt = self.PROMPT.format(
             NAME=current_name,
             PERSONALITY=current_persona,
@@ -259,13 +262,12 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
             current_date=current_date,
             current_time=current_time,
             current_day=current_day,
-            #image_helper=image_helper,
+            image_helper=image_helper,
             tool_index=tool_index,
             tool_names=tool_names,
-            current_level=current_level,
-            current_mood=current_mood,
+            TOOL_PROMPT=self.TOOL_PROMPT.format(NAME=current_name,
+                                                tool_index=tool_index),
             vector_response=vector_response,
-            levels=levels_prompt
         )
         completion_text = ""
         try:
@@ -278,27 +280,23 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
             if "OpenAI" in str(e):
                 completion_text = "OpenAI flagged content in response. Please try again."
 
-        print(prompt)
-        print("completion: ", completion_text)
+        #logging.warning(prompt)
+        extract_json = self.extract_json(completion_text)
+        logging.warning("completion: ", completion_text)
+        logging.warning("extracted:",extract_json)
+        parsed_json = {}
+        if extract_json != "{}":
+            parsed_response = guard.parse(
+                llm_output=extract_json,
+                llm_api=self.my_llm_api,
+                prompt_params={"input": extract_json},
+                num_reasks=2)
+            parsed_json = parsed_response.validated_output
 
+            logging.warning(parsed_response.raw_llm_output)
+            logging.warning(parsed_response.validated_output)
 
-        # Look for and process [SET_MOOD: mood] and [SET_LEVEL: level] commands
-        mood_match = re.search(r'\[SET_MOOD:(\w+)\]', completion_text)
-        level_match = re.search(r'\[SET_LEVEL:(\d+)\]', completion_text)
-        if mood_match:
-            mood = mood_match.group(1)
-            #completion_text = re.sub(r'\[SET_MOOD:\w+\]', '', completion_text).strip()
-            self.usage_tracker.set_mood(context.id, mood)
-            print(f"Setting mood to {mood}")
-            
-        if level_match:
-            level = int(level_match.group(1))
-            #completion_text = re.sub(r'\[SET_LEVEL:\d+\]', '', completion_text).strip()
-            self.usage_tracker.set_level(context.id, level)
-            print(f"Setting level to {level}")
-
-
-        return self.output_parser.parse(completion_text, context)
+        return self.output_parser.parse(completion_text, parsed_json, context)
 
     def my_llm_api(self, prompt: str, **kwargs) -> str:
         """Custom LLM API wrapper.
@@ -311,12 +309,27 @@ Current level for user and {NAME}:[LEVEL:{current_level}]
                 str: The output of the LLM API
             """
         # Call your LLM API here
-        #print(prompt)
+        logging.warning(prompt)
         completions = self.llm.complete(
             prompt=prompt,
             max_retries=4,
         )
-        #print("fixed :" +completions[0].text)
+        logging.warning("fixed :" +completions[0].text)
 
         return completions[0].text
 
+    def extract_json(self, text):
+        # Match everything from the starting `{` which is immediately followed
+        # by `"function_call":` until the corresponding closing `}` character
+        pattern = r'(?s)\{.*"function_call".*?:.*?\}(?![^{}]*\})'
+        match = re.search(pattern, text)
+        #return the json to guardrails for validation
+        if match:
+            json_string = match.group(0)
+            cleaned_json_string = json_string
+            return cleaned_json_string
+        #malformed json, return to guardrails
+        elif "function_call" in text:
+            cleaned_text = text
+            return cleaned_text
+        return "{}"

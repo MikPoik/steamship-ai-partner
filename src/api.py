@@ -42,9 +42,11 @@ GPT4 = "gpt-4-0613"
 LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-70b"
 LLAMA2_HERMES13B = "NousResearch/Nous-Hermes-Llama2-13b"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
+MISTRAL25 = "teknium/OpenHermes-2p5-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
 MYTHOMAX = "Gryphe/MythoMax-L2-13b"
 MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
+SFT_MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT"
 YI34B = "NousResearch/Nous-Hermes-2-Yi-34B"
 
 os.environ["GUARDRAILS_PROCESS_COUNT"] = "1"
@@ -67,16 +69,15 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MISTRAL, description="llm model to use")
+    llm_model: Optional[str] = Field(SFT_MIXTRAL,
+                                     description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
-        "",
-        description="Together.ai api key")
+        "", description="Together.ai api key")
 
-    zephyr_api_key: Optional[str] = Field("",
-                                          description="Lemonfox api key")
+    zephyr_api_key: Optional[str] = Field("", description="Lemonfox api key")
     create_images: Optional[str] = Field(
         "true", description="Enable Image generation tool")
-    
+
     image_model: Optional[str] = Field(
         "realistic-vision-v3",
         description="CivitAI URL or getimg.ai model name, for cli testing")
@@ -95,7 +96,7 @@ def build_context_appending_emit_func(
         for block in blocks:
             block.set_public_data(make_blocks_public)
             try:
-                
+
                 context.chat_history.append_assistant_message(
                     text=block.text,
                     tags=block.tags,
@@ -129,8 +130,6 @@ class MyAssistant(AgentService):
         for func in context.emit_funcs:
             func(action.output, context.metadata)
 
-
-
     def check_usage(self, chat_id: str, context: AgentContext) -> bool:
 
         if not self.usage.exists(chat_id):
@@ -147,15 +146,16 @@ class MyAssistant(AgentService):
 
         if "gpt" in self.config.llm_model:
             self.set_default_agent(
-                FunctionsBasedAgent(tools,
-                           llm=ChatOpenAI(self.client,
-                                      model_name=self.config.llm_model,
-                                      temperature=0.7,
-                                      max_tokens=256,
-                                      moderate_output=False),
-                            client=self.client,
-                            message_selector=MessageWindowMessageSelector(
-                               k=MESSAGE_COUNT)))
+                FunctionsBasedAgent(
+                    tools,
+                    llm=ChatOpenAI(self.client,
+                                   model_name=self.config.llm_model,
+                                   temperature=0.8,
+                                   max_tokens=256,
+                                   moderate_output=False),
+                    client=self.client,
+                    message_selector=MessageWindowMessageSelector(
+                        k=MESSAGE_COUNT)))
 
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
             self.set_default_agent(
@@ -165,7 +165,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.7,
+                        temperature=0.8,
                         #top_p=0.7,
                         max_tokens=256,
                         max_retries=4),
@@ -181,7 +181,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.7,
+                        temperature=0.8,
                         #top_p=0.7,
                         max_tokens=256,
                         max_retries=4),
@@ -198,11 +198,7 @@ class MyAssistant(AgentService):
         self.indexer_mixin = IndexerPipelineMixin(self.client, self)
         self.add_mixin(self.indexer_mixin)
 
-
-
-        #disable usage tracker, causes slowness
-        self.usage = UsageTracker(self.client,
-                                  n_free_messages=1)
+        self.usage = UsageTracker(self.client, n_free_messages=1)
 
     #Customized run_agent
     def run_agent(self,
@@ -210,14 +206,13 @@ class MyAssistant(AgentService):
                   context: AgentContext,
                   msg_chat_id: str = "",
                   callback_args: dict = None):
-        self.usage.set_kv_store(self.client,storage_identifier=context.id)
+        self.usage.set_kv_store(self.client, storage_identifier=context.id)
         context.completed_steps = []
 
-        
-            #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
-            #Disabled usage check, slows down the bot
-            #if not self.check_usage(chat_id=chat_id, context=context):
-            #    return
+        #Check used messages, if exceeded, send message and invoice (invoice only in telegram)
+        #Disabled usage check, slows down the bot
+        #if not self.check_usage(chat_id=chat_id, context=context):
+        #    return
 
         action = self.next_action(
             agent=agent,
@@ -271,15 +266,6 @@ class MyAssistant(AgentService):
         logging.info(
             f"Completed agent run. Result: {len(action.output or [])} blocks. {output_text_length} total text length. Emitting on {len(context.emit_funcs)} functions."
         )
-
-        #Increase message count, disabled, slows down the bot
-        #if self.config.n_free_messages > 0:
-        #    self.usage.increase_message_count(str(chat_id))
-        #increase used tokens and reduce balance
-        #if self.config.usd_balance > 0:
-        #    self.usage.increase_token_count(action.output,
-        #                                    chat_id=str(chat_id),
-        #                                    use_voice=self.config.use_voice)
 
         current_voice_config = self.config.use_voice
         meta_voice_id = context.metadata.get("instruction", {}).get("voice_id")
@@ -368,19 +354,19 @@ class MyAssistant(AgentService):
         """Run an agent with the provided text as the input."""
         #print("context_id: "+context_id)
         with self.build_default_context(context_id, **kwargs) as context:
-            prompt = prompt or kwargs.get("question")            
+            prompt = prompt or kwargs.get("question")
 
             if seed is None:
                 seed = SEED
 
             context.metadata["instruction"] = {
                 "name": name or NAME,
-                "personality": personality or None,
-                "type": description or None,
-                "behaviour": behaviour or None,
-                "selfie_pre": selfie_pre or None,
-                "selfie_post": selfie_post or None,
-                "seed": seed or None,
+                "personality": personality or PERSONA,
+                "type": description or TYPE,
+                "behaviour": behaviour or BEHAVIOUR,
+                "selfie_pre": selfie_pre or NSFW_SELFIE_TEMPLATE_PRE,
+                "selfie_post": selfie_post or NSFW_SELFIE_TEMPLATE_POST,
+                "seed": seed or SEED,
                 "model": self.config.llm_model or None,
                 "image_model": image_model or self.config.image_model,
                 "voice_id": voice_id or None,
@@ -390,17 +376,17 @@ class MyAssistant(AgentService):
             }
 
             last_agent_msg = context.chat_history.last_agent_message
+            meta_name = context.metadata.get("instruction", {}).get("name")
+            if meta_name is not None:
+                context.metadata["instruction"]["name"] = meta_name
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
-                    context.chat_history.append_assistant_message(f""+meta_seed)
-            #print("context_id: "+context.id)                                                     
+                    context.chat_history.append_assistant_message(
+                        f'{meta_seed}')
+            #print("context_id: "+context.id)
 
-            context.chat_history.append_user_message(prompt)
-            meta_name = context.metadata.get("instruction", {}).get("name")
-            #split the name if it contains spaces
-            if meta_name is not None:
-                context.metadata["instruction"]["name"] = meta_name
+            context.chat_history.append_user_message(f"{prompt}")
 
             #logging.warning("prompt inputs: " +
             #str(context.metadata["instruction"]))
@@ -505,9 +491,9 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="partner-ai-dev3-ws")
+    client = Steamship(workspace="partner-ai-dev4-ws")
     context_id = uuid.uuid4()
-    #context_id="mipotest1"
+    #context_id="mipotest2"
     #print("chat id " + str(context_id))
     AgentREPL(MyAssistant,
               method="prompt",

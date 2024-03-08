@@ -1,5 +1,5 @@
 from typing import Optional,List
-
+import time
 from pydantic import BaseModel
 from steamship import Steamship,Block #upm package(steamship)
 from tools.kv_store import KeyValueStore #upm package(steamship)
@@ -13,7 +13,10 @@ class UsageEntry(BaseModel):
     usd_balance: float = 0
     indexed:int = 0
     level:int = 1
+    previous_level = 0
     mood:str = "normal"
+    engagement:str = ""
+    previous_level
 
     
 
@@ -23,7 +26,8 @@ class UsageTracker:
     gpt_price_per_thousand_tokens = 1           #Calculate price for GPT, default 0.18c/1000 tokens 
     elevenlabs_price_per_thousand_chars = 1        #Calculate price based on generated voice, default price 0.30c/1000 chars
     chars_per_minute = 1010
-
+    timing = True
+    
     def __init__(self, client: Steamship, n_free_messages: Optional[int] = 0,usd_balance: Optional[float] = 0,level: Optional[int] = 1,mood: Optional[str] = "neutral",context_id:str="default"):
         self.kv_store = KeyValueStore(client, store_identifier=f"usage_tracking_{context_id}")
         self.n_free_messages = n_free_messages
@@ -81,9 +85,15 @@ class UsageTracker:
         return round(usage_entry.usd_balance,2)
 
     def get_usage(self, chat_id) -> UsageEntry:
+        if self.timing:
+            start_time = time.time()
         if not self.exists(chat_id):
             self.add_user(chat_id)
-        return UsageEntry.parse_obj(self.kv_store.get(chat_id))
+        usage_entry = self.kv_store.get(chat_id)
+        end_time = time.time() - start_time
+        if self.timing and end_time > 0.1:
+            logging.warning("Usage tracking get duration " + str(end_time))
+        return UsageEntry.parse_obj(usage_entry)
 
     def set_level(self, chat_id, level):
         usage_entry = self.get_usage(chat_id)
@@ -93,7 +103,25 @@ class UsageTracker:
     def get_level(self, chat_id):
         usage_data = self.get_usage(chat_id)
         return usage_data.level
+        
+    def set_previous_level(self, chat_id, level):
+        usage_entry = self.get_usage(chat_id)
+        usage_entry.previous_level = level
+        self._set_usage(chat_id, usage_entry)
 
+    def get_previous_level(self, chat_id):
+        usage_data = self.get_usage(chat_id)
+        return usage_data.previous_level
+        
+    def get_engagement(self,chat_id):
+        usage_data = self.get_usage(chat_id)
+        return usage_data.engagement
+
+    def set_engagement(self, chat_id, engagement):
+        usage_data = self.get_usage(chat_id)
+        usage_data.engagement = engagement
+        self._set_usage(chat_id, usage_data)
+        
     def set_mood(self, chat_id, mood):
         usage_entry = self.get_usage(chat_id)
         usage_entry.mood = mood
@@ -111,9 +139,20 @@ class UsageTracker:
     def get_index_status(self,chat_id):      
          usage_entry = self.get_usage(chat_id)
          return usage_entry.indexed
-        
+
+    def get_usage_entry(self, chat_id):
+        return self.get_usage(chat_id)
+
+    def set_usage_entry(self, chat_id, usage_entry):
+        self._set_usage(chat_id, usage_entry)
+    
     def _set_usage(self, chat_id, usage: UsageEntry) -> None:
+        if self.timing:
+            start_time = time.time()
         self.kv_store.set(chat_id, usage.dict())
+        end_time = time.time() - start_time
+        if self.timing and end_time > 0.1:            
+            logging.warning("Usage tracking set duration " + str(end_time))
 
     def usage_exceeded(self, chat_id: str):
         usage_entry = self.kv_store.get(chat_id)

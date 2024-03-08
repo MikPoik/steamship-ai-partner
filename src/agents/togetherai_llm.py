@@ -1,7 +1,9 @@
 from typing import List, Optional
-
-from steamship import Block, File, PluginInstance, Steamship  #upm package(steamship)
+import logging
+from steamship import Block, File, PluginInstance, Steamship, Tag  #upm package(steamship)
 from steamship.agents.schema import LLM, ChatLLM, Tool  #upm package(steamship)
+from steamship.data import TagKind
+from steamship.data.tags.tag_constants import GenerationTag
 
 PLUGIN_HANDLE = "together-ai-generator"
 DEFAULT_MAX_TOKENS = 256
@@ -99,8 +101,10 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
         Supported kwargs include:
         - `max_tokens` (controls the size of LLM responses)
         """
-
-        temp_file = File.create(client=self.client, blocks=messages)
+        if len(messages) <= 0:
+            return []
+            
+        #temp_file = File.create(client=self.client, blocks=messages)
 
         options = {}
         if len(tools) > 0:
@@ -110,14 +114,47 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             #options["functions"] = functions #disable functions
             #print(functions)
         
-        options["stop"] = ["<|im_end|>","<|im_start|>","</s>","\n###","\n\n\n"]
+        options["stop"] = ["<|im_end|>","\n-","</s>","\nUser","\n\n\n"]
         
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
         if "max_retries" in kwargs:
             options["max_retries"] = kwargs["max_retries"]
+            
+        # for streaming use cases, we want to always use the existing file
+        # the way to detect this would be if all messages were from the same file
+        #disabled for now, always new file
+        if self._from_same_existing_file(blocks=messages):
+            file_id = messages[0].file_id
+            block_indices = [b.index_in_file for b in messages]
+            block_indices.sort()
+            
+            generate_task = self.generator.generate(
+                input_file_id=file_id,
+                input_file_block_index_list=block_indices,
+                options=options,
+                # append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
+            )
+            generate_task.wait()  # wait
+            return generate_task.output.blocks
 
-        tool_selection_task = self.generator.generate(
-            input_file_id=temp_file.id, options=options)
-        tool_selection_task.wait()
-        return tool_selection_task.output.blocks
+        # if not in same file, then we must create a temporary file and clean up after ourselves.
+        try:
+            tags = [Tag(kind=TagKind.GENERATION, name=GenerationTag.PROMPT_COMPLETION)]
+            temp_file = File.create(client=self.client, blocks=messages, tags=tags)
+            generate_task = self.generator.generate(input_file_id=temp_file.id, options=options)
+            generate_task.wait()  # must wait until task is done before we can delete the file
+            return generate_task.output.blocks
+        finally:
+            temp_file.delete()
+
+    def _from_same_existing_file(self, blocks: List[Block]) -> bool:
+        return False #always use new file for now
+        if len(blocks) == 1:
+            return blocks[0].file_id is not None
+        file_id = blocks[0].file_id
+        for b in blocks[1:]:
+            if b.file_id != file_id:
+                return False
+        return True
+

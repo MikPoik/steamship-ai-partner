@@ -17,7 +17,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
     agent_description = "This tool generates a image, picture or selfie. The input should be a JSON object with list of uncensored keywords that describes the desired image. The output is an image that correlates with the input keywords. "
 
     generator_plugin_handle: str = "fal-ai-image-generator"
-    generator_plugin_config: dict = {"api_key":""} #FAL_KEY pair in format "key:secret"
+    generator_plugin_config: dict = {"api_key":"0b283e5b-09b3-4d7a-8822-e745f78a1337:8dc56c6e1391527bd92fc6861449d7b9"} #FAL_KEY pair in format "key:secret"
 
     def run(self,
             tool_input: List[Block],
@@ -28,7 +28,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
         #model to use
         current_model = "https://civitai.com/api/download/models/312314"
 
-        current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25,watermark"
+        current_negative_prompt = ""
 
         meta_model = context.metadata.get("instruction", {}).get("model")
 
@@ -39,8 +39,8 @@ class SelfieToolFalAi(ImageGeneratorTool):
             current_model = meta_image_model
 
         #Image width
-        image_width = 512
-        image_height = 768
+        image_width = 768
+        image_height = 1024
         #check if Pro
         meta_is_pro = context.metadata.get("instruction", {}).get("is_pro")
         if meta_is_pro is not None:
@@ -66,7 +66,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
             "steps":
             10,
             "guidance":
-            4,
+            6,
             "scheduler": "DPM++ 2M SDE Karras",
             "image_size":
             "portrait_4_3",
@@ -103,7 +103,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
 
-        prompt = f"{prompt},{pre_prompt}"
+        prompt = f"({prompt}),[{pre_prompt}]"
         #logging.warning("Getimg prompt: " + prompt)
         task = image_generator.generate(
             text=prompt,
