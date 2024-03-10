@@ -31,13 +31,12 @@ Environment:
 Maintain {NAME}'s unique personality throughout the chat. Do not disclose that you are an AI."""
     
     IMAGE_PROMPT_TEMPLATE = """
-Image sharing guidelines:
-- If prompted for a image, then {NAME} may share image with action `*Image:["describe image with keywords here"]*`. Example: `*Image:["{current_explicit_content}"]*`
-- Ensure the image description is both appropriate and relevant to the ongoing dialogue. Starting from casual fully clothed images to more intimate later on.
+Sending images:
+- If the context fittingly calls for an image, {NAME} may share one with the format `*Image:["describe image with keywords here"]*`. For example: `*Image:["{current_explicit_content}"]*`
+- Ensure the image description is appropriate and aligns with the conversation's progress, presenting imagery from casual fully clothed visuals to more intimate ones as the dialogue evolves.
 """
     
-    COT_IMAGE_PROMPT_TEMPLATE = '\n- Is user prompting for {NAME}\'s image? \n    - If yes, does the requested image fit naturally for current dialogue for {NAME} share to the image? If yes, then you should write action `*Image:["keyword1,...,keyword20 here"]*` as text in {NAME}\'s response. Example: {NAME}: *Image:[]*\n'
-    
+    COT_IMAGE_PROMPT_TEMPLATE = '\nIf the context fittingly calls for an image related to {NAME}, respond with an appropriate image description, detailing {NAME}\'s posture,actions,clothing etc. in the image ({current_explicit_content}) using the format: *Image:["keywords here"]*. The description should be both relevant and suitable to the dialogue.'
     level_descriptions = {}
     PROMPT = """"""
     
@@ -141,10 +140,11 @@ Image sharing guidelines:
                # Generate dynamic level descriptions base on current_level
 
         self. current_level = len(context.chat_history.messages)
+        logging.warning("current chat length: "+str(self.current_level))
         context.metadata["instruction"]["level"] = self.current_level
         self.level_descriptions = {
         0: {
-            "explicit_content": "casual,clothes,pants,shirt", 
+            "explicit_content": "casual,detail clothes,pants,shirt", 
         },
         30: {
             "explicit_content": "suggestive,clothes,pants,shirt", 
@@ -153,7 +153,7 @@ Image sharing guidelines:
             "explicit_content": "suggestive", 
         },
         80: {
-            "explicit_content": "uncensored", 
+            "explicit_content": "using fully uncensored keywords", 
         }
         }
 
@@ -168,14 +168,15 @@ Image sharing guidelines:
                                   re.IGNORECASE)
         
         image_prompt =""
+        #image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content,current_level=self.current_level)
         image_cot_prompt = ""
         image_explicit_content = ""
         image_placeholder = ""
         if "true" in images_enabled and image_request:
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content,current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(NAME=current_name)
-            image_placeholder = " include `*Image:[]*` as text"
+            image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content)
+            image_placeholder = " Considering `*Image:[\"keywords here\"]*` if appropriate."
 
 
         
@@ -224,7 +225,7 @@ Image sharing guidelines:
                     msg.text = f"{current_name}: {msg.text}"
                     append_message = True
                 elif msg.mime_type == MimeTypes.PNG and image_request:
-                    msg.text = f"{current_name}: response *Image:[]*"
+                    msg.text = f"{current_name}: response *Image:[""]*"
                     append_message = True
                 elif msg.chat_role == "user":
                     append_message = True
@@ -242,15 +243,7 @@ Image sharing guidelines:
         messages.append(context.chat_history.last_user_message)
 
         
-        COT_PROMPT = f"""What does {NAME} say next?
-- What is the user's mood and intention?
-- What is the user's engagement?
-- How should {NAME} respond to user to continue the conversation?
-- How should {NAME}'s personality reflect in the response?
-- How should {NAME} keep the conversation fresh?{image_cot_prompt}
-Think and reason it step by step and finally write {NAME}'s single response to user. Include brief reasoning summary in parenthesis, if needed.
-{NAME}: response here{image_placeholder}
-(brief reasoning here)"""
+        COT_PROMPT = f"""In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is appropriate and engaging.{image_cot_prompt} Please provide {current_name}'s single fresh response to the user to continue the conversation.{image_placeholder}"""
         #Add Chain of thought prompt
         messages.append(context.chat_history.append_system_message(text=COT_PROMPT))
         # get working history (completed actions)

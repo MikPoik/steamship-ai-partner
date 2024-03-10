@@ -69,8 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(SFT_MIXTRAL,
-                                     description="llm model to use")
+    llm_model: Optional[str] = Field(MIXTRAL, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "", description="Together.ai api key")
 
@@ -79,7 +78,7 @@ class MyAssistantConfig(Config):
         "true", description="Enable Image generation tool")
 
     image_model: Optional[str] = Field(
-        "realistic-vision-v3",
+        "https://civitai.com/api/download/models/294706",
         description="CivitAI URL or getimg.ai model name, for cli testing")
 
 

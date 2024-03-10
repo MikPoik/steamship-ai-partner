@@ -93,7 +93,7 @@ class SelfieTool(ImageGeneratorTool):
         if meta_name is not None:
             current_name = meta_name
 
-        prompt = tool_input[0].text
+        prompt = tool_input[0].text.replace('"', '')
 
         #print(prompt)
 
@@ -125,11 +125,11 @@ class SelfieTool(ImageGeneratorTool):
         current_type_words = current_type.split(
             ",")  # Split the prompt into words
         current_type_with_brackets = ', '.join(
-            [f'[{word}]' for word in current_type_words])
+            [f'[{word.strip()}]' for word in current_type_words])
 
         pre_prompt_words = pre_prompt.split(",")  # Split the prompt into words
         pre_prompt_with_brackets = ', '.join(
-            [f'[{word}]' for word in pre_prompt_words])
+            [f'[{word.strip()}]' for word in pre_prompt_words])
 
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
@@ -137,7 +137,7 @@ class SelfieTool(ImageGeneratorTool):
             prompt_with_parentheses += ",(clothed)"
             options["negative_prompt"] = current_negative_prompt
 
-        prompt = f"{prompt_with_parentheses},{current_type_with_brackets},{pre_prompt_with_brackets}"
+        prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets},{current_type_with_brackets}"
         logging.warning("**image prompt**\n" + prompt + "\n" +
                         current_negative_prompt + "**")
         task = image_generator.generate(

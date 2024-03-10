@@ -12,23 +12,33 @@ import re
 
 class SelfieToolFalAi(ImageGeneratorTool):
 
-    name: str = "take_selfie_fal_ai"
+    name: str = "selfie_tool_fal_ai"
     human_description: str = "Useful to generate a image. The input should be a plain text string , that describes in detail, the desired image."
     agent_description = "This tool generates a image, picture or selfie. The input should be a JSON object with list of uncensored keywords that describes the desired image. The output is an image that correlates with the input keywords. "
 
     generator_plugin_handle: str = "fal-ai-image-generator"
-    generator_plugin_config: dict = {"api_key":"0b283e5b-09b3-4d7a-8822-e745f78a1337:8dc56c6e1391527bd92fc6861449d7b9"} #FAL_KEY pair in format "key:secret"
+    generator_plugin_config: dict = {
+        "api_key": ""
+    }  #FAL_KEY pair in format "key:secret"
 
     def run(self,
             tool_input: List[Block],
             context: AgentContext,
             img_width=0,
             img_height=0) -> Union[List[Block], Task[Any]]:
-        
-        #model to use
-        current_model = "https://civitai.com/api/download/models/312314"
 
+        #model to use
+        current_model = "https://civitai.com/api/download/models/294706"
+        #iNiverseMix
+        #https://civitai.com/api/download/models/294706
+        negative_post = ""
         current_negative_prompt = ""
+
+        meta_current_level = context.metadata.get("instruction",
+                                                  {}).get("level")
+        if meta_current_level is not None:
+            if int(meta_current_level) < 30:
+                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
 
@@ -56,25 +66,17 @@ class SelfieToolFalAi(ImageGeneratorTool):
         image_generator = context.client.use_plugin(
             plugin_handle=self.generator_plugin_handle,
             config=self.generator_plugin_config,
-            version="1.0.4"
-        )
+            version="1.0.4")
         options = {
-            "model_name":
-            current_model,
-            "model_architecture":
-            "sdxl",
-            "steps":
-            10,
-            "guidance":
-            6,
+            "model_name": current_model,
+            "model_architecture": "sdxl",
+            "steps": 10,
+            "guidance": 6,
             "scheduler": "DPM++ 2M SDE Karras",
-            "image_size":
-            "portrait_4_3",
-            "clip_skip":
-            2,
+            "image_size": "portrait_4_3",
+            "clip_skip": 2,
             "loras": [],
-            "negative_prompt":
-            current_negative_prompt
+            "negative_prompt": current_negative_prompt
         }
 
         current_name = "NAME"
@@ -82,16 +84,11 @@ class SelfieToolFalAi(ImageGeneratorTool):
         if meta_name is not None:
             current_name = meta_name
 
-
-        prompt = tool_input[0].text 
-        prompt = prompt.replace(current_name, "")
-        prompt = re.sub(re.escape("closeup"), "", prompt, flags=re.IGNORECASE)
-        prompt = re.sub(re.escape("close up"), "", prompt, flags=re.IGNORECASE)
-        prompt = re.sub(re.escape("close-up"), "", prompt, flags=re.IGNORECASE)
+        prompt = tool_input[0].text.replace('"', "")
         #print(prompt)
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
-        post_prompt =NSFW_SELFIE_TEMPLATE_POST
+        post_prompt = NSFW_SELFIE_TEMPLATE_POST
 
         meta_pre_prompt = context.metadata.get("instruction",
                                                {}).get("selfie_pre")
@@ -102,9 +99,37 @@ class SelfieToolFalAi(ImageGeneratorTool):
                                                 {}).get("selfie_post")
         if meta_post_prompt is not None:
             post_prompt = meta_post_prompt
+        current_type = TYPE
 
-        prompt = f"({prompt}),[{pre_prompt}]"
-        #logging.warning("Getimg prompt: " + prompt)
+        meta_type = context.metadata.get("instruction", {}).get("type")
+        if meta_type is not None:
+            if len(current_type) < 30:
+                current_type = meta_type
+            else:
+                current_type = meta_type.split(".")[0]
+
+        prompt_words = prompt.split(",")  # Split the prompt into words
+        prompt_with_parentheses = ', '.join(
+            [f'(({word}))' for word in prompt_words])
+
+        current_type_words = current_type.split(
+            ",")  # Split the prompt into words
+        current_type_with_brackets = ', '.join(
+            [f'[{word.strip()}]' for word in current_type_words])
+
+        pre_prompt_words = pre_prompt.split(",")  # Split the prompt into words
+        pre_prompt_with_brackets = ', '.join(
+            [f'[{word.strip()}]' for word in pre_prompt_words])
+
+        meta_level = context.metadata.get("instruction", {}).get("level")
+        if meta_level is not None and meta_level < 30:
+            current_negative_prompt += ",(uncensored),(nude),(nsfw)"
+            prompt_with_parentheses += ",(clothed)"
+            options["negative_prompt"] = current_negative_prompt
+
+        prompt = f"{prompt},{pre_prompt},{current_type}"
+        logging.warning("**image prompt**\n" + prompt + "\n" +
+                        current_negative_prompt + "**")
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,
