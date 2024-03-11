@@ -23,7 +23,10 @@ class SelfieTool(ImageGeneratorTool):
     )
 
     generator_plugin_handle: str = "getimg-ai"
-    generator_plugin_config: dict = {"api_key": "key-"}
+    generator_plugin_config: dict = {
+        "api_key":
+        "key-"
+    }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
     def run(self,
@@ -35,12 +38,12 @@ class SelfieTool(ImageGeneratorTool):
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
-        current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25,((double image)), ((split image)), ((two images)),child,text"
+        current_negative_prompt = "disfigured,deformed, poorly drawn, extra limbs, blurry:0.25,((double image)), ((split image)), ((two images)),((two bodies)),text"
         negative_post = ""
         meta_current_level = context.metadata.get("instruction",
                                                   {}).get("level")
         if meta_current_level is not None:
-            if int(meta_current_level) < 3:
+            if int(meta_current_level) < 30: 
                 negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")

@@ -62,7 +62,7 @@ class ReACTOutputParser(OutputParser):
                 ",")  # Parses the inner words into run_tool_input
             text = re.sub(r'\*Image:\s*\[\s*.*?\s*\]\*', '', text)
 
-        #text = re.sub(r'\(.*?\)|$', '', text,flags=re.DOTALL | re.IGNORECASE).strip().replace("  "," ")
+        text = re.sub(r'\(.*?\)|$', '', text,flags=re.DOTALL | re.IGNORECASE).strip().replace("  "," ")
         text = text.replace(f"{current_name}:", "").strip()
         text = text.rstrip()
         text = text.replace("Image:", "").strip()
@@ -70,12 +70,15 @@ class ReACTOutputParser(OutputParser):
         text = text.split("Note:")[0].strip()
         text = text.replace('""', "")
         text = text.replace('<|im_sep|>', "")
+        text = text.replace('<|im_start|>', "")
         text = text.replace(" .", ".")
         text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)
         if len(text) > 900:
             # Modified to split from the last occurrence of "\n"
             if "\n" in text:
                 text = text.rsplit("\n", 1)[0]
+            if len(text) > 900:
+                text = text.rsplit(".",1)[0]
         #if text.count('"') == 2:
         #    text = text.lstrip('"').rstrip('"')
 
@@ -125,8 +128,8 @@ class ReACTOutputParser(OutputParser):
                         if image_block:
                             result_blocks.extend(image_block)
                             context.chat_history.append_user_message(
-                                "I received the image! Don't send new unless I ask for."
+                                "I received the image!"
                             )
-                            context.chat_history.append_user_message("Ok!")
+                            #context.chat_history.append_user_message("Ok!")
 
         return result_blocks

@@ -25,18 +25,15 @@ class FunctionsBasedAgent(ChatAgent):
 - {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
 - {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}
 {image_prompt}
-Environment:
-{current_day} {time_of_day}
-
 Maintain {NAME}'s unique personality throughout the chat. Do not disclose that you are an AI."""
     
     IMAGE_PROMPT_TEMPLATE = """
-Sending images:
-- If the context fittingly calls for an image, {NAME} may share one with the format `*Image:["describe image with keywords here"]*`. For example: `*Image:["{current_explicit_content}"]*`
-- Ensure the image description is appropriate and aligns with the conversation's progress, presenting imagery from casual fully clothed visuals to more intimate ones as the dialogue evolves.
+Sharing images:
+- If user prompted for an image, {NAME} may share one with the format `*Image:["describe image with keywords here"]*`. For example: `Here's something I thought you would like. *Image:["insert keywords {current_explicit_content}"]*`
+- Ensure the image description in brackets is appropriate and aligns with the conversation's progress, presenting imagery from casual fully clothed visuals to more intimate ones as the dialogue evolves.
 """
     
-    COT_IMAGE_PROMPT_TEMPLATE = '\nIf the context fittingly calls for an image related to {NAME}, respond with an appropriate image description, detailing {NAME}\'s posture,actions,clothing etc. in the image ({current_explicit_content}) using the format: *Image:["keywords here"]*. The description should be both relevant and suitable to the dialogue.'
+    COT_IMAGE_PROMPT_TEMPLATE = '\nIf prompted for an image and the moment is right, {NAME} may include an appropriate image detailing {NAME}\'s posture,actions,clothing etc. in the image using the format: *Image:["insert keywords here"]*. The keywords should be both relevant and suitable to the dialogue. If {NAME} is comfortable to share the image, write `*Image:[\"keywords here {current_explicit_content}\"]*`'
     level_descriptions = {}
     PROMPT = """"""
     
@@ -139,21 +136,21 @@ Sending images:
             current_nsfw_selfie_pre = meta_nsfw_selfie_pre.replace("\n", ". ")
                # Generate dynamic level descriptions base on current_level
 
-        self. current_level = len(context.chat_history.messages)
-        logging.warning("current chat length: "+str(self.current_level))
+        self. current_level = len(context.chat_history.messages)*100
+        #logging.warning("current chat length: "+str(self.current_level))
         context.metadata["instruction"]["level"] = self.current_level
         self.level_descriptions = {
         0: {
-            "explicit_content": "casual,detail clothes,pants,shirt", 
+            "explicit_content": "detailing full clothed image", 
         },
         30: {
-            "explicit_content": "suggestive,clothes,pants,shirt", 
+            "explicit_content": "detailing suggestive image", 
         },
         60: {
-            "explicit_content": "suggestive", 
+            "explicit_content": "detailing explicit image", 
         },
         80: {
-            "explicit_content": "using fully uncensored keywords", 
+            "explicit_content": "detailing fully uncensored keywords", 
         }
         }
 
@@ -168,7 +165,8 @@ Sending images:
                                   re.IGNORECASE)
         
         image_prompt =""
-        #image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content,current_level=self.current_level)
+        if "image" in context.chat_history.last_user_message.text or "selfie" in context.chat_history.last_user_message.text:
+            image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content,current_level=self.current_level)
         image_cot_prompt = ""
         image_explicit_content = ""
         image_placeholder = ""
@@ -176,7 +174,7 @@ Sending images:
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content,current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
             image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content)
-            image_placeholder = " Considering `*Image:[\"keywords here\"]*` if appropriate."
+            #image_placeholder = f" If {current_name} is comfortable to share the image, write also `*Image:[\"keywords here\"]*`."
 
 
         
@@ -225,7 +223,7 @@ Sending images:
                     msg.text = f"{current_name}: {msg.text}"
                     append_message = True
                 elif msg.mime_type == MimeTypes.PNG and image_request:
-                    msg.text = f"{current_name}: response *Image:[""]*"
+                    msg.text = f"{current_name}: replied with embedded *Image:[""]*" #remind bot of the format
                     append_message = True
                 elif msg.chat_role == "user":
                     append_message = True
@@ -240,12 +238,16 @@ Sending images:
          
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
-        messages.append(context.chat_history.last_user_message)
+        COT_PROMPT_SYSTEM = f"""In consideration of mood, engagement, and the overall dialogue context, what does {current_name} write next? Remember to maintain {current_name}'s personality and ensure the response is appropriate and engaging.{image_cot_prompt} Please provide {current_name}'s single fresh response only."""
 
-        
-        COT_PROMPT = f"""In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is appropriate and engaging.{image_cot_prompt} Please provide {current_name}'s single fresh response to the user to continue the conversation.{image_placeholder}"""
         #Add Chain of thought prompt
-        messages.append(context.chat_history.append_system_message(text=COT_PROMPT))
+        if current_model in ["NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO","NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT"]:
+            messages.append(context.chat_history.append_system_message(text=COT_PROMPT_SYSTEM))
+            logging.warning("COT PROMPT: \n"+COT_PROMPT_SYSTEM)
+        else:
+            context.chat_history.last_user_message.text = context.chat_history.last_user_message.text + f"\n\nNote for {current_name}:"+COT_PROMPT_SYSTEM
+            logging.warning("COT PROMPT: \n"+COT_PROMPT_SYSTEM)
+        messages.append(context.chat_history.last_user_message)
         # get working history (completed actions)
         messages.extend(self._function_calls_since_last_user_message(context))
 
