@@ -32,17 +32,17 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
     
     IMAGE_PROMPT_TEMPLATE = """Image sharing:
 ---
-{NAME} can share an image but only when explicitly requested by user for and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Format for image inclusion: 
+{NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Format for image inclusion: 
 ``` 
-> {NAME}:
-> ![Keywords: "Keywords describing {NAME} in detail"]({NAME}.jpg)
+> {NAME}: I want to share an image.
+> ![Keywords: Keywords describing {NAME} in detail]({NAME}.jpg)
 ```"""
     
     COT_IMAGE_PROMPT_TEMPLATE = """
-{NAME} can share an image, consider if {NAME} is comfortable to share the requested image. Format for image sharing: 
+{NAME} can share an image, consider if {NAME} is comfortable to share the requested image. Response format for image sharing: 
 ``` 
-> {NAME}:
-> ![Keywords: "Insert keywords describing {NAME}'s{current_explicit_content}image in detail"]({NAME}.jpg)
+> {NAME}: write response here
+> ![Keywords: Insert keywords describing {NAME}'s{current_explicit_content}image in detail]({NAME}.jpg)
 ```
 """
     level_descriptions = {}
@@ -188,7 +188,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
         if "true" in images_enabled and image_request:
             image_explicit_content = self.current_explicit_content
             image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(NAME=current_name,current_explicit_content=self.current_explicit_content)
-            markdown_prompt = f"(Markdown blockquote for {current_name}'s reply and image described in given syntax)"
+            markdown_prompt = f"(Markdown blockquote for {current_name}'s response and image in given syntax)"
 
 
 
@@ -238,7 +238,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
                     append_message = True
                 elif msg.mime_type == MimeTypes.PNG:
                     if image_request:
-                        msg.text = f"### Response:\n> {current_name}:\n> ![Keywords: ({current_name}.jpg)"
+                        msg.text = f"### Response:\n> {current_name}:\n> ![Keywords: ]({current_name}.jpg)"
                         append_message = True
                 elif msg.chat_role == "user":
                     msg.text = "### Instruction:\n> User: " + msg.text
@@ -261,7 +261,7 @@ In consideration of the user's mood, engagement, and the overall dialogue contex
 """
 
         #Add Chain of thought prompt
-        if current_model in ["NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO","NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT","NousResearch/Nous-Hermes-2-Yi-34B","teknium/OpenHermes-2-Mistral-7B","Gryphe/MythoMax-L2-13b","gpt-3.5-turbo-0613"]:
+        if current_model in ["NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO","NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT","NousResearch/Nous-Hermes-2-Yi-34B","teknium/OpenHermes-2-Mistral-7B","gpt-3.5-turbo-0613"]:
             context.chat_history.last_user_message.text = "### Instruction:\n> User: "+context.chat_history.last_user_message.text
             messages.append(context.chat_history.append_system_message(text=COT_PROMPT_SYSTEM))
             #logging.warning("COT PROMPT: \n"+COT_PROMPT_SYSTEM)

@@ -50,7 +50,7 @@ class ReACTOutputParser(OutputParser):
             logging.warning(f"run_tool_input: {run_tool_input}")
 
         # Updated regex to match the new directive pattern
-        image_action = re.findall(r'!\s?\[\s*(.*?)\]',
+        image_action = re.findall(r'!\s?\[\s*(.*?)\]\(.*?\)',
                                   text,
                                   flags=re.DOTALL | re.IGNORECASE)
         if image_action:

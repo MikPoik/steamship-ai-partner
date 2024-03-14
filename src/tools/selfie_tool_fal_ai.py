@@ -19,7 +19,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
     generator_plugin_handle: str = "fal-ai-image-generator"
     generator_plugin_config: dict = {
         "api_key":
-        ""
+        ":"
     }  #FAL_KEY pair in format "key:secret"
 
     def run(self,
