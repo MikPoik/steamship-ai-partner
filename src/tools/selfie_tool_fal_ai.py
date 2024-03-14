@@ -19,7 +19,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
     generator_plugin_handle: str = "fal-ai-image-generator"
     generator_plugin_config: dict = {
         "api_key":
-        ":"
+        ""
     }  #FAL_KEY pair in format "key:secret"
 
     def run(self,
@@ -86,6 +86,8 @@ class SelfieToolFalAi(ImageGeneratorTool):
             current_name = meta_name
 
         prompt = tool_input[0].text.replace('"', "")
+        prompt = prompt.replace("Keywords:", "").strip()
+        
         #print(prompt)
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE
@@ -128,7 +130,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
             prompt_with_parentheses += ",(clothed)"
             options["negative_prompt"] = current_negative_prompt
 
-        prompt = f"{prompt},{pre_prompt},{current_type}"
+        prompt = f"{prompt},{pre_prompt}"
         logging.warning("**image prompt**\n" + prompt + "\n" +
                         current_negative_prompt + "**")
         task = image_generator.generate(

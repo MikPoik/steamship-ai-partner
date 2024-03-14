@@ -1,13 +1,11 @@
 import logging
 import re
 from typing import Dict, List, Optional
-from typing_extensions import runtime
 from tools.active_companion import *  #upm package(steamship)
 from steamship import Block, Steamship  #upm package(steamship)
 from steamship.agents.schema import Action, AgentContext, FinishAction, OutputParser, Tool  #upm package(steamship)
 from tools.selfie_tool_getimgai import SelfieTool  #upm package(steamship)
 from tools.selfie_tool_fal_ai import SelfieToolFalAi  #upm package(steamship)
-import re
 import json
 from typing import List, Optional, Union
 
@@ -51,8 +49,8 @@ class ReACTOutputParser(OutputParser):
             run_tool_input = response_json.get("image", "")
             logging.warning(f"run_tool_input: {run_tool_input}")
 
-        # Updated regex to match requested format and check for optional []
-        image_action = re.findall(r'\*Image:\s*\[\s*(.*?)\s*\]\*',
+        # Updated regex to match the new directive pattern
+        image_action = re.findall(r'!\s?\[\s*(.*?)\]',
                                   text,
                                   flags=re.DOTALL | re.IGNORECASE)
         if image_action:
@@ -60,28 +58,33 @@ class ReACTOutputParser(OutputParser):
             run_tool = "selfie_tool"
             run_tool_input = image_action[0].split(
                 ",")  # Parses the inner words into run_tool_input
-            text = re.sub(r'\*Image:\s*\[\s*.*?\s*\]\*', '', text)
+            text = re.sub(r'!\[.*?\]', '', text).lstrip().rstrip()
 
-        text = re.sub(r'\(.*?\)|$', '', text,flags=re.DOTALL | re.IGNORECASE).strip().replace("  "," ")
+        text = re.sub(r'\(.*?\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
         text = text.replace(f"{current_name}:", "").strip()
-        text = text.rstrip()
-        text = text.replace("Image:", "").strip()
-        #text = text.replace("\n",". ").strip()
-        text = text.split("Note:")[0].strip()
-        text = text.replace('""', "")
+        text = text.replace("### Response:", "").strip()
         text = text.replace('<|im_sep|>', "")
         text = text.replace('<|im_start|>', "")
-        text = text.replace(" .", ".")
+        text = text.replace('</s>', "")
+        text = text.replace(">", "").rstrip().lstrip()
+        text = text.replace("<", "").rstrip().lstrip()
+        # Reduce multiple line breaks to a single line break after the image action text.
+        text = re.sub(r'\n\s*\n', '\n', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)
-        if len(text) > 900:
-            # Modified to split from the last occurrence of "\n"
-            if "\n" in text:
-                text = text.rsplit("\n", 1)[0]
-            if len(text) > 900:
-                text = text.rsplit(".",1)[0]
-        #if text.count('"') == 2:
-        #    text = text.lstrip('"').rstrip('"')
 
+        if len(text) > 600:
+            # Updated to strip the text to the last . ? ! if too long
+            m = re.search(r"([.!?])[^.!?]*$", text)
+            if m:
+                text = text[:m.start()+1]
+        if text.count('"') == 2:
+            text = text.lstrip('"').rstrip('"')
+        if text.count("(") == 1:
+            text = text.rstrip("(")
+        #if text.count("]") == 1:
+        #    text = text.replace("]", "")
+        text = text.split("#")[0]
+        text = text.rstrip().lstrip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             self, context.client, text, run_tool, run_tool_input, context),
                             context=context)
@@ -127,9 +130,7 @@ class ReACTOutputParser(OutputParser):
                             [Block(text=','.join(tool_input))], context)
                         if image_block:
                             result_blocks.extend(image_block)
-                            context.chat_history.append_user_message(
-                                "I received the image!"
-                            )
-                            #context.chat_history.append_user_message("Ok!")
-
+                            #context.chat_history.append_user_message(
+                            #    "I received the image! Don't send another unless I ask for."
+                            #)
         return result_blocks

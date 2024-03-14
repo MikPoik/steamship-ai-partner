@@ -97,6 +97,7 @@ class SelfieTool(ImageGeneratorTool):
             current_name = meta_name
 
         prompt = tool_input[0].text.replace('"', '')
+        prompt = prompt.replace("Keywords:", "").strip()
 
         #print(prompt)
 
@@ -140,7 +141,7 @@ class SelfieTool(ImageGeneratorTool):
             prompt_with_parentheses += ",(clothed)"
             options["negative_prompt"] = current_negative_prompt
 
-        prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets},{current_type_with_brackets}"
+        prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets}"
         logging.warning("**image prompt**\n" + prompt + "\n" +
                         current_negative_prompt + "**")
         task = image_generator.generate(

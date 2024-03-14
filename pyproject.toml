@@ -10,9 +10,7 @@ termcolor = "~=2.3.0"
 pytransloadit = "0.2.1"
 pydantic = "==1.10.9"
 steamship = "2.17.33"
-guardrails-ai = "0.3.1"
 requests = "~=2.28.1"
-transformers = "4.36.2"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md

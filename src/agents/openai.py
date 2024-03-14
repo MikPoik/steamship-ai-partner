@@ -114,7 +114,7 @@ class ChatOpenAI(ChatLLM, OpenAI):
             extra["num_messages"] = len(messages)
             extra["num_tools"] = len(tools)
 
-        logging.info(f"OpenAI ChatComplete ({messages[-1].as_llm_input()})", extra=extra)
+        #logging.info(f"OpenAI ChatComplete ({messages[-1].as_llm_input()})", extra=extra)
 
         # for streaming use cases, we want to always use the existing file
         # the way to detect this would be if all messages were from the same file

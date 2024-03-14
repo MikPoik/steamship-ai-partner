@@ -13,7 +13,6 @@ from usage_tracking import UsageTracker
 import datetime
 import logging
 import re
-import guardrails as gd  #upm package(guardrails-ai)
 from tools.vector_search_response_tool import VectorSearchResponseTool  #upm package(steamship)
 
 
