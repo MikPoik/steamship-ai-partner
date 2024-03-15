@@ -2,7 +2,7 @@ import requests
 import os
 from steamship import Steamship, Block, File
 import json
-url = "https://mpoikkilehto.steamship.run/space-0087514f9327b1afd85a1dd9f028c024/backend-test-bot-eb54c731b1e3a4497c2a1d5e38936362/async_prompt"
+url = "https://mpoikkilehto.steamship.run/space-f44596945d4245b4c7035d8c3bb3b6eb/backend-test-bot-b33119042929c5070def2ceba15d7836/async_prompt"
 headers = {
     'Content-Type': 'application/json',
     'Authorization': f'Bearer {os.environ["STEAMSHIP_API_KEY"]}'
@@ -46,7 +46,7 @@ def stream_chat(response, access_token, stream_timeout=300, format="markdown"):
         "Authorization": f"Bearer {access_token}",
         "Accept": "text/event-stream",
     }
-    client = Steamship(api_key=access_token, workspace="space-0087514f9327b1afd85a1dd9f028c024")
+    client = Steamship(api_key=access_token, workspace="space-f44596945d4245b4c7035d8c3bb3b6eb")
     with requests.get(sse_url, headers=headers, stream=True) as response:
         for event in response.iter_lines():
             if event is None:
@@ -66,10 +66,10 @@ def stream_chat(response, access_token, stream_timeout=300, format="markdown"):
                 print(block.text,flush=True)
                 print(block.mime_type)
                 if block.mime_type == 'image/png':
-                    File.get()
+                    #File.get()
                     print(block)
                     print(f"https://api.steamship.com/api/v1/block/{block.id}/raw")
-                    file = File.get(client=client, _id=block.id)
+                    #file = File.get(client=client, _id=block.id)
                 #print(block)
 
 stream_chat(response_data,os.environ["STEAMSHIP_API_KEY"])

@@ -69,7 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT, description="llm model to use")
+    llm_model: Optional[str] = Field(MIXTRAL, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
         description="Together.ai api key")
@@ -199,7 +199,7 @@ class MyAssistant(AgentService):
         self.indexer_mixin = IndexerPipelineMixin(self.client, self)
         self.add_mixin(self.indexer_mixin)
 
-        self.usage = UsageTracker(self.client, n_free_messages=1)
+        #self.usage = UsageTracker(self.client, n_free_messages=1)
 
     #Customized run_agent
     def run_agent(self,
@@ -207,7 +207,7 @@ class MyAssistant(AgentService):
                   context: AgentContext,
                   msg_chat_id: str = "",
                   callback_args: dict = None):
-        self.usage.set_kv_store(self.client, storage_identifier=context.id)
+        #self.usage.set_kv_store(self.client, storage_identifier=context.id)
         context.completed_steps = []
 
         #Check used messages, if exceeded, send message and invoice (invoice only in telegram)

@@ -71,11 +71,11 @@ class SelfieToolFalAi(ImageGeneratorTool):
         options = {
             "model_name": current_model,
             "model_architecture": "sdxl",
-            "steps": 20,
-            "guidance":4,
-            "scheduler": "DPM++ 2M SDE Karras",
+            "steps": 15,
+            "guidance":6,
+            "scheduler": "DPM++ 2MKarras",
             "image_size": "portrait_4_3",
-            "clip_skip": 0,
+            "clip_skip": 2,
             "loras": [],
             "negative_prompt": current_negative_prompt
         }

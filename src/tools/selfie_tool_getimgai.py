@@ -87,7 +87,7 @@ class SelfieTool(ImageGeneratorTool):
             "width": image_width,
             "height": image_height,
             "steps": 30,
-            "guidance": 5,
+            "guidance": 6,
             "negative_prompt": current_negative_prompt
         }
 
@@ -138,7 +138,7 @@ class SelfieTool(ImageGeneratorTool):
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
             current_negative_prompt += ",(uncensored),(nude),(nsfw)"
-            prompt_with_parentheses += ",(clothed)"
+            prompt_with_parentheses += ",((clothed))"
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets}"
@@ -148,6 +148,7 @@ class SelfieTool(ImageGeneratorTool):
             text=prompt,
             make_output_public=True,
             append_output_to_file=True,
+            output_file_id=context.chat_history.file.id,
             options=options,
         )
         task.wait()
