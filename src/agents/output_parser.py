@@ -47,8 +47,8 @@ class ReACTOutputParser(OutputParser):
 
         if response_json.get("image", None):
             run_tool_input = response_json.get("image", "")
-            logging.warning(f"run_tool_input: {run_tool_input}")
-
+            #logging.warning(f"run_tool_input: {run_tool_input}")
+        
         # Updated regex to match the new directive pattern
         image_action = re.findall(r'!\s?\[\s*(.*?)\s*\]\s?\(',
           text,
@@ -59,9 +59,16 @@ class ReACTOutputParser(OutputParser):
             # Now correctly accessing the first group from the first match
             run_tool_input = [image_action[0]]  
             text = re.sub(r'!\s?\[.*?\]', '', text).lstrip().rstrip()
-            
 
-        text = re.sub(r'\(.*?\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
+        current_model = ""            
+        meta_model = context.metadata.get("instruction", {}).get("model")
+        if meta_model is not None:
+            current_model = meta_model
+        if current_model == "zephyr-chat":
+            text = re.sub(r'\(.*?\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
+        else:
+            text = re.sub(r'\(.*?.jpg\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
+            
         text = text.replace(f"{current_name}:", "").strip()
         text = text.replace("### Response:", "").strip()
         text = text.replace('<|im_sep|>', "")
@@ -82,7 +89,11 @@ class ReACTOutputParser(OutputParser):
         if text.count('"') == 2:
             text = text.lstrip('"').rstrip('"')
         if text.count("(") == 1:
-            text = text.rstrip("(")
+            text = text.replace("(", "",1)
+        if text.count('"') == 1:
+            text = text.replace('"', "",1)
+
+
         text = text.replace("User","")
         text = text.split("#")[0]
         text = text.split("![Keywords:")[0]

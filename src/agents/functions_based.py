@@ -39,7 +39,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
 ```"""
 
     COT_IMAGE_PROMPT_TEMPLATE = """
-{NAME} can share an image, consider if {NAME} is comfortable to share the requested image. Response format for image sharing: 
+You can share an image, consider if you are comfortable to share the requested image. Response format for image sharing: 
 ``` 
 > {NAME}: write response here
 > ![Keywords: Insert keyword list describing {NAME}'s{current_explicit_content}image in detail]({NAME}.jpg)
@@ -196,7 +196,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
             image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content)
-            markdown_prompt = f"(Markdown blockquote for {current_name}'s response with image)"
+            markdown_prompt = f"(Markdown blockquote for {current_name}'s reply with image)"
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -262,7 +262,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
         messages.append(context.chat_history.last_user_message)
 
         COT_PROMPT_SYSTEM = f"""{image_cot_prompt}
-In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is authentic and engaging. Please provide {current_name}'s single response to the user.
+In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is authentic and engaging. Please provide {current_name}'s single response.
 ### Response{markdown_prompt}:
 """
 
@@ -282,7 +282,7 @@ In consideration of the user's mood, engagement, and the overall dialogue contex
         else:
 
             context.chat_history.last_user_message.text = f"""{image_cot_prompt}
-In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is authentic and engaging. Please provide {current_name}'s single response to the user.
+In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is authentic and engaging. Please provide {current_name}'s single response.
 ### Instruction:
 > User: {context.chat_history.last_user_message.text}
 ### Response{markdown_prompt}:

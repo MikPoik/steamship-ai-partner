@@ -19,7 +19,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
     generator_plugin_handle: str = "fal-ai-image-generator"
     generator_plugin_config: dict = {
         "api_key":
-        ":"
+        ""
     }  #FAL_KEY pair in format "key:secret"
 
     def run(self,
@@ -38,7 +38,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
         meta_current_level = context.metadata.get("instruction",
                                                   {}).get("level")
         if meta_current_level is not None:
-            if int(meta_current_level) < 30: 
+            if int(meta_current_level) < 30:
                 negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
@@ -72,8 +72,8 @@ class SelfieToolFalAi(ImageGeneratorTool):
             "model_name": current_model,
             "model_architecture": "sdxl",
             "steps": 15,
-            "guidance":6,
-            "scheduler": "DPM++ 2MKarras",
+            "guidance": 6,
+            "scheduler": "DPM++ 2M Karras",
             "image_size": "portrait_4_3",
             "clip_skip": 2,
             "loras": [],
@@ -87,7 +87,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
 
         prompt = tool_input[0].text.replace('"', "")
         prompt = prompt.replace("Keywords:", "").strip()
-        
+
         #print(prompt)
 
         pre_prompt = NSFW_SELFIE_TEMPLATE_PRE

@@ -43,7 +43,7 @@ class SelfieTool(ImageGeneratorTool):
         meta_current_level = context.metadata.get("instruction",
                                                   {}).get("level")
         if meta_current_level is not None:
-            if int(meta_current_level) < 30: 
+            if int(meta_current_level) < 30:
                 negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
