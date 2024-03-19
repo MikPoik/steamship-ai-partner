@@ -2,7 +2,7 @@ import requests
 import os
 from steamship import Steamship, Block, File
 import json
-url = "https://mpoikkilehto.steamship.run/space-74633ad0f1e087e67780b3193651a44e/backend-test-bot-909e519798329bd4b336101629a3c8c4/async_prompt"
+url = "https://mpoikkilehto.steamship.run/space-1a8ed605380842359d39359d7443b01c/backend-test-bot-f3066bf8a8a773d14f3ba82096d71dfc/async_prompt"
 headers = {
     'Content-Type': 'application/json',
     'Authorization': f'Bearer {os.environ["STEAMSHIP_API_KEY"]}'
@@ -25,7 +25,7 @@ if task_data.get("state") == "failed":
 chat_file_id = file_data.get("id")
 request_id = task_data.get("requestId")
 
-def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
+def stream_chat(response, access_token, stream_timeout=10, format="markdown"):
     if "status" in response and response["status"]["state"] == "failed":
         raise Exception(f"Exception from server: {json.dumps(response)}")
 
@@ -46,11 +46,12 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
         "Authorization": f"Bearer {access_token}",
         "Accept": "text/event-stream",
     }
-    client = Steamship(api_key=access_token, workspace="space-74633ad0f1e087e67780b3193651a44e")
+    client = Steamship(api_key=access_token, workspace="space-1a8ed605380842359d39359d7443b01c")
     with requests.get(sse_url, headers=headers, stream=True) as response:
         for event in response.iter_lines():
             if event is None:
                 # Stream has ended, exit the loop
+                print("end of events")
                 break
             event_data = event.decode("utf-8")
             print((event_data))

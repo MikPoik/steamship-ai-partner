@@ -22,7 +22,7 @@ class SelfieTool(ImageGeneratorTool):
         "This tool generates a image, picture or selfie. The input should be a JSON object with list of uncensored keywords that describes the desired image. The output is an image that correlates with the input keywords. "
     )
 
-    generator_plugin_handle: str = "getimg-ai"
+    generator_plugin_handle: str = "getimg-ai-image-generator"
     generator_plugin_config: dict = {
         "api_key":
         "key-"
@@ -34,7 +34,8 @@ class SelfieTool(ImageGeneratorTool):
             context: AgentContext,
             api_key: str = "",
             img_width=0,
-            img_height=0) -> Union[List[Block], Task[Any]]:
+            img_height=0,
+           stream=True) -> Union[List[Block], Task[Any]]:
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
@@ -47,10 +48,7 @@ class SelfieTool(ImageGeneratorTool):
                 negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
-        #if meta_model is not None:
-        #    if "gpt" in meta_model:
-        #        current_model = "realistic-vision-v3"  #nsfw safe model here?
-        #        current_negative_prompt = current_negative_prompt  #,nude,nsfw?
+
 
         meta_image_model = context.metadata.get("instruction",
                                                 {}).get("image_model")
@@ -81,7 +79,7 @@ class SelfieTool(ImageGeneratorTool):
         image_generator = context.client.use_plugin(
             plugin_handle=self.generator_plugin_handle,
             config=self.generator_plugin_config,
-            version="0.0.7")
+            version="1.0.2")
         options = {
             "model": current_model,
             "width": image_width,
@@ -138,17 +136,18 @@ class SelfieTool(ImageGeneratorTool):
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
             current_negative_prompt += ",(uncensored),(nude),(nsfw)"
-            prompt_with_parentheses += ",((clothed))"
+            prompt_with_parentheses += ",((with clothes))"
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets}"
-        logging.warning("**image prompt**\n" + prompt + "\n" +
-                        current_negative_prompt + "**")
+        #logging.warning("**image prompt**\n" + prompt + "\n" +
+        #                current_negative_prompt + "**")
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,
             append_output_to_file=True,
             output_file_id=context.chat_history.file.id,
+            streaming=stream,
             options=options,
         )
         task.wait()

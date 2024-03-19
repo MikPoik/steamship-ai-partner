@@ -69,7 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT, description="llm model to use")
+    llm_model: Optional[str] = Field(MIXTRAL, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
         description="Together.ai api key")
@@ -368,10 +368,10 @@ class MyAssistant(AgentService):
                 "selfie_pre": selfie_pre or NSFW_SELFIE_TEMPLATE_PRE,
                 "selfie_post": selfie_post or NSFW_SELFIE_TEMPLATE_POST,
                 "seed": seed or SEED,
-                "model": self.config.llm_model or None,
+                "model": model or self.config.llm_model,
                 "image_model": image_model or self.config.image_model,
                 "voice_id": voice_id or None,
-                "create_images": self.config.create_images or None,
+                "create_images": create_images or self.config.create_images,
                 "is_pro": is_pro or None,
                 "context_id": context_id
             }
@@ -444,13 +444,27 @@ class MyAssistant(AgentService):
 
             # Get the agent
             agent: Optional[Agent] = self.get_default_agent()
-            selfie_tool = SelfieTool()
-            selfie_response = selfie_tool.run([Block(text=prompt)],
-                                              context=context,
-                                              img_height=512,
-                                              img_width=512)
-            #logging.warning(str(selfie_response[0]))
-            return selfie_response
+            get_img_ai_models = [
+                "realistic-vision-v3", "dark-sushi-mix-v2-25",
+                "absolute-reality-v1-8-1", "van-gogh-diffusion",
+                "neverending-dream", "mo-di-diffusion", "synthwave-punk-v2",
+                "dream-shaper-v8"
+            ]
+            if image_model is not None and image_model not in get_img_ai_models:
+                selfie_tool = SelfieToolFalAi()
+                selfie_response = selfie_tool.run([Block(text=prompt)],
+                                                  context=context,
+                                                  img_height=512,
+                                                  img_width=512,stream=False)
+                return selfie_response
+            else:
+                selfie_tool = SelfieTool()
+                selfie_response = selfie_tool.run([Block(text=prompt)],
+                                                  context=context,
+                                                  img_height=512,
+                                                  img_width=512,stream=False)
+                
+                return selfie_response
 
     @post("initial_index")
     def initial_index(self, chat_id: str = ""):

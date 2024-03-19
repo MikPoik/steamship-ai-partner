@@ -50,7 +50,7 @@ class ReACTOutputParser(OutputParser):
             #logging.warning(f"run_tool_input: {run_tool_input}")
         
         # Updated regex to match the new directive pattern
-        image_action = re.findall(r'!\s?\[\s*(.*?)\s*\]\s?\(',
+        image_action = re.findall(r'!\s?\[\s*(.*?)\s*\]\s?\(.*?.\)',
           text,
           flags=re.DOTALL | re.IGNORECASE)
         if image_action:
@@ -67,7 +67,7 @@ class ReACTOutputParser(OutputParser):
         if current_model == "zephyr-chat":
             text = re.sub(r'\(.*?\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
         else:
-            text = re.sub(r'\(.*?.jpg\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
+            text = re.sub(r'\(.*?.\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
             
         text = text.replace(f"{current_name}:", "").strip()
         text = text.replace("### Response:", "").strip()
@@ -87,16 +87,18 @@ class ReACTOutputParser(OutputParser):
                 text = text[:m.start()+1]
             
         if text.count('"') == 2:
-            text = text.lstrip('"').rstrip('"')
+            text = text.replace('"',"",2)
         if text.count("(") == 1:
             text = text.replace("(", "",1)
         if text.count('"') == 1:
             text = text.replace('"', "",1)
-
-
+        
+        text = text.replace("[]","",1)
         text = text.replace("User","")
         text = text.split("#")[0]
         text = text.split("![Keywords:")[0]
+        text = text.split("Note:")[0]
+        text = text.split("User:")[0]
         text = text.rstrip().lstrip()
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             self, context.client, text, run_tool, run_tool_input, context),
@@ -113,7 +115,8 @@ class ReACTOutputParser(OutputParser):
         result_blocks: List[Block] = []
         block_found = 0
         if text:
-            self.emit(text, context)
+            #self.emit(text, context)
+            result_blocks.append(Block(text=text))
 
         saved_block = context.metadata.get("blocks", {}).get("image")
         if saved_block is not None:
@@ -140,7 +143,7 @@ class ReACTOutputParser(OutputParser):
                         tool_name, None)
                     if selfie_tool and tool_input is not None:
                         image_block = selfie_tool.run(
-                            [Block(text=','.join(tool_input))], context)
+                            [Block(text=','.join(tool_input))], context,stream=True)
                         if image_block:
                             result_blocks.extend(image_block)
                             context.chat_history.append_user_message(

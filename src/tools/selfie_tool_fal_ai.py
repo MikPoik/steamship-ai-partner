@@ -26,7 +26,8 @@ class SelfieToolFalAi(ImageGeneratorTool):
             tool_input: List[Block],
             context: AgentContext,
             img_width=0,
-            img_height=0) -> Union[List[Block], Task[Any]]:
+            img_height=0,
+           stream=True) -> Union[List[Block], Task[Any]]:
 
         #model to use
         current_model = "https://civitai.com/api/download/models/294706"
@@ -50,8 +51,8 @@ class SelfieToolFalAi(ImageGeneratorTool):
             current_model = meta_image_model
 
         #Image width
-        image_width = 768
-        image_height = 1024
+        image_width = 512
+        image_height = 768
         #check if Pro
         meta_is_pro = context.metadata.get("instruction", {}).get("is_pro")
         if meta_is_pro is not None:
@@ -71,12 +72,18 @@ class SelfieToolFalAi(ImageGeneratorTool):
         options = {
             "model_name": current_model,
             "model_architecture": "sdxl",
-            "steps": 15,
+            "steps": 30,
             "guidance": 6,
             "scheduler": "DPM++ 2M Karras",
-            "image_size": "portrait_4_3",
+            "image_size": {
+                "width":image_width,
+                "height":image_height
+            },
             "clip_skip": 2,
-            "loras": [],
+            "loras": [
+                #{"path":"https://civitai.com/api/download/models/160240?type=Model&format=SafeTensor",
+                #"scale":0.6}
+            ],
             "negative_prompt": current_negative_prompt
         }
 
@@ -126,8 +133,9 @@ class SelfieToolFalAi(ImageGeneratorTool):
 
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
-            current_negative_prompt += ",(uncensored),(nude),(nsfw)"
-            prompt_with_parentheses += ",(clothed)"
+            current_negative_prompt += ""
+            prompt_with_parentheses += ",(with clothes)"
+            prompt += ",(with clothes)"
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt},{pre_prompt}"
@@ -137,7 +145,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
             text=prompt,
             make_output_public=True,
             append_output_to_file=True,
-            streaming=True,
+            streaming=stream,
             output_file_id=context.chat_history.file.id,
             options=options,
         )

@@ -34,8 +34,8 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
 ---
 {NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Format for image inclusion: 
 ``` 
-> {NAME}: I want to share an image.
-> ![Keywords: Keyword list describing {NAME} in detail]({NAME}.jpg)
+> {NAME}: response here etc. I want to share an image.
+> ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
 ```"""
 
     COT_IMAGE_PROMPT_TEMPLATE = """
@@ -154,10 +154,10 @@ You can share an image, consider if you are comfortable to share the requested i
         context.metadata["instruction"]["level"] = self.current_level
         self.level_descriptions = {
             0: {
-                "explicit_content": " casually clothed ",
+                "explicit_content": " with clothes ",
             },
             30: {
-                "explicit_content": " suggestively clothed ",
+                "explicit_content": " with suggestive clothes ",
             },
             60: {
                 "explicit_content": " explicit ",
@@ -190,13 +190,14 @@ You can share an image, consider if you are comfortable to share the requested i
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
+            image_cot_prompt = f"If user is prompting for image, inclusion format for image: ![Keywords: ]({current_name.lower()}.jpg).\nOtherwise continue conversation."
 
         if "true" in images_enabled and image_request:
             image_explicit_content = self.current_explicit_content
             image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content)
-            markdown_prompt = f"(Markdown blockquote for {current_name}'s reply with image)"
+            markdown_prompt = f"(Single markdown blockquote for {current_name}'s reply with image included as markdown)"
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -242,10 +243,10 @@ You can share an image, consider if you are comfortable to share the requested i
                 if msg.mime_type == MimeTypes.TXT and not f"{current_name}:" in msg.text and msg.chat_role == "assistant":
                     msg.text = f"### Response:\n> {current_name}: {msg.text}"
                     append_message = True
-                elif msg.mime_type == MimeTypes.PNG:
-                    if image_request:
-                        msg.text = f"### Response:\n> {current_name}:\n> ![Keywords: ]({current_name}.jpg)"
-                        append_message = True
+                #elif msg.mime_type == MimeTypes.PNG:
+                    #if image_request:
+                    #    msg.text = f"### Response:\n> {current_name}:\n![Keywords: ]({current_name}.jpg)"
+                    #    append_message = True
                 elif msg.chat_role == "user":
                     msg.text = "### Instruction:\n> User: " + msg.text
                     append_message = True
@@ -258,7 +259,7 @@ You can share an image, consider if you are comfortable to share the requested i
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         if image_request:
-            context.chat_history.last_user_message.text += f". Use format: ![Keywords: ]({current_name}.jpg)"
+            context.chat_history.last_user_message.text += f". Use format: ![Keywords: insert keywords here ]({current_name}.jpg)"
         messages.append(context.chat_history.last_user_message)
 
         COT_PROMPT_SYSTEM = f"""{image_cot_prompt}
@@ -303,7 +304,7 @@ In consideration of the user's mood, engagement, and the overall dialogue contex
         # Run the default LLM on those messages
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)
         output_text = output_blocks[0].text
-        logging.warning("\n**Completion**\n" + output_text + "\n**")
+        #logging.warning("\n**Completion**\n" + output_text + "\n**")
         parsed_response = {}
         future_action = self.output_parser.parse(output_text, parsed_response,
                                                  context)
