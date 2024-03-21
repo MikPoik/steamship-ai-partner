@@ -25,7 +25,7 @@ class SelfieTool(ImageGeneratorTool):
     generator_plugin_handle: str = "getimg-ai-image-generator"
     generator_plugin_config: dict = {
         "api_key":
-        "key-"
+        ""
     }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
@@ -35,7 +35,7 @@ class SelfieTool(ImageGeneratorTool):
             api_key: str = "",
             img_width=0,
             img_height=0,
-           stream=True) -> Union[List[Block], Task[Any]]:
+            stream=True) -> Union[List[Block], Task[Any]]:
 
         current_model = "realistic-vision-v3"
         #current_model = "dark-sushi-mix-v2-25"
@@ -45,10 +45,9 @@ class SelfieTool(ImageGeneratorTool):
                                                   {}).get("level")
         if meta_current_level is not None:
             if int(meta_current_level) < 30:
-                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
+                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
-
 
         meta_image_model = context.metadata.get("instruction",
                                                 {}).get("image_model")
@@ -135,13 +134,14 @@ class SelfieTool(ImageGeneratorTool):
 
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
-            current_negative_prompt += ",(uncensored),(nude),(nsfw)"
+            current_negative_prompt += negative_post
             prompt_with_parentheses += ",((with clothes))"
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets}"
-        #logging.warning("**image prompt**\n" + prompt + "\n" +
-        #                current_negative_prompt + "**")
+        if context.metadata.get("verbose_logging",False):
+            logging.warning("** Running Getimg tool with prompt**\n" + prompt + "\n" +
+                            current_negative_prompt + "**")
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,

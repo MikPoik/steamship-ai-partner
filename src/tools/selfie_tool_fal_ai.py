@@ -40,7 +40,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
                                                   {}).get("level")
         if meta_current_level is not None:
             if int(meta_current_level) < 30:
-                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples)),((ass))"
+                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
 
@@ -133,14 +133,15 @@ class SelfieToolFalAi(ImageGeneratorTool):
 
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
-            current_negative_prompt += ""
+            current_negative_prompt += negative_post
             prompt_with_parentheses += ",(with clothes)"
             prompt += ",(with clothes)"
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt},{pre_prompt}"
-        logging.warning("**image prompt**\n" + prompt + "\n" +
-                        current_negative_prompt + "**")
+        if context.metadata.get("verbose_logging",False):
+            logging.warning("**Running fal-ai image tool with prompt**\n" + prompt + "\n" +
+                            current_negative_prompt + "**")
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,

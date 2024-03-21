@@ -69,7 +69,8 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MIXTRAL, description="llm model to use")
+    llm_model: Optional[str] = Field(SFT_MIXTRAL,
+                                     description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
         description="Together.ai api key")
@@ -82,6 +83,8 @@ class MyAssistantConfig(Config):
     image_model: Optional[str] = Field(
         "realistic-vision-v3",
         description="CivitAI URL or getimg.ai model name, for cli testing")
+    verbose_logging: Optional[str] = Field(
+        True, description="Enable verbose logging")
 
 
 def build_context_appending_emit_func(
@@ -360,6 +363,8 @@ class MyAssistant(AgentService):
             if seed is None:
                 seed = SEED
 
+            context.metadata["verbose_logging"] = self.config.verbose_logging
+
             context.metadata["instruction"] = {
                 "name": name or NAME,
                 "personality": personality or PERSONA,
@@ -385,7 +390,7 @@ class MyAssistant(AgentService):
                 if meta_seed is not None:
                     context.chat_history.append_assistant_message(
                         f'{meta_seed}')
-            #print("context_id: "+context.id)
+
 
             context.chat_history.append_user_message(f"{prompt}")
 
@@ -455,15 +460,17 @@ class MyAssistant(AgentService):
                 selfie_response = selfie_tool.run([Block(text=prompt)],
                                                   context=context,
                                                   img_height=512,
-                                                  img_width=512,stream=False)
+                                                  img_width=512,
+                                                  stream=False)
                 return selfie_response
             else:
                 selfie_tool = SelfieTool()
                 selfie_response = selfie_tool.run([Block(text=prompt)],
                                                   context=context,
                                                   img_height=512,
-                                                  img_width=512,stream=False)
-                
+                                                  img_width=512,
+                                                  stream=False)
+
                 return selfie_response
 
     @post("initial_index")

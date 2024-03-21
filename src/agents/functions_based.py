@@ -32,18 +32,17 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
 
     IMAGE_PROMPT_TEMPLATE = """Image sharing:
 ---
-{NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Format for image inclusion: 
-``` 
-> {NAME}: response here etc. I want to share an image.
+{NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. For image inclusion, example: 
+> {NAME}: write response here etc. I want to share an image.
 > ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
-```"""
+"""
 
     COT_IMAGE_PROMPT_TEMPLATE = """
-You can share an image, consider if you are comfortable to share the requested image. Response format for image sharing: 
-``` 
-> {NAME}: write response here
+You can share an image, consider if you are comfortable to share the requested image. Useage for image sharing, example: 
+> {NAME}: write here reply about the image
 > ![Keywords: Insert keyword list describing {NAME}'s{current_explicit_content}image in detail]({NAME}.jpg)
-```
+
+Otherwise continue conversation
 """
     level_descriptions = {}
     PROMPT = """"""
@@ -55,6 +54,7 @@ You can share an image, consider if you are comfortable to share the requested i
     usage_entry: UsageEntry = None
     current_explicit_content = ""
     current_level = 1
+    verbose_logging = False
 
     def __init__(self, tools: List[Tool], llm: ChatLLM, client: Steamship,
                  **kwargs):
@@ -78,7 +78,7 @@ You can share an image, consider if you are comfortable to share the requested i
     def build_chat_history_for_tool(self,
                                     context: AgentContext) -> List[Block]:
         """Builds a list of chat blocks for the tool."""
-
+        self.verbose_logging = context.metadata.get("verbose_logging", False)
         current_day = datetime.datetime.now().strftime("%A")  # Day of the week
         current_hour = datetime.datetime.now().hour  # Hour of the day
         # Determine the time of day based on the current hour
@@ -190,14 +190,15 @@ You can share an image, consider if you are comfortable to share the requested i
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
-            image_cot_prompt = f"If user is prompting for image, inclusion format for image: ![Keywords: ]({current_name.lower()}.jpg).\nOtherwise continue conversation."
+            image_cot_prompt = f"If user is prompting for image, use ![Keywords: ]({current_name.lower()}.jpg) for image inclusion.\n"
 
         if "true" in images_enabled and image_request:
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(
-                NAME=current_name,
-                current_explicit_content=self.current_explicit_content)
-            markdown_prompt = f"(Single markdown blockquote for {current_name}'s reply with image included as markdown)"
+            #image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(
+            #    NAME=current_name,
+            #    current_explicit_content=self.current_explicit_content)
+            if current_model in ["teknium/OpenHermes-2-Mistral-7B", "Gryphe/MythoMax-L2-13b"]:
+                markdown_prompt = f"(Single markdown blockquote for {current_name}'s reply with image included as markdown)"
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -244,9 +245,9 @@ You can share an image, consider if you are comfortable to share the requested i
                     msg.text = f"### Response:\n> {current_name}: {msg.text}"
                     append_message = True
                 #elif msg.mime_type == MimeTypes.PNG:
-                    #if image_request:
-                    #    msg.text = f"### Response:\n> {current_name}:\n![Keywords: ]({current_name}.jpg)"
-                    #    append_message = True
+                #    if image_request:
+                #        msg.text = f"### Response:\n> {current_name}:\n![Keywords: ]({current_name}.jpg)"
+                #        append_message = True
                 elif msg.chat_role == "user":
                     msg.text = "### Instruction:\n> User: " + msg.text
                     append_message = True
@@ -259,7 +260,7 @@ You can share an image, consider if you are comfortable to share the requested i
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         if image_request:
-            context.chat_history.last_user_message.text += f". Use format: ![Keywords: insert keywords here ]({current_name}.jpg)"
+            context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg)"
         messages.append(context.chat_history.last_user_message)
 
         COT_PROMPT_SYSTEM = f"""{image_cot_prompt}
@@ -298,13 +299,16 @@ In consideration of the user's mood, engagement, and the overall dialogue contex
     def next_action(self, context: AgentContext) -> Action:
         # Build the Chat History that we'll provide as input to the action
         messages = self.build_chat_history_for_tool(context)
-        #for msg in messages:
-        #    logging.warning(msg.text)  #print assistant/user messages
+        if self.verbose_logging:
+            #for msg in messages:
+            #    logging.warning(msg.text)  #print assistant/user messages
+            logging.warning(f'**Prompting LLM {context.metadata.get("instruction", {}).get("model")}')
 
         # Run the default LLM on those messages
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)
         output_text = output_blocks[0].text
-        #logging.warning("\n**Completion**\n" + output_text + "\n**")
+        if self.verbose_logging:
+            logging.warning("**Completion**\n" + output_text + "\n**")
         parsed_response = {}
         future_action = self.output_parser.parse(output_text, parsed_response,
                                                  context)
