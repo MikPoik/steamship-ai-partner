@@ -250,7 +250,7 @@ Image sharing:
             context.chat_history.last_user_message.text #+= f". Use ![Keywords: insert keywords here ]({current_name}.jpg) so I can see the image"
         messages.append(context.chat_history.last_user_message)
 
-        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide single response.{markdown_prompt}"""
+        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide {current_name}'s single response.{markdown_prompt}"""
 
 
         #Add Chain of thought prompt
@@ -268,7 +268,7 @@ Image sharing:
 
         else:
 
-            context.chat_history.last_user_message.text = f"{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide single response.{markdown_prompt}\n> User: {context.chat_history.last_user_message.text}"        
+            context.chat_history.last_user_message.text = f"{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide {current_name}'s single response.{markdown_prompt}\n> User: {context.chat_history.last_user_message.text}"        
         # get working history (completed actions)
         messages.extend(self._function_calls_since_last_user_message(context))
 
