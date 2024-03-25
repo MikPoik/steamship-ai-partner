@@ -27,7 +27,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
             context: AgentContext,
             img_width=0,
             img_height=0,
-           stream=True) -> Union[List[Block], Task[Any]]:
+            stream=True) -> Union[List[Block], Task[Any]]:
 
         #model to use
         current_model = "https://civitai.com/api/download/models/294706"
@@ -40,7 +40,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
                                                   {}).get("level")
         if meta_current_level is not None:
             if int(meta_current_level) < 30:
-                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples))"
+                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
 
@@ -76,8 +76,8 @@ class SelfieToolFalAi(ImageGeneratorTool):
             "guidance": 6,
             "scheduler": "DPM++ 2M Karras",
             "image_size": {
-                "width":image_width,
-                "height":image_height
+                "width": image_width,
+                "height": image_height
             },
             "clip_skip": 2,
             "loras": [
@@ -139,9 +139,9 @@ class SelfieToolFalAi(ImageGeneratorTool):
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt},{pre_prompt}"
-        if context.metadata.get("verbose_logging",False):
-            logging.warning("**Running fal-ai image tool with prompt**\n" + prompt + "\n" +
-                            current_negative_prompt + "**")
+        if context.metadata.get("verbose_logging", False):
+            logging.warning("**Running fal-ai image tool with prompt**\n" +
+                            prompt + "\n" + current_negative_prompt + "**")
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,

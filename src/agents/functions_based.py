@@ -21,29 +21,18 @@ class FunctionsBasedAgent(ChatAgent):
 
     PROMPT_TEMPLATE = """Enter role-play mode, you are {NAME} a {CHARACTER_TYPE}
 
-## Traits:
----
+Traits:
 - {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
 - {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}
-
 {image_prompt}
-
 Maintain {NAME}'s unique personality without disclosing AI identity."""
 
-    IMAGE_PROMPT_TEMPLATE = """Image sharing:
----
-{NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. For image inclusion, example: 
-> {NAME}: write response here etc. I want to share an image.
-> ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
+    IMAGE_PROMPT_TEMPLATE = """
+Image sharing:
+{NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Image sharing format example: 
+> {NAME}: write response here etc. I want to share an image. ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
 """
 
-    COT_IMAGE_PROMPT_TEMPLATE = """
-You can share an image, consider if you are comfortable to share the requested image. Useage for image sharing, example: 
-> {NAME}: write here reply about the image
-> ![Keywords: Insert keyword list describing {NAME}'s{current_explicit_content}image in detail]({NAME}.jpg)
-
-Otherwise continue conversation
-"""
     level_descriptions = {}
     PROMPT = """"""
 
@@ -150,7 +139,8 @@ Otherwise continue conversation
             # Generate dynamic level descriptions base on current_level
 
         self.current_level = len(context.chat_history.messages)
-        #logging.warning("current chat length: "+str(self.current_level))
+        if self.verbose_logging:
+            logging.warning("current chat length: " + str(self.current_level))
         context.metadata["instruction"]["level"] = self.current_level
         self.level_descriptions = {
             0: {
@@ -185,20 +175,20 @@ Otherwise continue conversation
         image_cot_prompt = ""
         image_explicit_content = ""
         markdown_prompt = ""
-        if "true" in images_enabled:
+        if "true" in images_enabled and "send" in context.chat_history.last_user_message.text.lower():            
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
-            image_cot_prompt = f"If user is prompting for image, use ![Keywords: ]({current_name.lower()}.jpg) for image inclusion.\n"
-
+            
         if "true" in images_enabled and image_request:
+            image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(
+                NAME=current_name,
+                current_explicit_content=self.current_explicit_content,
+                current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            #image_cot_prompt = self.COT_IMAGE_PROMPT_TEMPLATE.format(
-            #    NAME=current_name,
-            #    current_explicit_content=self.current_explicit_content)
-            if current_model in ["teknium/OpenHermes-2-Mistral-7B", "Gryphe/MythoMax-L2-13b"]:
-                markdown_prompt = f"(Single markdown blockquote for {current_name}'s reply with image included as markdown)"
+            image_cot_prompt = f"If {current_name} is comfortable to share the image, include markdown image ![Keywords: insert keywords descibing image]({current_name.lower()}.jpg) in response. "
+            markdown_prompt = f" Formatted as markdown."
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -242,15 +232,12 @@ Otherwise continue conversation
             append_message = False
             if msg.id not in ids and msg.chat_role != "system":
                 if msg.mime_type == MimeTypes.TXT and not f"{current_name}:" in msg.text and msg.chat_role == "assistant":
-                    msg.text = f"### Response:\n> {current_name}: {msg.text}"
+                    msg.text = f"> {current_name}: {msg.text}"
                     append_message = True
-                #elif msg.mime_type == MimeTypes.PNG:
-                #    if image_request:
-                #        msg.text = f"### Response:\n> {current_name}:\n![Keywords: ]({current_name}.jpg)"
-                #        append_message = True
                 elif msg.chat_role == "user":
-                    msg.text = "### Instruction:\n> User: " + msg.text
+                    msg.text = "> User: " + msg.text
                     append_message = True
+
                 if append_message:
                     messages.append(msg)
                     ids.append(msg.id)
@@ -260,13 +247,11 @@ Otherwise continue conversation
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         if image_request:
-            context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg)"
+            context.chat_history.last_user_message.text #+= f". Use ![Keywords: insert keywords here ]({current_name}.jpg) so I can see the image"
         messages.append(context.chat_history.last_user_message)
 
-        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}
-In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is authentic and engaging. Please provide {current_name}'s single response.
-### Response{markdown_prompt}:
-"""
+        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide single response.{markdown_prompt}"""
+
 
         #Add Chain of thought prompt
         if current_model in [
@@ -276,21 +261,14 @@ In consideration of the user's mood, engagement, and the overall dialogue contex
                 "teknium/OpenHermes-2-Mistral-7B", "Gryphe/MythoMax-L2-13b",
                 "gpt-3.5-turbo-0613"
         ]:
-            context.chat_history.last_user_message.text = "### Instruction:\n> User: " + context.chat_history.last_user_message.text
+            context.chat_history.last_user_message.text = "> User: " + context.chat_history.last_user_message.text
             messages.append(
                 context.chat_history.append_system_message(
                     text=COT_PROMPT_SYSTEM))
-            #logging.warning("COT PROMPT: \n"+COT_PROMPT_SYSTEM)
+
         else:
 
-            context.chat_history.last_user_message.text = f"""{image_cot_prompt}
-In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation interesting and natural? Remember to maintain {current_name}'s personality and ensure the response is authentic and engaging. Please provide {current_name}'s single response.
-### Instruction:
-> User: {context.chat_history.last_user_message.text}
-### Response{markdown_prompt}:
-"""
-            #logging.warning("COT PROMPT: \n"+COT_PROMPT_SYSTEM)
-
+            context.chat_history.last_user_message.text = f"{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide single response.{markdown_prompt}\n> User: {context.chat_history.last_user_message.text}"        
         # get working history (completed actions)
         messages.extend(self._function_calls_since_last_user_message(context))
 
@@ -299,10 +277,14 @@ In consideration of the user's mood, engagement, and the overall dialogue contex
     def next_action(self, context: AgentContext) -> Action:
         # Build the Chat History that we'll provide as input to the action
         messages = self.build_chat_history_for_tool(context)
+            
         if self.verbose_logging:
-            #for msg in messages:
-            #    logging.warning(msg.text)  #print assistant/user messages
-            logging.warning(f'**Prompting LLM {context.metadata.get("instruction", {}).get("model")}')
+            logging.warning("chat sliding window: "+str(len(messages)))
+            for msg in messages:
+                logging.warning(msg.text)  #print assistant/user messages                
+            logging.warning(
+                f'**Prompting LLM {context.metadata.get("instruction", {}).get("model")}'
+            )
 
         # Run the default LLM on those messages
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)

@@ -25,7 +25,7 @@ class SelfieTool(ImageGeneratorTool):
     generator_plugin_handle: str = "getimg-ai-image-generator"
     generator_plugin_config: dict = {
         "api_key":
-        ""
+        "key-"
     }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
@@ -45,7 +45,7 @@ class SelfieTool(ImageGeneratorTool):
                                                   {}).get("level")
         if meta_current_level is not None:
             if int(meta_current_level) < 30:
-                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored)),((nipples))"
+                negative_post = ",((nude)),((naked)),((nsfw)),((uncensored))"
 
         meta_model = context.metadata.get("instruction", {}).get("model")
 
@@ -139,9 +139,9 @@ class SelfieTool(ImageGeneratorTool):
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets}"
-        if context.metadata.get("verbose_logging",False):
-            logging.warning("** Running Getimg tool with prompt**\n" + prompt + "\n" +
-                            current_negative_prompt + "**")
+        if context.metadata.get("verbose_logging", False):
+            logging.warning("** Running Getimg tool with prompt**\n" + prompt +
+                            "\n" + current_negative_prompt + "**")
         task = image_generator.generate(
             text=prompt,
             make_output_public=True,

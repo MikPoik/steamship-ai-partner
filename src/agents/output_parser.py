@@ -52,7 +52,7 @@ class ReACTOutputParser(OutputParser):
         # Updated regex to match the new directive pattern
         image_action = re.findall(r'!\s?\[\s*(.*?)\s*\]\s?\(.*?.\)',
           text,
-          flags=re.DOTALL | re.IGNORECASE)
+          flags=re.IGNORECASE)
         if image_action:
             function_call = True
             run_tool = "selfie_tool"
@@ -76,7 +76,7 @@ class ReACTOutputParser(OutputParser):
         text = text.replace('</s>', "")
         text = re.sub(r'\<.*?\>', '',text).lstrip().rstrip()
         text = text.replace(">", "").rstrip().lstrip()
-        text = text.replace("<", "").rstrip().lstrip()
+        #text = text.replace("<", "").rstrip().lstrip()
         # Reduce multiple line breaks to a single line break after the image action text.
         text = re.sub(r'\n\s*\n', '\n', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)
@@ -146,7 +146,7 @@ class ReACTOutputParser(OutputParser):
                             [Block(text=','.join(tool_input))], context,stream=True)
                         if image_block:
                             result_blocks.extend(image_block)
-                            context.chat_history.append_user_message(
-                                "I received the image!"
-                            )
+                            #context.chat_history.append_user_message(
+                            #    "I received the image!"
+                            #)
         return result_blocks

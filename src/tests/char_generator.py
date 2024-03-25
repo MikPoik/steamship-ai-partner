@@ -17,19 +17,26 @@ with Steamship.temporary_workspace() as steamship:
                                      #"model": "zephyr-chat",
                                      "model": "NousResearch/Nous-Hermes-2-Yi-34B",
                                      "max_tokens": 2500,
-                                     "temperature": 0.0,
+                                     "temperature": 0.9,
                                      #"top_p": 0.9
                                  })
     file = File.create(
         steamship,
         blocks=[
             Block(
-                text="""You are a creative role-play game level creator.""",
+                text="""You are a character personality generator""",
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.SYSTEM)],
                 mime_type=MimeTypes.TXT,
             ),
             Block(
                 text="""
+Create me a human character with the following characteristics:
+Name:
+Type:
+Personality:
+Behaviour:
+Appearance: ["Descriptinve keyword list describing character for image generation"]
+Background story:
 """,
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.USER)],
                 mime_type=MimeTypes.TXT,
