@@ -39,8 +39,6 @@ from json import loads
 #Available llm models to use
 GPT3 = "gpt-3.5-turbo-0613"
 GPT4 = "gpt-4-0613"
-LLAMA2_HERMES = "NousResearch/Nous-Hermes-Llama2-70b"
-LLAMA2_HERMES13B = "NousResearch/Nous-Hermes-Llama2-13b"
 MISTRAL = "teknium/OpenHermes-2-Mistral-7B"
 MISTRAL25 = "teknium/OpenHermes-2p5-Mistral-7B"
 ZEPHYR_CHAT = "zephyr-chat"
@@ -81,7 +79,7 @@ class MyAssistantConfig(Config):
         "true", description="Enable Image generation tool")
 
     image_model: Optional[str] = Field(
-        "realistic-vision-v3",
+        "https://civitai.com/api/download/models/156375",
         description="CivitAI URL or getimg.ai model name, for cli testing")
     verbose_logging: Optional[bool] = Field(
         False, description="Enable verbose logging")

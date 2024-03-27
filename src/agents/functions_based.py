@@ -30,7 +30,8 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
     IMAGE_PROMPT_TEMPLATE = """
 Image sharing:
 {NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Image sharing format example: 
-> {NAME}: write response here etc. I want to share an image. ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
+> {NAME}: write response here etc. I want to share an image.
+> ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
 """
 
     level_descriptions = {}
@@ -174,8 +175,7 @@ Image sharing:
         image_prompt = ""
         image_cot_prompt = ""
         image_explicit_content = ""
-        markdown_prompt = ""
-        if "true" in images_enabled and "send" in context.chat_history.last_user_message.text.lower():            
+        if "true" in images_enabled:            
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
@@ -187,8 +187,8 @@ Image sharing:
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = f"If {current_name} is comfortable to share the image, include markdown image ![Keywords: insert keywords descibing image]({current_name.lower()}.jpg) in response. "
-            markdown_prompt = f" Formatted as markdown."
+            image_cot_prompt = f"If {current_name} is comfortable to share the image, use a markdown tool to describe the image ![Keywords: insert keywords descibing image]({current_name.lower()}.jpg) in response. "
+
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -247,10 +247,10 @@ Image sharing:
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         if image_request:
-            context.chat_history.last_user_message.text #+= f". Use ![Keywords: insert keywords here ]({current_name}.jpg) so I can see the image"
+            context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg) to describe the image"
         messages.append(context.chat_history.last_user_message)
 
-        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide {current_name}'s single response.{markdown_prompt}"""
+        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s single response to user only."""
 
 
         #Add Chain of thought prompt
@@ -268,7 +268,7 @@ Image sharing:
 
         else:
 
-            context.chat_history.last_user_message.text = f"{image_cot_prompt}In consideration of the user's mood, engagement, and the overall dialogue context, what does {current_name} say next to keep the conversation fresh, interesting and natural? Maintain {current_name}'s personality and ensure the response is authentic and engaging, provide {current_name}'s single response.{markdown_prompt}\n> User: {context.chat_history.last_user_message.text}"        
+            context.chat_history.last_user_message.text = f"{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s single response to user only.\n> User: {context.chat_history.last_user_message.text}"        
         # get working history (completed actions)
         messages.extend(self._function_calls_since_last_user_message(context))
 
