@@ -67,7 +67,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MIXTRAL,
+    llm_model: Optional[str] = Field(SFT_MIXTRAL,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
@@ -82,7 +82,7 @@ class MyAssistantConfig(Config):
         "https://civitai.com/api/download/models/156375",
         description="CivitAI URL or getimg.ai model name, for cli testing")
     verbose_logging: Optional[bool] = Field(
-        False, description="Enable verbose logging")
+        False, description="Enable verbose cli logging")
 
 
 def build_context_appending_emit_func(

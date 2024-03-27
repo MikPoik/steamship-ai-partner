@@ -30,7 +30,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
     IMAGE_PROMPT_TEMPLATE = """
 Image sharing:
 {NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Image sharing format example: 
-> {NAME}: write response here etc. I want to share an image.
+> {NAME}: write response here etc. I want to share an image. 
 > ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
 """
 
@@ -247,7 +247,7 @@ Image sharing:
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
         if image_request:
-            context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg) to describe the image"
+            context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg) so I can see the image"
         messages.append(context.chat_history.last_user_message)
 
         COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s single response to user only."""
@@ -258,8 +258,7 @@ Image sharing:
                 "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
                 "NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT",
                 "NousResearch/Nous-Hermes-2-Yi-34B",
-                "teknium/OpenHermes-2-Mistral-7B", "Gryphe/MythoMax-L2-13b",
-                "gpt-3.5-turbo-0613"
+                "teknium/OpenHermes-2-Mistral-7B", "Gryphe/MythoMax-L2-13b"
         ]:
             context.chat_history.last_user_message.text = "> User: " + context.chat_history.last_user_message.text
             messages.append(

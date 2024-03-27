@@ -9,7 +9,7 @@ python = ">=3.10.0,<3.11"
 termcolor = "~=2.3.0"
 pytransloadit = "0.2.1"
 pydantic = "==1.10.9"
-steamship = "2.17.33"
+steamship = "2.17.34"
 requests = "~=2.28.1"
 
 [tool.pyright]
