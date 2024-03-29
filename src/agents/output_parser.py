@@ -129,7 +129,7 @@ class ReACTOutputParser(OutputParser):
                 "realistic-vision-v3", "dark-sushi-mix-v2-25",
                 "absolute-reality-v1-8-1", "van-gogh-diffusion",
                 "neverending-dream", "mo-di-diffusion", "synthwave-punk-v2",
-                "dream-shaper-v8"
+                "dream-shaper-v8","arcane-diffusion"
             ]
 
             if create_images == "true":

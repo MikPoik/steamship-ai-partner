@@ -79,7 +79,7 @@ class MyAssistantConfig(Config):
         "true", description="Enable Image generation tool")
 
     image_model: Optional[str] = Field(
-        "https://civitai.com/api/download/models/156375",
+        "realistic-vision-v3",
         description="CivitAI URL or getimg.ai model name, for cli testing")
     verbose_logging: Optional[bool] = Field(
         False, description="Enable verbose cli logging")
@@ -358,9 +358,6 @@ class MyAssistant(AgentService):
         with self.build_default_context(context_id, **kwargs) as context:
             prompt = prompt or kwargs.get("question")
 
-            if seed is None:
-                seed = SEED
-
             context.metadata["verbose_logging"] = self.config.verbose_logging
 
             context.metadata["instruction"] = {
@@ -380,15 +377,12 @@ class MyAssistant(AgentService):
             }
 
             last_agent_msg = context.chat_history.last_agent_message
-            meta_name = context.metadata.get("instruction", {}).get("name")
-            if meta_name is not None:
-                context.metadata["instruction"]["name"] = meta_name
+
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
                     context.chat_history.append_assistant_message(
                         f'{meta_seed}')
-
 
             context.chat_history.append_user_message(f"{prompt}")
 
@@ -451,7 +445,7 @@ class MyAssistant(AgentService):
                 "realistic-vision-v3", "dark-sushi-mix-v2-25",
                 "absolute-reality-v1-8-1", "van-gogh-diffusion",
                 "neverending-dream", "mo-di-diffusion", "synthwave-punk-v2",
-                "dream-shaper-v8"
+                "dream-shaper-v8", "arcane-diffusion"
             ]
             if image_model is not None and image_model not in get_img_ai_models:
                 selfie_tool = SelfieToolFalAi()
