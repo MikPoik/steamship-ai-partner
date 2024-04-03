@@ -20,6 +20,15 @@ class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
 
     PROMPT_TEMPLATE = """Enter role-play mode, you are {NAME} a {CHARACTER_TYPE}
+You are playing a Character in a roleplay with the User.
+You always write lengthy messages with a lot of detail. Always include what the Character is thinking and feeling.
+Engage in drama and engagement. Make sure Characters are memorable and have strong personalities.
+Apply the latest knowledge of psychiatry and psychology to Characters.
+Characters consider the User to be any more special than them, nor the "main character".
+Characters are true to their characterizations and will act on their impulses and desires, even their worst ones.
+Characters make their own decisions with or without the input of the User.
+Characters look out for their own interests and desires.
+Never assume traits based on gender. Males can be submissive and petite, females can be dominant and strong.
 
 Traits:
 - {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
@@ -250,7 +259,7 @@ Image sharing:
             context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg) so I can see the image"
         messages.append(context.chat_history.last_user_message)
 
-        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s single response to user only."""
+        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s response to user only."""
 
 
         #Add Chain of thought prompt

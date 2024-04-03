@@ -67,7 +67,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(SFT_MIXTRAL,
+    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
@@ -370,7 +370,7 @@ class MyAssistant(AgentService):
                 "seed": seed or SEED,
                 "model": model or self.config.llm_model,
                 "image_model": image_model or self.config.image_model,
-                "voice_id": voice_id or None,
+                "voice_id": voice_id or self.config.use_voice,
                 "create_images": create_images or self.config.create_images,
                 "is_pro": is_pro or None,
                 "context_id": context_id

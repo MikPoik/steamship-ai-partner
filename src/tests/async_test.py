@@ -2,7 +2,7 @@ import requests
 import os
 from steamship import Steamship, Block, File
 import json
-url = "https://mpoikkilehto.steamship.run/space-1a8ed605380842359d39359d7443b01c/backend-test-bot-f3066bf8a8a773d14f3ba82096d71dfc/async_prompt"
+url = "https://mpoikkilehto.steamship.run/space-cea37e5e4f64242cfaaa945c24e748a4/backend-test-bot-f6f6d84612d87c45dc51a495b64799c0/async_prompt"
 headers = {
     'Content-Type': 'application/json',
     'Authorization': f'Bearer {os.environ["STEAMSHIP_API_KEY"]}'
@@ -25,7 +25,7 @@ if task_data.get("state") == "failed":
 chat_file_id = file_data.get("id")
 request_id = task_data.get("requestId")
 
-def stream_chat(response, access_token, stream_timeout=10, format="markdown"):
+def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
     if "status" in response and response["status"]["state"] == "failed":
         raise Exception(f"Exception from server: {json.dumps(response)}")
 
@@ -46,7 +46,7 @@ def stream_chat(response, access_token, stream_timeout=10, format="markdown"):
         "Authorization": f"Bearer {access_token}",
         "Accept": "text/event-stream",
     }
-    client = Steamship(api_key=access_token, workspace="space-1a8ed605380842359d39359d7443b01c")
+    client = Steamship(api_key=access_token, workspace="space-cea37e5e4f64242cfaaa945c24e748a4")
     with requests.get(sse_url, headers=headers, stream=True) as response:
         for event in response.iter_lines():
             if event is None:
@@ -64,9 +64,12 @@ def stream_chat(response, access_token, stream_timeout=10, format="markdown"):
                 mimeType = block_created_data.get("mimeType")
                 created_at = block_created_data.get("createdAt")
                 block=Block.get(client=client, _id=block_id)
+                print(block)
+                print(f"block_id: {block_id}, mimeType: {mimeType}, createdAt: {created_at}")
                 if block.mime_type == 'text/plain':
                     # Checking if tag kind is 'chat' and role is 'assistant'
                     chat_tag = next((tag for tag in block.tags if tag.kind == 'chat' and tag.name == 'role' and tag.value.get('string-value') == 'assistant'), None)
+                    print(chat_tag)
                     if chat_tag:
                         print(f"Assistant's message: {block.text}")
                 elif block.mime_type == 'image/png':
