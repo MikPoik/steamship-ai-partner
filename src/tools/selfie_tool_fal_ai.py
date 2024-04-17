@@ -73,7 +73,7 @@ class SelfieToolFalAi(ImageGeneratorTool):
             "model_name": current_model,
             "model_architecture": "sdxl",
             "steps": 30,
-            "guidance": 6,
+            "guidance": 7,
             "scheduler": "DPM++ 2M Karras",
             "image_size": {
                 "width": image_width,

@@ -50,11 +50,12 @@ class ReACTOutputParser(OutputParser):
             #logging.warning(f"run_tool_input: {run_tool_input}")
         
         # Updated regex to match the new directive pattern
-        image_action = re.findall(r'!\s?\[\s*(.*?)\s*\]\s?\(.*?.\)',
+        image_action = re.findall(r'!\[\s*(.*?)\s*\]\s?\(.*?.\)',
           text,
           flags=re.IGNORECASE)
         if image_action:
             function_call = True
+            #logging.warning("image_action: " + str(image_action))
             run_tool = "selfie_tool"
             # Now correctly accessing the first group from the first match
             run_tool_input = [image_action[0]]  
@@ -68,8 +69,10 @@ class ReACTOutputParser(OutputParser):
             text = re.sub(r'\(.*?\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
         else:
             text = re.sub(r'\(.*?.\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
-            
+
+        text = text.replace(f"**{current_name}:**", "").strip()
         text = text.replace(f"{current_name}:", "").strip()
+        
         text = text.replace("### Response:", "").strip()
         text = text.replace('<|im_sep|>', "")
         text = text.replace('<|im_start|>', "")
@@ -87,19 +90,27 @@ class ReACTOutputParser(OutputParser):
                 text = text[:m.start()+1]
             
         if text.count('"') == 2:
-            text = text.replace('"',"",2)
+            text = text.lstrip('"').rstrip('"')
         if text.count("(") == 1:
             text = text.replace("(", "",1)
         if text.count('"') == 1:
             text = text.replace('"', "",1)
         
         text = text.replace("[]","",1)
-        text = text.replace("User","")
+        #text = text.replace("User","")
         text = text.split("#")[0]
         text = text.split("![Keywords:")[0]
         text = text.split("Note:")[0]
         text = text.split("User:")[0]
         text = text.rstrip().lstrip()
+
+        # Add check if no toolname is defined, but text contains regex keywords, run the tool anyway
+        pattern = r"(\bhere\b|\btakes\b|\bsends\b|\bsnaps\b).*?(?:picture|photo|image|selfie|nude|pic|peek|snapshot)"
+        if run_tool is None and re.search(pattern, text, re.IGNORECASE):
+            #logging.warning("No toolname defined, but text contains regex keywords, run the tool anyway")
+            run_tool = "selfie_tool"
+            run_tool_input = [text]
+            
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             self, context.client, text, run_tool, run_tool_input, context),
                             context=context)
@@ -131,7 +142,11 @@ class ReACTOutputParser(OutputParser):
                 "neverending-dream", "mo-di-diffusion", "synthwave-punk-v2",
                 "dream-shaper-v8","arcane-diffusion"
             ]
-
+            pattern = r"(\bhere\b|\btake\b|\bsends\b|\bhere\'s\b).*?(?:picture|photo|image|selfie|nude|pic|peek)"
+            sending_image = re.search(pattern,
+                      text,
+                      re.IGNORECASE)
+            
             if create_images == "true":
                 if tool_name:
                     image_model = context.metadata.get("instruction",
@@ -148,5 +163,5 @@ class ReACTOutputParser(OutputParser):
                             result_blocks.extend(image_block)
                             #context.chat_history.append_user_message(
                             #    "I received the image!"
-                            #)
+                            #)                
         return result_blocks

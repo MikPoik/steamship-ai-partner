@@ -18,7 +18,6 @@ import logging
 
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
-
     PROMPT_TEMPLATE = """Enter role-play mode, you are {NAME} a {CHARACTER_TYPE}
 You are playing a Character in a roleplay with the User.
 You always write lengthy messages with a lot of detail. Always include what the Character is thinking and feeling.
@@ -36,11 +35,9 @@ Traits:
 {image_prompt}
 Maintain {NAME}'s unique personality without disclosing AI identity."""
 
+    #not used now
     IMAGE_PROMPT_TEMPLATE = """
-Image sharing:
-{NAME} can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image in detail and ensure it complements the exchange. Consider if {NAME} is comfortable to share the requested image. Image sharing format example: 
-> {NAME}: write response here etc. I want to share an image. 
-> ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
+You can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image keywords in detail and ensure it complements the exchange. Consider if you are comfortable to share the requested image. Image inclusion format: ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
 """
 
     level_descriptions = {}
@@ -69,7 +66,7 @@ Image sharing:
     def _get_or_create_system_message(self,
                                       context: AgentContext,
                                       system_prompt=None) -> Block:
-        if context.chat_history.last_system_message and not system_prompt:
+        if context.chat_history.last_system_message:
             return context.chat_history.last_system_message
         return context.chat_history.append_system_message(
             text=system_prompt, mime_type=MimeTypes.TXT)
@@ -196,7 +193,7 @@ Image sharing:
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = f"If {current_name} is comfortable to share the image, use a markdown tool to describe the image ![Keywords: insert keywords descibing image]({current_name.lower()}.jpg) in response. "
+            image_cot_prompt = f"If {current_name} is comfortable to share the image, write markdown suffix with keywords for the image in response: ![Keywords: insert keywords list describing {current_name}{self.current_explicit_content} in detail]({current_name.lower()}.jpg)"
 
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
@@ -211,24 +208,27 @@ Image sharing:
             image_prompt=image_prompt,
             current_explicit_content=self.current_explicit_content,
         )
-        sys_msg = self._get_or_create_system_message(context,
-                                                     system_prompt=self.PROMPT)
+        sys_msg = self._get_or_create_system_message(context,system_prompt = self.PROMPT
+                                                     )
         messages: List[Block] = [sys_msg]
 
         messages_from_memory = []
 
         # get prior conversations
+        current_message_limit = MESSAGE_COUNT
+        if "mixtral" in current_model:
+            message_limit = MESSAGE_COUNT_32K
         if context.chat_history.is_searchable():
             messages_from_memory.extend(
                 context.chat_history.search(
                     context.chat_history.last_user_message.text,
-                    k=MESSAGE_COUNT).wait().to_ranked_blocks())
+                    k=current_message_limit).wait().to_ranked_blocks())
             # TODO(dougreid): we need a way to threshold message inclusion, especially for small contexts
 
         # get most recent context
-        messages_from_memory.extend(
-            context.chat_history.select_messages(self.message_selector))
-
+        messages_from_memory.extend(context.chat_history.select_messages(self.message_selector))
+        
+        
         messages_from_memory.sort(key=attrgetter("index_in_file"))
 
         # de-dupe the messages from memory
@@ -236,17 +236,16 @@ Image sharing:
             sys_msg.id,
             context.chat_history.last_user_message.id,
         ]  # filter out last user message, it is appended afterwards
+                        
         for msg in messages_from_memory:
             # Conditions for appending messages are combined for efficiency and readability
             append_message = False
             if msg.id not in ids and msg.chat_role != "system":
-                if msg.mime_type == MimeTypes.TXT and not f"{current_name}:" in msg.text and msg.chat_role == "assistant":
-                    msg.text = f"> {current_name}: {msg.text}"
+                if msg.mime_type == MimeTypes.TXT and msg.chat_role == "assistant":
                     append_message = True
-                elif msg.chat_role == "user":
-                    msg.text = "> User: " + msg.text
+                elif msg.id not in ids and msg.chat_role == "user":
                     append_message = True
-
+                    
                 if append_message:
                     messages.append(msg)
                     ids.append(msg.id)
@@ -255,30 +254,20 @@ Image sharing:
 
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
-        if image_request:
-            context.chat_history.last_user_message.text += f". Use ![Keywords: insert keywords here ]({current_name}.jpg) so I can see the image"
+
         messages.append(context.chat_history.last_user_message)
 
-        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s response to user only."""
+        #COT_PROMPT_SYSTEM =f"Write {current_name}'s next reply to user, do not repeat phrases from history or this message.{image_cot_prompt}"
+        COT_PROMPT_SYSTEM =f"{image_cot_prompt}"
+        #Add Chain of thought prompt
 
 
         #Add Chain of thought prompt
-        if current_model in [
-                "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-                "NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT",
-                "NousResearch/Nous-Hermes-2-Yi-34B",
-                "teknium/OpenHermes-2-Mistral-7B", "Gryphe/MythoMax-L2-13b"
-        ]:
-            context.chat_history.last_user_message.text = "> User: " + context.chat_history.last_user_message.text
-            messages.append(
-                context.chat_history.append_system_message(
-                    text=COT_PROMPT_SYSTEM))
-
-        else:
-
-            context.chat_history.last_user_message.text = f"{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s single response to user only.\n> User: {context.chat_history.last_user_message.text}"        
-        # get working history (completed actions)
-        messages.extend(self._function_calls_since_last_user_message(context))
+        #if image_request and "true" in images_enabled:
+        if len(COT_PROMPT_SYSTEM) > 1:
+            cot_block = Block(text=COT_PROMPT_SYSTEM)
+            cot_block.set_chat_role(RoleTag.SYSTEM)
+            messages.append(cot_block)
 
         return messages
 
@@ -289,7 +278,7 @@ Image sharing:
         if self.verbose_logging:
             logging.warning("chat sliding window: "+str(len(messages)))
             for msg in messages:
-                logging.warning(msg.text)  #print assistant/user messages                
+                logging.warning(f"[{msg.chat_role}] {msg.text}")  #print assistant/user messages                
             logging.warning(
                 f'**Prompting LLM {context.metadata.get("instruction", {}).get("model")}'
             )
@@ -298,11 +287,12 @@ Image sharing:
         output_blocks = self.llm.chat(messages=messages, tools=self.tools)
         output_text = output_blocks[0].text
         if self.verbose_logging:
+            #logging.warning(f"LLM output: {output_blocks}")
             logging.warning("**Completion**\n" + output_text + "\n**")
         parsed_response = {}
-        future_action = self.output_parser.parse(output_text, parsed_response,
-                                                 context)
-
+        
+        future_action = self.output_parser.parse(output_text, parsed_response,context)
+        #future_action = FinishAction(output=output_blocks,context=context)
         if not isinstance(future_action, FinishAction):
             # record the LLM's function response in history
             self._record_action_selection(future_action, context)

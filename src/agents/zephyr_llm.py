@@ -4,6 +4,7 @@ from steamship import Block, File, PluginInstance, Steamship, Tag  #upm package(
 from steamship.agents.schema import LLM, ChatLLM, Tool  #upm package(steamship)
 from steamship.data import TagKind
 from steamship.data.tags.tag_constants import GenerationTag
+from steamship.cli.utils import is_in_replit
 
 PLUGIN_HANDLE = "lemonfox-streaming-llm"
 DEFAULT_MAX_TOKENS = 256
@@ -63,7 +64,7 @@ class Zephyr(LLM):
         options = {}
         if stop:
             stop = stop.split(" ")[0]
-            options["stop"] = ["\n\n", "\n###", "<|im_end|>","\n\nUser"]
+            options["stop"] = ["\n\n", "\n###", "<|im_end|>", "\n\nUser"]
         else:
             options["stop"] = ["\n\n", "\n###", "<|im_end|>", "\n\nUser"]
         #print(options)
@@ -103,15 +104,14 @@ class ChatZephyr(ChatLLM, Zephyr):
         - `max_tokens` (controls the size of LLM responses)
         """
 
-
         options = {}
         if len(tools) > 0:
             functions = []
             for tool in tools:
                 functions.append(tool.as_openai_function())
             #options["functions"] = functions
-        options["stop"] = ["\n\n> User","\n\n###","User:","\n\n"]
-            #print(functions)
+        options["stop"] = ["\n\n**User**", "\n\nUser", "User:", "\n\n\n"]
+        #print(functions)
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
@@ -121,6 +121,8 @@ class ChatZephyr(ChatLLM, Zephyr):
         # for streaming use cases, we want to always use the existing file
         # the way to detect this would be if all messages were from the same file
         #disabled for now, always new file
+        #stream = not is_in_replit()
+        stream = False
         if self._from_same_existing_file(blocks=messages):
             file_id = messages[0].file_id
             block_indices = [b.index_in_file for b in messages]
@@ -130,23 +132,32 @@ class ChatZephyr(ChatLLM, Zephyr):
                 input_file_id=file_id,
                 input_file_block_index_list=block_indices,
                 options=options,
-                # append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
+                streaming=stream,
+                append_output_to_file=
+                True,  # not needed unless streaming. these can be ephemeral.
             )
             generate_task.wait()  # wait
             return generate_task.output.blocks
 
         # if not in same file, then we must create a temporary file and clean up after ourselves.
         try:
-            tags = [Tag(kind=TagKind.GENERATION, name=GenerationTag.PROMPT_COMPLETION)]
-            temp_file = File.create(client=self.client, blocks=messages, tags=tags)
-            generate_task = self.generator.generate(input_file_id=temp_file.id, options=options)
-            generate_task.wait()  # must wait until task is done before we can delete the file
+            tags = [
+                Tag(kind=TagKind.GENERATION,
+                    name=GenerationTag.PROMPT_COMPLETION)
+            ]
+            temp_file = File.create(client=self.client,
+                                    blocks=messages,
+                                    tags=tags)
+            generate_task = self.generator.generate(input_file_id=temp_file.id,
+                                                    options=options)
+            generate_task.wait(
+            )  # must wait until task is done before we can delete the file
             return generate_task.output.blocks
         finally:
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
-        return False #always use new file for now
+        #return False #always use new file for now
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id

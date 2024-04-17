@@ -2,9 +2,11 @@ from typing import List, Optional
 import logging
 from steamship import Block, File, PluginInstance, Steamship, Tag  #upm package(steamship)
 from steamship.agents.schema import LLM, ChatLLM, Tool  #upm package(steamship)
+from steamship.cli.utils import is_in_replit
 from steamship.data import TagKind
 from steamship.data.tags.tag_constants import GenerationTag
-
+from steamship.cli.utils import is_in_replit
+import json
 PLUGIN_HANDLE = "together-ai-generator"
 DEFAULT_MAX_TOKENS = 256
 
@@ -114,16 +116,19 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             #options["functions"] = functions #disable functions
             #print(functions)
         
-        options["stop"] = ["<|im_end|>","</s>","\n\n> User:","\nNote","\n\n###","\n\n\n"]
+        options["stop"] = ["<|im_end|>","</s>","\n\nUser:","\n\n###","\n\n\n"]
         
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
         if "max_retries" in kwargs:
             options["max_retries"] = kwargs["max_retries"]
-            
+
+        #logging.warning(json.dumps(
+        #                   "\n".join([f"[{msg.chat_role}] {msg.as_llm_input()}" for msg in messages])))        
         # for streaming use cases, we want to always use the existing file
         # the way to detect this would be if all messages were from the same file
-        #disabled for now, always new file
+        #stream = not is_in_replit()
+        stream = False
         if self._from_same_existing_file(blocks=messages):
             file_id = messages[0].file_id
             block_indices = [b.index_in_file for b in messages]
@@ -133,7 +138,8 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
                 input_file_id=file_id,
                 input_file_block_index_list=block_indices,
                 options=options,
-                # append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
+                streaming=stream,
+                append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
             )
             generate_task.wait()  # wait
             return generate_task.output.blocks
@@ -149,7 +155,7 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
-        return False #always use new file for now
+        #return False #always use new file for now
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id

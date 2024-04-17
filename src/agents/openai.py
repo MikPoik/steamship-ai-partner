@@ -7,7 +7,7 @@ from steamship.agents.logging import AgentLogging
 from steamship.agents.schema import LLM, ChatLLM, Tool
 from steamship.data import TagKind
 from steamship.data.tags.tag_constants import GenerationTag
-
+from steamship.cli.utils import is_in_replit
 PLUGIN_HANDLE = "gpt-4"
 DEFAULT_MAX_TOKENS = 256
 
@@ -118,7 +118,9 @@ class ChatOpenAI(ChatLLM, OpenAI):
 
         # for streaming use cases, we want to always use the existing file
         # the way to detect this would be if all messages were from the same file
-        if self._from_same_existing_file(blocks=messages): #disabled for now, always new file
+        #stream = not is_in_replit()
+        stream = False
+        if self._from_same_existing_file(blocks=messages): 
             file_id = messages[0].file_id
             block_indices = [b.index_in_file for b in messages]
             block_indices.sort()
@@ -127,7 +129,8 @@ class ChatOpenAI(ChatLLM, OpenAI):
                 input_file_id=file_id,
                 input_file_block_index_list=block_indices,
                 options=options,
-                # append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
+                streaming=stream,
+                append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
             )
             generate_task.wait()  # wait
             return generate_task.output.blocks
@@ -143,7 +146,6 @@ class ChatOpenAI(ChatLLM, OpenAI):
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
-        return False #always return False for now
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id

@@ -2,13 +2,13 @@ import requests
 import os
 from steamship import Steamship, Block, File
 import json
-url = "https://mpoikkilehto.steamship.run/space-cea37e5e4f64242cfaaa945c24e748a4/backend-test-bot-f6f6d84612d87c45dc51a495b64799c0/async_prompt"
+url = "https://mpoikkilehto.steamship.run/space-99670ad1b675ce393862bad46a080a50/backend-test-bot-4fe9584f4949f0e8fad2f8134e02671b/async_prompt"
 headers = {
     'Content-Type': 'application/json',
     'Authorization': f'Bearer {os.environ["STEAMSHIP_API_KEY"]}'
 }
 data = {
-    'prompt': 'send me a selfie',
+    'prompt': 'Hi',
 }
 response = requests.post(url, json=data, headers=headers)
 
@@ -19,13 +19,13 @@ task_request_id = task_data.get("requestId")
 file_data = response_data.get("file", {})
 file_id = file_data.get('id')
 # Print the task_request_id and file_id
-print(task_request_id, " : ", file_id, "\n\n\n")
+#print(task_request_id, " : ", file_id, "\n\n\n")
 if task_data.get("state") == "failed":
     raise Exception(f"Exception from server: {json.dumps(response)}")
 chat_file_id = file_data.get("id")
 request_id = task_data.get("requestId")
 
-def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
+def stream_chat(response, access_token, stream_timeout=30, format="json-no-inner-stream"):
     if "status" in response and response["status"]["state"] == "failed":
         raise Exception(f"Exception from server: {json.dumps(response)}")
 
@@ -46,7 +46,7 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
         "Authorization": f"Bearer {access_token}",
         "Accept": "text/event-stream",
     }
-    client = Steamship(api_key=access_token, workspace="space-cea37e5e4f64242cfaaa945c24e748a4")
+    client = Steamship(api_key=access_token, workspace="space-99670ad1b675ce393862bad46a080a50")
     with requests.get(sse_url, headers=headers, stream=True) as response:
         for event in response.iter_lines():
             if event is None:
@@ -54,7 +54,7 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
                 print("end of events")
                 break
             event_data = event.decode("utf-8")
-            print((event_data))
+            #print((event_data))
             if event_data.startswith("data:"):
                 data_str = event_data[len("data:"):]
                 data_dict = json.loads(data_str)
@@ -64,17 +64,24 @@ def stream_chat(response, access_token, stream_timeout=30, format="markdown"):
                 mimeType = block_created_data.get("mimeType")
                 created_at = block_created_data.get("createdAt")
                 block=Block.get(client=client, _id=block_id)
-                print(block)
-                print(f"block_id: {block_id}, mimeType: {mimeType}, createdAt: {created_at}")
+                #print(block)
+                #print(f"block_id: {block_id}, mimeType: {mimeType}, createdAt: {created_at}")
                 if block.mime_type == 'text/plain':
+                    #print("Block content: " + "".join(content))
                     # Checking if tag kind is 'chat' and role is 'assistant'
                     chat_tag = next((tag for tag in block.tags if tag.kind == 'chat' and tag.name == 'role' and tag.value.get('string-value') == 'assistant'), None)
-                    print(chat_tag)
+                    #print(chat_tag)
                     if chat_tag:
-                        print(f"Assistant's message: {block.text}")
+                        response_text = requests.get(f"https://api.steamship.com/api/v1/block/{block.id}/raw", headers=headers,stream=True)
+                        content = []
+                        for chunk in response_text.iter_content(chunk_size=None):  # Consider setting an appropriate chunk size
+                            if chunk:
+                                content.append(chunk.decode('utf-8'))
+                                print(chunk.decode('utf-8'),flush=True)
+                        #print(f"Assistant's message: {block.text}")
                 elif block.mime_type == 'image/png':
                     if block.stream_state == 'started':
-                        print(block)
+                        #print(block)
                         print(f"https://api.steamship.com/api/v1/block/{block.id}/raw")
 
 stream_chat(response_data,os.environ["STEAMSHIP_API_KEY"])

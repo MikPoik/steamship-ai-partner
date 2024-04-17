@@ -46,6 +46,7 @@ MYTHOMAX = "Gryphe/MythoMax-L2-13b"
 MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
 SFT_MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT"
 YI34B = "NousResearch/Nous-Hermes-2-Yi-34B"
+DOLPHIN = "cognitivecomputations/dolphin-2.5-mixtral-8x7b"
 
 os.environ["GUARDRAILS_PROCESS_COUNT"] = "1"
 
@@ -83,6 +84,7 @@ class MyAssistantConfig(Config):
         description="CivitAI URL or getimg.ai model name, for cli testing")
     verbose_logging: Optional[bool] = Field(
         False, description="Enable verbose cli logging")
+
 
 
 def build_context_appending_emit_func(
@@ -160,6 +162,9 @@ class MyAssistant(AgentService):
                         k=MESSAGE_COUNT)))
 
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
+            current_message_limit = MESSAGE_COUNT
+            if "mixtral" in self.config.llm_model:
+                current_message_limit = MESSAGE_COUNT_32K
             self.set_default_agent(
                 FunctionsBasedAgent(
                     tools,
@@ -168,12 +173,12 @@ class MyAssistant(AgentService):
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
                         temperature=0.8,
-                        #top_p=0.7,
+                        #top_p=0.6,
                         max_tokens=256,
                         max_retries=4),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
+                        k=current_message_limit)))
 
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
@@ -183,7 +188,7 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.8,
+                        temperature=1,
                         #top_p=0.7,
                         max_tokens=256,
                         max_retries=4),
@@ -355,6 +360,7 @@ class MyAssistant(AgentService):
                **kwargs) -> List[Block]:
         """Run an agent with the provided text as the input."""
         #print("context_id: "+context_id)
+
         with self.build_default_context(context_id, **kwargs) as context:
             prompt = prompt or kwargs.get("question")
 
@@ -377,12 +383,13 @@ class MyAssistant(AgentService):
             }
 
             last_agent_msg = context.chat_history.last_agent_message
-
+            meta_name = context.metadata.get("instruction", {}).get("name")
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
                     context.chat_history.append_assistant_message(
                         f'{meta_seed}')
+                    
 
             context.chat_history.append_user_message(f"{prompt}")
 
@@ -505,7 +512,7 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
     #your workspace name
-    client = Steamship(workspace="partner-ai-dev4-ws")
+    #client = Steamship(workspace="partner-ai-dev5-ws")
     context_id = uuid.uuid4()
     #context_id="mipotest2"
     #print("chat id " + str(context_id))
@@ -514,4 +521,4 @@ if __name__ == "__main__":
               agent_package_config={
                   'botToken': 'not-a-real-token-for-local-testing'
               },
-              context_id=context_id).run_with_client(client=client)
+              context_id=context_id).run()
