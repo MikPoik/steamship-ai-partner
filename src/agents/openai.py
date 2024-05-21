@@ -139,13 +139,14 @@ class ChatOpenAI(ChatLLM, OpenAI):
         try:
             tags = [Tag(kind=TagKind.GENERATION, name=GenerationTag.PROMPT_COMPLETION)]
             temp_file = File.create(client=self.client, blocks=messages, tags=tags)
-            generate_task = self.generator.generate(input_file_id=temp_file.id, options=options)
+            generate_task = self.generator.generate(input_file_id=temp_file.id, options=options,streaming=stream,append_output_to_file=True)
             generate_task.wait()  # must wait until task is done before we can delete the file
             return generate_task.output.blocks
         finally:
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
+        return False #return False always otherwise system prompt will be inserted in wrong position. Should be change prompt dynamic prompt to init and kv store to store the prompt.
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id

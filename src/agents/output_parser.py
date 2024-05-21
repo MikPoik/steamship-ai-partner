@@ -51,8 +51,8 @@ class ReACTOutputParser(OutputParser):
         
         # Updated regex to match the new directive pattern
         image_action = re.findall(r'!\[\s*(.*?)\s*\]\s?\(.*?.\)',
-          text,
-          flags=re.IGNORECASE)
+              text,
+              flags=re.IGNORECASE)
         if image_action:
             function_call = True
             #logging.warning("image_action: " + str(image_action))
@@ -60,15 +60,13 @@ class ReACTOutputParser(OutputParser):
             # Now correctly accessing the first group from the first match
             run_tool_input = [image_action[0]]  
             text = re.sub(r'!\s?\[.*?\]', '', text).lstrip().rstrip()
+        
 
         current_model = ""            
         meta_model = context.metadata.get("instruction", {}).get("model")
         if meta_model is not None:
             current_model = meta_model
-        if current_model == "zephyr-chat":
-            text = re.sub(r'\(.*?\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
-        else:
-            text = re.sub(r'\(.*?.\)', '', text,flags=re.DOTALL | re.IGNORECASE).lstrip().rstrip().replace("  "," ")
+
 
         text = text.replace(f"**{current_name}:**", "").strip()
         text = text.replace(f"{current_name}:", "").strip()
@@ -78,14 +76,13 @@ class ReACTOutputParser(OutputParser):
         text = text.replace('<|im_start|>', "")
         text = text.replace('</s>', "")
         text = re.sub(r'\<.*?\>', '',text).lstrip().rstrip()
-        text = text.replace(">", "").rstrip().lstrip()
-        #text = text.replace("<", "").rstrip().lstrip()
-        # Reduce multiple line breaks to a single line break after the image action text.
-        text = re.sub(r'\n\s*\n', '\n', text, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)
+        
+        text = re.sub(r'\<((?!<).)*?\>', '',text).lstrip().rstrip()
+
+        text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)        
         if len(text) > 600:
             # Updated to strip the text to the last . ? ! if too long
-            m = re.search(r"([.!?])[^.!?]*$", text)
+            m = re.search(r'([.!?*"])[^.!?*"]*$', text)
             if m:
                 text = text[:m.start()+1]
             
@@ -105,11 +102,11 @@ class ReACTOutputParser(OutputParser):
         text = text.rstrip().lstrip()
 
         # Add check if no toolname is defined, but text contains regex keywords, run the tool anyway
-        pattern = r"(\bhere\b|\btakes\b|\bsends\b|\bsnaps\b).*?(?:picture|photo|image|selfie|nude|pic|peek|snapshot)"
-        if run_tool is None and re.search(pattern, text, re.IGNORECASE):
-            #logging.warning("No toolname defined, but text contains regex keywords, run the tool anyway")
-            run_tool = "selfie_tool"
-            run_tool_input = [text]
+        #pattern = r"(\bhere\b|\btakes\b|\bsends\b|\bsnaps\b).*?(?:picture|photo|image|selfie|nude|pic|peek|snapshot)"
+        #if run_tool is None and re.search(pattern, text, re.IGNORECASE):
+        #    #logging.warning("No toolname defined, but text contains regex keywords, run the tool anyway")
+        #    run_tool = "selfie_tool"
+        #    run_tool_input = [text]
             
         return FinishAction(output=ReACTOutputParser._blocks_from_text(
             self, context.client, text, run_tool, run_tool_input, context),

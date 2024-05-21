@@ -28,14 +28,12 @@ Characters are true to their characterizations and will act on their impulses an
 Characters make their own decisions with or without the input of the User.
 Characters look out for their own interests and desires.
 Never assume traits based on gender. Males can be submissive and petite, females can be dominant and strong.
-
-Traits:
+Characters do not disclose sensitive personal information, such as sexual preferences or mental health status, unless there is earned trust between interlocutors.
+Character traits:
 - {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
-- {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}
-{image_prompt}
+- {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}{image_prompt}
 Maintain {NAME}'s unique personality without disclosing AI identity."""
 
-    #not used now
     IMAGE_PROMPT_TEMPLATE = """
 You can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image keywords in detail and ensure it complements the exchange. Consider if you are comfortable to share the requested image. Image inclusion format: ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
 """
@@ -154,15 +152,6 @@ You can share an image but only when requested for by user and if it complements
                 "explicit_content": " with clothes ",
             },
             30: {
-                "explicit_content": " with suggestive clothes ",
-            },
-            60: {
-                "explicit_content": " explicit ",
-            },
-            80: {
-                "explicit_content": " uncensored ",
-            },
-            100: {
                 "explicit_content": " ",
             }
         }
@@ -179,22 +168,21 @@ You can share an image but only when requested for by user and if it complements
                                   re.IGNORECASE)
 
         image_prompt = ""
-        image_cot_prompt = ""
+        image_cot_prompt = f""
         image_explicit_content = ""
-        if "true" in images_enabled:            
+        if "true" in images_enabled:
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
-            
+
         if "true" in images_enabled and image_request:
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = f"If {current_name} is comfortable to share the image, write markdown suffix with keywords for the image in response: ![Keywords: insert keywords list describing {current_name}{self.current_explicit_content} in detail]({current_name.lower()}.jpg)"
-
+            image_cot_prompt = f"""If {current_name} is comfortable to share the image, write markdown suffix with keywords for the image in response: ![Keywords: insert keywords list describing {current_name}{self.current_explicit_content} in detail]({current_name.lower()}.jpg)"""
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -208,8 +196,8 @@ You can share an image but only when requested for by user and if it complements
             image_prompt=image_prompt,
             current_explicit_content=self.current_explicit_content,
         )
-        sys_msg = self._get_or_create_system_message(context,system_prompt = self.PROMPT
-                                                     )
+        sys_msg = self._get_or_create_system_message(context,
+                                                     system_prompt=self.PROMPT)
         messages: List[Block] = [sys_msg]
 
         messages_from_memory = []
@@ -222,13 +210,14 @@ You can share an image but only when requested for by user and if it complements
             messages_from_memory.extend(
                 context.chat_history.search(
                     context.chat_history.last_user_message.text,
-                    k=current_message_limit).wait().to_ranked_blocks())
+                    k=MESSAGE_COUNT).wait().to_ranked_blocks())
             # TODO(dougreid): we need a way to threshold message inclusion, especially for small contexts
 
         # get most recent context
-        messages_from_memory.extend(context.chat_history.select_messages(self.message_selector))
-        
-        
+
+        messages_from_memory.extend(
+            context.chat_history.select_messages(self.message_selector))
+
         messages_from_memory.sort(key=attrgetter("index_in_file"))
 
         # de-dupe the messages from memory
@@ -236,7 +225,7 @@ You can share an image but only when requested for by user and if it complements
             sys_msg.id,
             context.chat_history.last_user_message.id,
         ]  # filter out last user message, it is appended afterwards
-                        
+
         for msg in messages_from_memory:
             # Conditions for appending messages are combined for efficiency and readability
             append_message = False
@@ -245,28 +234,28 @@ You can share an image but only when requested for by user and if it complements
                     append_message = True
                 elif msg.id not in ids and msg.chat_role == "user":
                     append_message = True
-                    
+
                 if append_message:
                     messages.append(msg)
                     ids.append(msg.id)
 
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
 
+
+
+        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s response to user only."""
+
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
-
         messages.append(context.chat_history.last_user_message)
 
-        #COT_PROMPT_SYSTEM =f"Write {current_name}'s next reply to user, do not repeat phrases from history or this message.{image_cot_prompt}"
-        COT_PROMPT_SYSTEM =f"{image_cot_prompt}"
         #Add Chain of thought prompt
 
-
-        #Add Chain of thought prompt
-        #if image_request and "true" in images_enabled:
         if len(COT_PROMPT_SYSTEM) > 1:
             cot_block = Block(text=COT_PROMPT_SYSTEM)
             cot_block.set_chat_role(RoleTag.SYSTEM)
+            if self.verbose_logging:
+                logging.warning(COT_PROMPT_SYSTEM)
             messages.append(cot_block)
 
         return messages
@@ -274,11 +263,12 @@ You can share an image but only when requested for by user and if it complements
     def next_action(self, context: AgentContext) -> Action:
         # Build the Chat History that we'll provide as input to the action
         messages = self.build_chat_history_for_tool(context)
-            
+
         if self.verbose_logging:
-            logging.warning("chat sliding window: "+str(len(messages)))
+            logging.warning("chat sliding window: " + str(len(messages)))
             for msg in messages:
-                logging.warning(f"[{msg.chat_role}] {msg.text}")  #print assistant/user messages                
+                logging.warning(f"[{msg.chat_role}] {msg.text}"
+                                )  #print assistant/user messages
             logging.warning(
                 f'**Prompting LLM {context.metadata.get("instruction", {}).get("model")}'
             )
@@ -288,10 +278,11 @@ You can share an image but only when requested for by user and if it complements
         output_text = output_blocks[0].text
         if self.verbose_logging:
             #logging.warning(f"LLM output: {output_blocks}")
-            logging.warning("**Completion**\n" + output_text + "\n**")
+            logging.warning("**Completion**" + output_text + "\n**")
         parsed_response = {}
-        
-        future_action = self.output_parser.parse(output_text, parsed_response,context)
+
+        future_action = self.output_parser.parse(output_text, parsed_response,
+                                                 context)
         #future_action = FinishAction(output=output_blocks,context=context)
         if not isinstance(future_action, FinishAction):
             # record the LLM's function response in history

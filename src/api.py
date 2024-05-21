@@ -68,7 +68,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(ZEPHYR_CHAT,
+    llm_model: Optional[str] = Field(MIXTRAL,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
@@ -83,7 +83,7 @@ class MyAssistantConfig(Config):
         "realistic-vision-v3",
         description="CivitAI URL or getimg.ai model name, for cli testing")
     verbose_logging: Optional[bool] = Field(
-        False, description="Enable verbose cli logging")
+        True, description="Enable verbose cli logging")
 
 
 
@@ -159,7 +159,7 @@ class MyAssistant(AgentService):
                                    moderate_output=False),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
+                        k=RELEVANT_MESSAGES)))
 
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
             current_message_limit = MESSAGE_COUNT
@@ -178,7 +178,7 @@ class MyAssistant(AgentService):
                         max_retries=4),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=current_message_limit)))
+                        k=RELEVANT_MESSAGES)))
 
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
@@ -188,13 +188,13 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=1,
+                        temperature=0.8,
                         #top_p=0.7,
                         max_tokens=256,
                         max_retries=4),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
+                        k=RELEVANT_MESSAGES)))
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         # Uncomment to enable webwidget chat
@@ -314,6 +314,14 @@ class MyAssistant(AgentService):
         context.chat_history.clear()
         return "OK"
 
+    @post("reset_index")
+    def reset_index(self, context_id: Optional[str] = None):
+        indexer = self.indexer_mixin.indexer_mixin._get_index()
+        indexer.reset()
+        
+        logging.warning("reset_index called")
+        return "INDEX_RESET"
+        
     @post("append_history")
     def append_history(self,
                        prompt: Optional[str] = None,
@@ -357,13 +365,14 @@ class MyAssistant(AgentService):
                voice_id: Optional[str] = None,
                create_images: Optional[str] = None,
                is_pro: Optional[str] = None,
+               scenario:Optional[str] = None,
                **kwargs) -> List[Block]:
         """Run an agent with the provided text as the input."""
         #print("context_id: "+context_id)
 
         with self.build_default_context(context_id, **kwargs) as context:
             prompt = prompt or kwargs.get("question")
-
+                        
             context.metadata["verbose_logging"] = self.config.verbose_logging
 
             context.metadata["instruction"] = {
@@ -379,7 +388,8 @@ class MyAssistant(AgentService):
                 "voice_id": voice_id or self.config.use_voice,
                 "create_images": create_images or self.config.create_images,
                 "is_pro": is_pro or None,
-                "context_id": context_id
+                "context_id": context_id,
+                "scenario": scenario or None
             }
 
             last_agent_msg = context.chat_history.last_agent_message
@@ -387,9 +397,7 @@ class MyAssistant(AgentService):
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
-                    context.chat_history.append_assistant_message(
-                        f'{meta_seed}')
-                    
+                    context.chat_history.append_assistant_message(f"{meta_seed}")
 
             context.chat_history.append_user_message(f"{prompt}")
 
@@ -512,10 +520,10 @@ class MyAssistant(AgentService):
 
 if __name__ == "__main__":
     #your workspace name
-    #client = Steamship(workspace="partner-ai-dev5-ws")
-    context_id = uuid.uuid4()
+    #client = Steamship(workspace="2xq0qa9661t4vv5qvufzmmbv7yg-e9a842a86f654fa1b96c82f249e81114")
+    context_id = str(uuid.uuid4())
     #context_id="mipotest2"
-    #print("chat id " + str(context_id))
+    print("chat id " + str(context_id))
     AgentREPL(MyAssistant,
               method="prompt",
               agent_package_config={

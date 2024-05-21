@@ -7,6 +7,7 @@ from steamship.data import TagKind
 from steamship.data.tags.tag_constants import GenerationTag
 from steamship.cli.utils import is_in_replit
 import json
+
 PLUGIN_HANDLE = "together-ai-generator"
 DEFAULT_MAX_TOKENS = 256
 
@@ -65,9 +66,14 @@ class TogetherAiLLM(LLM):
         options = {}
         if stop:
             stop = stop.split(" ")[0]
-            options["stop"] = ["</s>", "\n\n", "<|", "\n###","<|im_end|>","<|im_start|>",f"\n\n{stop}"]
+            options["stop"] = [
+                "</s>", "\n\n", "<|", "\n###", "<|im_end|>", "<|im_start|>",
+                f"\n\n{stop}"
+            ]
         else:
-            options["stop"] = ["\n\n\n", "\n###","<|im_end|>","<|im_start|>","</s>"]
+            options["stop"] = [
+                "\n\n\n", "\n###", "<|im_end|>", "<|im_start|>", "</s>"
+            ]
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
@@ -105,7 +111,7 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
         """
         if len(messages) <= 0:
             return []
-            
+
         #temp_file = File.create(client=self.client, blocks=messages)
 
         options = {}
@@ -115,16 +121,18 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
                 functions.append(tool.as_openai_function())
             #options["functions"] = functions #disable functions
             #print(functions)
-        
-        options["stop"] = ["<|im_end|>","</s>","\n\nUser:","\n\n###","\n\n\n"]
-        
+
+        options["stop"] = [
+            "<|im_end|>", "</s>", "\n\nUser:", "\n###", "\n\n\n"
+        ]
+
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
         if "max_retries" in kwargs:
             options["max_retries"] = kwargs["max_retries"]
 
         #logging.warning(json.dumps(
-        #                   "\n".join([f"[{msg.chat_role}] {msg.as_llm_input()}" for msg in messages])))        
+        #                   "\n".join([f"[{msg.chat_role}] {msg.as_llm_input()}" for msg in messages])))
         # for streaming use cases, we want to always use the existing file
         # the way to detect this would be if all messages were from the same file
         #stream = not is_in_replit()
@@ -133,29 +141,39 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             file_id = messages[0].file_id
             block_indices = [b.index_in_file for b in messages]
             block_indices.sort()
-            
+
             generate_task = self.generator.generate(
                 input_file_id=file_id,
                 input_file_block_index_list=block_indices,
                 options=options,
                 streaming=stream,
-                append_output_to_file=True,  # not needed unless streaming. these can be ephemeral.
+                append_output_to_file=
+                True,  # not needed unless streaming. these can be ephemeral.
             )
             generate_task.wait()  # wait
             return generate_task.output.blocks
 
         # if not in same file, then we must create a temporary file and clean up after ourselves.
         try:
-            tags = [Tag(kind=TagKind.GENERATION, name=GenerationTag.PROMPT_COMPLETION)]
-            temp_file = File.create(client=self.client, blocks=messages, tags=tags)
-            generate_task = self.generator.generate(input_file_id=temp_file.id, options=options)
-            generate_task.wait()  # must wait until task is done before we can delete the file
+            tags = [
+                Tag(kind=TagKind.GENERATION,
+                    name=GenerationTag.PROMPT_COMPLETION)
+            ]
+            temp_file = File.create(client=self.client,
+                                    blocks=messages,
+                                    tags=tags)
+            generate_task = self.generator.generate(input_file_id=temp_file.id,
+                                                    options=options,
+                                                   streaming=stream,
+                                                   append_output_to_file=True)
+            generate_task.wait(
+            )  # must wait until task is done before we can delete the file
             return generate_task.output.blocks
         finally:
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
-        #return False #always use new file for now
+        return False #always use new file for now, otherwise system prompt will be inserted in wrong position. Should be change prompt dynamic prompt to init and kv store to store the prompt.
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id
@@ -163,4 +181,3 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             if b.file_id != file_id:
                 return False
         return True
-

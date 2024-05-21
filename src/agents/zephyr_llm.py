@@ -149,7 +149,9 @@ class ChatZephyr(ChatLLM, Zephyr):
                                     blocks=messages,
                                     tags=tags)
             generate_task = self.generator.generate(input_file_id=temp_file.id,
-                                                    options=options)
+                                                    options=options,
+                                                   streaming=stream,
+                                                   append_output_to_file=True)
             generate_task.wait(
             )  # must wait until task is done before we can delete the file
             return generate_task.output.blocks
@@ -157,7 +159,7 @@ class ChatZephyr(ChatLLM, Zephyr):
             temp_file.delete()
 
     def _from_same_existing_file(self, blocks: List[Block]) -> bool:
-        #return False #always use new file for now
+        return False #always use new file for now,otherwise system prompt will be inserted in wrong position. Should be change prompt dynamic prompt to init and kv store to store the prompt.
         if len(blocks) == 1:
             return blocks[0].file_id is not None
         file_id = blocks[0].file_id
