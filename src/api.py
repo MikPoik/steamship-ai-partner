@@ -47,6 +47,7 @@ MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
 SFT_MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT"
 YI34B = "NousResearch/Nous-Hermes-2-Yi-34B"
 DOLPHIN = "cognitivecomputations/dolphin-2.5-mixtral-8x7b"
+CAPYBARA = "NousResearch/Nous-Capybara-7B-V1p9"
 
 os.environ["GUARDRAILS_PROCESS_COUNT"] = "1"
 
@@ -68,7 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MIXTRAL,
+    llm_model: Optional[str] = Field(SFT_MIXTRAL,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
@@ -83,8 +84,7 @@ class MyAssistantConfig(Config):
         "realistic-vision-v3",
         description="CivitAI URL or getimg.ai model name, for cli testing")
     verbose_logging: Optional[bool] = Field(
-        True, description="Enable verbose cli logging")
-
+        False, description="Enable verbose cli logging")
 
 
 def build_context_appending_emit_func(
@@ -159,10 +159,11 @@ class MyAssistant(AgentService):
                                    moderate_output=False),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=RELEVANT_MESSAGES)))
+                        k=MESSAGE_COUNT)))
 
+        current_message_limit = MESSAGE_COUNT
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
-            current_message_limit = MESSAGE_COUNT
+
             if "mixtral" in self.config.llm_model:
                 current_message_limit = MESSAGE_COUNT_32K
             self.set_default_agent(
@@ -178,7 +179,7 @@ class MyAssistant(AgentService):
                         max_retries=4),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=RELEVANT_MESSAGES)))
+                        k=current_message_limit)))
 
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
@@ -194,7 +195,7 @@ class MyAssistant(AgentService):
                         max_retries=4),
                     client=self.client,
                     message_selector=MessageWindowMessageSelector(
-                        k=RELEVANT_MESSAGES)))
+                        k=current_message_limit)))
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         # Uncomment to enable webwidget chat
@@ -318,10 +319,10 @@ class MyAssistant(AgentService):
     def reset_index(self, context_id: Optional[str] = None):
         indexer = self.indexer_mixin.indexer_mixin._get_index()
         indexer.reset()
-        
+
         logging.warning("reset_index called")
         return "INDEX_RESET"
-        
+
     @post("append_history")
     def append_history(self,
                        prompt: Optional[str] = None,
@@ -365,14 +366,14 @@ class MyAssistant(AgentService):
                voice_id: Optional[str] = None,
                create_images: Optional[str] = None,
                is_pro: Optional[str] = None,
-               scenario:Optional[str] = None,
+               scenario: Optional[str] = None,
                **kwargs) -> List[Block]:
         """Run an agent with the provided text as the input."""
         #print("context_id: "+context_id)
 
         with self.build_default_context(context_id, **kwargs) as context:
             prompt = prompt or kwargs.get("question")
-                        
+
             context.metadata["verbose_logging"] = self.config.verbose_logging
 
             context.metadata["instruction"] = {
@@ -397,7 +398,8 @@ class MyAssistant(AgentService):
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
-                    context.chat_history.append_assistant_message(f"{meta_seed}")
+                    context.chat_history.append_assistant_message(
+                        f"{meta_seed}")
 
             context.chat_history.append_user_message(f"{prompt}")
 

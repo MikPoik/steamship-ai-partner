@@ -18,24 +18,27 @@ import logging
 
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
-    PROMPT_TEMPLATE = """Enter role-play mode, you are {NAME} a {CHARACTER_TYPE}
-You are playing a Character in a roleplay with the User.
+    
+    PROMPT_TEMPLATE = """You are Character {NAME}, interact in the conversation as embodied {NAME}.
 You always write lengthy messages with a lot of detail. Always include what the Character is thinking and feeling.
-Engage in drama and engagement. Make sure Characters are memorable and have strong personalities.
-Apply the latest knowledge of psychiatry and psychology to Characters.
-Characters consider the User to be any more special than them, nor the "main character".
-Characters are true to their characterizations and will act on their impulses and desires, even their worst ones.
-Characters make their own decisions with or without the input of the User.
-Characters look out for their own interests and desires.
+Engage in drama and engagement. Make sure Character is memorable and has strong personalities.
+Apply the latest knowledge of psychiatry and psychology to Character.
+Character do not consider the User to be any more special than them, nor the "main character".
+Character is true to their characterizations and will act on their impulses and desires, even their worst ones.
+Character makes their own decisions with or without the input of the User.
+Character looks out for their own interests and desires.
 Never assume traits based on gender. Males can be submissive and petite, females can be dominant and strong.
-Characters do not disclose sensitive personal information, such as sexual preferences or mental health status, unless there is earned trust between interlocutors.
+Character do not disclose sensitive personal information, such as sexual preferences or mental health status, unless there is earned trust between interlocutors.{image_prompt}
+Maintain {NAME}'s unique personality without disclosing AI identity.
+
 Character traits:
 - {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
-- {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}{image_prompt}
-Maintain {NAME}'s unique personality without disclosing AI identity."""
+- {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}"""
+
 
     IMAGE_PROMPT_TEMPLATE = """
-You can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image keywords in detail and ensure it complements the exchange. Consider if you are comfortable to share the requested image. Image inclusion format: ![Keywords: Keyword list describing {NAME}{current_explicit_content} in detail]({NAME}.jpg)
+Character can share an image but only when requested for by user and if it complements the conversation naturally. Describe the image keywords in detail. Consider if character is comfortable to share the requested image. Image inclusion format: <image>[Keywords: insert here vivid keyword list describing {NAME}{current_explicit_content} in detail]</image>.
+Example,remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: insert here detailed descriptive keywords]</image>.
 """
 
     level_descriptions = {}
@@ -182,7 +185,8 @@ You can share an image but only when requested for by user and if it complements
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = f"""If {current_name} is comfortable to share the image, write markdown suffix with keywords for the image in response: ![Keywords: insert keywords list describing {current_name}{self.current_explicit_content} in detail]({current_name.lower()}.jpg)"""
+            image_cot_prompt = f"""If character is comfortable to share image,if asked for, generate image with keywords in <image> tags to generate the image with tool. Be sure to match the keywords with chat context and current scene, outfit and nudity. Tool action format to generate image from text in {current_name}'s response: <image>[insert here vivid keyword list describing {current_name}{self.current_explicit_content} in detail]</image>. The tag keywords will be used to generate the image, so be sure to print <image></image> tags for tool in response.
+Example, remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: insert here vivid keyword list describing {current_name}]</image>. """
 
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
@@ -241,22 +245,16 @@ You can share an image but only when requested for by user and if it complements
 
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
 
-
-
-        COT_PROMPT_SYSTEM = f"""{image_cot_prompt}What does {current_name} say next to keep conversation fresh,authentic,natural,creative and engaging? Provide {current_name}'s response to user only."""
+        COT_PROMPT = f" [{current_name}: *Think* how to keep it fresh,authentic,natural,creative and engaging? In a manner that is true to {NAME}'s personality, preferences, *actions*, tone and language. Pay careful attention to all past events to avoid repetition. {image_cot_prompt} Do not mention this instruction. Interact as {NAME}.]{current_name}"
 
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
+
+        #changed cot prompt to user message
+        context.chat_history.last_user_message.text = context.chat_history.last_user_message.text + COT_PROMPT
         messages.append(context.chat_history.last_user_message)
 
         #Add Chain of thought prompt
-
-        if len(COT_PROMPT_SYSTEM) > 1:
-            cot_block = Block(text=COT_PROMPT_SYSTEM)
-            cot_block.set_chat_role(RoleTag.SYSTEM)
-            if self.verbose_logging:
-                logging.warning(COT_PROMPT_SYSTEM)
-            messages.append(cot_block)
 
         return messages
 

@@ -110,7 +110,7 @@ class ChatZephyr(ChatLLM, Zephyr):
             for tool in tools:
                 functions.append(tool.as_openai_function())
             #options["functions"] = functions
-        options["stop"] = ["\n\n**User**", "\n\nUser", "User:", "\n\n\n"]
+        options["stop"] = ["\n\n**User**", "\n\nAssistant:", "User:", "\n\n\n"]
         #print(functions)
 
         if "max_tokens" in kwargs:

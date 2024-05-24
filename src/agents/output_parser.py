@@ -50,7 +50,7 @@ class ReACTOutputParser(OutputParser):
             #logging.warning(f"run_tool_input: {run_tool_input}")
         
         # Updated regex to match the new directive pattern
-        image_action = re.findall(r'!\[\s*(.*?)\s*\]\s?\(.*?.\)',
+        image_action = re.findall(r'<image>\[Keywords: (.*?)\]</image>',
               text,
               flags=re.IGNORECASE)
         if image_action:
@@ -59,7 +59,7 @@ class ReACTOutputParser(OutputParser):
             run_tool = "selfie_tool"
             # Now correctly accessing the first group from the first match
             run_tool_input = [image_action[0]]  
-            text = re.sub(r'!\s?\[.*?\]', '', text).lstrip().rstrip()
+            text = re.sub(r'<image>\[Keywords: (.*?)\]</image>', '', text, flags=re.IGNORECASE).lstrip().rstrip()
         
 
         current_model = ""            
@@ -75,9 +75,6 @@ class ReACTOutputParser(OutputParser):
         text = text.replace('<|im_sep|>', "")
         text = text.replace('<|im_start|>', "")
         text = text.replace('</s>', "")
-        text = re.sub(r'\<.*?\>', '',text).lstrip().rstrip()
-        
-        text = re.sub(r'\<((?!<).)*?\>', '',text).lstrip().rstrip()
 
         text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)        
         if len(text) > 600:
@@ -88,17 +85,14 @@ class ReACTOutputParser(OutputParser):
             
         if text.count('"') == 2:
             text = text.lstrip('"').rstrip('"')
-        if text.count("(") == 1:
-            text = text.replace("(", "",1)
         if text.count('"') == 1:
             text = text.replace('"', "",1)
         
         text = text.replace("[]","",1)
-        #text = text.replace("User","")
         text = text.split("#")[0]
         text = text.split("![Keywords:")[0]
-        text = text.split("Note:")[0]
-        text = text.split("User:")[0]
+        text = text.split("[Image:")[0]
+
         text = text.rstrip().lstrip()
 
         # Add check if no toolname is defined, but text contains regex keywords, run the tool anyway
