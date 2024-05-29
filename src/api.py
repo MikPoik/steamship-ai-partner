@@ -69,7 +69,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(SFT_MIXTRAL,
+    llm_model: Optional[str] = Field(MISTRAL,
                                      description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
@@ -78,7 +78,7 @@ class MyAssistantConfig(Config):
     zephyr_api_key: Optional[str] = Field("",
                                           description="Lemonfox api key")
     create_images: Optional[str] = Field(
-        "true", description="Enable Image generation tool")
+        "false", description="Enable Image generation tool")
 
     image_model: Optional[str] = Field(
         "realistic-vision-v3",

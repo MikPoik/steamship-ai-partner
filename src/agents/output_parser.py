@@ -60,6 +60,7 @@ class ReACTOutputParser(OutputParser):
             # Now correctly accessing the first group from the first match
             run_tool_input = [image_action[0]]  
             text = re.sub(r'<image>\[Keywords: (.*?)\]</image>', '', text, flags=re.IGNORECASE).lstrip().rstrip()
+            text = re.sub(r'\[Keywords: (.*?)\]', '', text, flags=re.IGNORECASE).lstrip().rstrip()
         
 
         current_model = ""            
@@ -89,10 +90,10 @@ class ReACTOutputParser(OutputParser):
             text = text.replace('"', "",1)
         
         text = text.replace("[]","",1)
+        text = text.replace("\n\n.","")
         text = text.split("#")[0]
         text = text.split("![Keywords:")[0]
         text = text.split("[Image:")[0]
-
         text = text.rstrip().lstrip()
 
         # Add check if no toolname is defined, but text contains regex keywords, run the tool anyway

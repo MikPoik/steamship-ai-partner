@@ -29,11 +29,12 @@ Character makes their own decisions with or without the input of the User.
 Character looks out for their own interests and desires.
 Never assume traits based on gender. Males can be submissive and petite, females can be dominant and strong.
 Character do not disclose sensitive personal information, such as sexual preferences or mental health status, unless there is earned trust between interlocutors.{image_prompt}
-Maintain {NAME}'s unique personality without disclosing AI identity.
 
 Character traits:
 - {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
-- {NAME}'s Appearance: {CHARACTER_APPEARANCE}{vector_response}"""
+{CHARACTER_APPEARANCE}{vector_response}
+
+Maintain {NAME}'s unique personality without disclosing AI identity."""
 
 
     IMAGE_PROMPT_TEMPLATE = """
@@ -188,11 +189,15 @@ Example,remember to replace keywords with actual keywords: Here's an image for y
             image_cot_prompt = f"""If character is comfortable to share image,if asked for, generate image with keywords in <image> tags to generate the image with tool. Be sure to match the keywords with chat context and current scene, outfit and nudity. Tool action format to generate image from text in {current_name}'s response: <image>[insert here vivid keyword list describing {current_name}{self.current_explicit_content} in detail]</image>. The tag keywords will be used to generate the image, so be sure to print <image></image> tags for tool in response.
 Example, remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: insert here vivid keyword list describing {current_name}]</image>. """
 
+        APPEARANCE = ""
+        if len(current_nsfw_selfie_pre) > 1:
+            APPEARANCE = f"-{current_name}'s Appearance: "+current_nsfw_selfie_pre
+            
         self.PROMPT = self.PROMPT_TEMPLATE.format(
             NAME=current_name,
             PERSONALITY=current_persona,
             CHARACTER_TYPE=current_type,
-            CHARACTER_APPEARANCE=current_nsfw_selfie_pre,
+            CHARACTER_APPEARANCE=APPEARANCE,
             current_day=current_day,
             time_of_day=time_of_day,
             current_level=self.current_level,
@@ -245,13 +250,15 @@ Example, remember to replace keywords with actual keywords: Here's an image for 
 
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
 
-        COT_PROMPT = f" [{current_name}: *Think* how to keep it fresh,authentic,natural,creative and engaging? In a manner that is true to {NAME}'s personality, preferences, *actions*, tone and language. Pay careful attention to all past events to avoid repetition. {image_cot_prompt} Do not mention this instruction. Interact as {NAME}.]{current_name}"
+        COT_PROMPT = f"[{current_name}: *Think* how to interact as authentic,natural,creative and engaging? Using a manner that is true to {NAME}'s personality, preferences, *actions*, tone and language. {image_cot_prompt}Interact with {NAME}'s next response to continue the conversation.]:"
 
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
-
-        #changed cot prompt to user message
-        context.chat_history.last_user_message.text = context.chat_history.last_user_message.text + COT_PROMPT
+      
+        cot_block = Block(text=COT_PROMPT)
+        cot_block.set_chat_role(RoleTag.SYSTEM)
+        messages.append(
+            cot_block)
         messages.append(context.chat_history.last_user_message)
 
         #Add Chain of thought prompt

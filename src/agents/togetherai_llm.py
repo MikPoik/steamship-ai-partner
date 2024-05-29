@@ -123,7 +123,7 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             #print(functions)
 
         options["stop"] = [
-            "<|im_end|>", "</s>", "\n\nUser:", "\n###", "\n\n\n","[Assistant:"
+            "</s>", "\n\nUser:", "\n###", "\n\n\n","\n[Assistant:"
         ]
 
         if "max_tokens" in kwargs:
