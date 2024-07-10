@@ -1,3 +1,4 @@
+from steamship.data.tags.tag_constants import RoleTag
 from agents.functions_based import FunctionsBasedAgent  #upm package(steamship)
 from steamship.agents.logging import AgentLogging  #upm package(steamship)
 from steamship.agents.service.agent_service import AgentService  #upm package(steamship)
@@ -11,7 +12,7 @@ from mixins.extended_telegram import ExtendedTelegramTransport, TelegramTranspor
 from usage_tracking import UsageTracker  #upm package(steamship)
 import uuid, os, re, logging, requests
 from steamship import File, Tag, DocTag  #upm package(steamship)
-from steamship.agents.schema import AgentContext, Metadata, Agent, FinishAction, EmitFunc  #upm package(steamship)
+from steamship.agents.schema import AgentContext, Metadata, Agent, FinishAction, EmitFunc, chathistory  #upm package(steamship)
 from typing import List, Optional
 from pydantic import Field
 from typing import Type
@@ -29,7 +30,7 @@ from utils import send_file_from_local  #upm package(steamship)
 from agents.togetherai_llm import ChatTogetherAiLLM  #upm package(steamship)
 from agents.react import ReACTAgent  #upm package(steamship)
 from message_history_limit import *  #upm package(steamship)
-from steamship.agents.schema.message_selectors import MessageWindowMessageSelector  #upm package(steamship)
+from steamship.agents.schema.message_selectors import TokenWindowMessageSelector  #upm package(steamship)
 from tools.lemonfox_tts_tool import LemonfoxTTSTool  #upm package(steamship)
 from agents.zephyr_llm import ChatZephyr, Zephyr  #upm package(steamship)
 from tools.selfie_tool_fal_ai import SelfieToolFalAi  #upm package(steamship)
@@ -158,14 +159,13 @@ class MyAssistant(AgentService):
                                    max_tokens=256,
                                    moderate_output=False),
                     client=self.client,
-                    message_selector=MessageWindowMessageSelector(
-                        k=MESSAGE_COUNT)))
+                    message_selector=TokenWindowMessageSelector(max_tokens=MAX_TOKENS)))
 
-        current_message_limit = MESSAGE_COUNT
+        current_message_limit = MAX_TOKENS
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
 
             if "mixtral" in self.config.llm_model:
-                current_message_limit = MESSAGE_COUNT_32K
+                current_message_limit = MAX_TOKENS_32K
             self.set_default_agent(
                 FunctionsBasedAgent(
                     tools,
@@ -178,8 +178,8 @@ class MyAssistant(AgentService):
                         max_tokens=256,
                         max_retries=4),
                     client=self.client,
-                    message_selector=MessageWindowMessageSelector(
-                        k=current_message_limit)))
+                    message_selector=TokenWindowMessageSelector(
+                        max_tokens=current_message_limit)))
 
         if "zephyr-chat" in self.config.llm_model:
             self.set_default_agent(
@@ -194,8 +194,8 @@ class MyAssistant(AgentService):
                         max_tokens=256,
                         max_retries=4),
                     client=self.client,
-                    message_selector=MessageWindowMessageSelector(
-                        k=current_message_limit)))
+                    message_selector=TokenWindowMessageSelector(
+                        max_tokens=MAX_TOKENS)))
 
         # This Mixin provides HTTP endpoints that connects this agent to a web client
         # Uncomment to enable webwidget chat
@@ -323,6 +323,36 @@ class MyAssistant(AgentService):
         logging.warning("reset_index called")
         return "INDEX_RESET"
 
+    @post("delete_messages")
+    def delete_messages(self, context_id = "",companionId=""):
+        """TODO: check why deleting messages causes error in chat history append"""
+        #check history length, catch errors.
+        try:
+            context = self.build_default_context(context_id)
+            last_user_message = context.chat_history.last_user_message
+            last_agent_message = context.chat_history.last_agent_message
+            selector = MessageWindowMessageSelector(k=1)
+            user_message_count = 0
+            assistant_message_count = 0
+            for msg in context.chat_history.messages:
+                if msg.chat_role == RoleTag.USER:
+                    user_message_count += 1
+                elif msg.chat_role == RoleTag.ASSISTANT:
+                    assistant_message_count += 1
+
+            #Only delete messages after seed
+            if context.chat_history and assistant_message_count > 1 and user_message_count > 1:               
+                context.chat_history.delete_messages(selector)
+                return "MESSAGES_DELETED"
+            else:
+                return "NO_MESSAGES_TO_DELETE"
+        
+        except Exception as e:
+            logging.warning(str(e))
+            return "ERROR_DELETING_MESSAGES"
+        
+        
+    
     @post("append_history")
     def append_history(self,
                        prompt: Optional[str] = None,
@@ -392,17 +422,18 @@ class MyAssistant(AgentService):
                 "context_id": context_id,
                 "scenario": scenario or None
             }
-
+            
             last_agent_msg = context.chat_history.last_agent_message
             meta_name = context.metadata.get("instruction", {}).get("name")
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
+                    context.chat_history.append_user_message("Begin!")
                     context.chat_history.append_assistant_message(
                         f"{meta_seed}")
 
             context.chat_history.append_user_message(f"{prompt}")
-
+            
             #logging.warning("prompt inputs: " +
             #str(context.metadata["instruction"]))
             output_blocks = []

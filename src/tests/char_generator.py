@@ -15,7 +15,7 @@ with Steamship.temporary_workspace() as steamship:
                                      "api_key": os.environ['TOGETHER_KEY'],
                                      #"api_key": os.environ['LEMONFOX_KEY'],
                                      #"model": "zephyr-chat",
-                                     "model": "NousResearch/Nous-Hermes-2-Yi-34B",
+                                     "model": "cognitivecomputations/dolphin-2.5-mixtral-8x7b",
                                      "max_tokens": 2500,
                                      "temperature": 0.9,
                                      #"top_p": 0.9
@@ -24,20 +24,19 @@ with Steamship.temporary_workspace() as steamship:
         steamship,
         blocks=[
             Block(
-                text="""You are a character personality generator""",
+                text="""You are a creative roleplay character writer""",
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.SYSTEM)],
                 mime_type=MimeTypes.TXT,
             ),
             Block(
                 text="""
-Create me a human character with the following characteristics:
+Come up with fictional female person with the following characteristics:
 Name:
-Type:
-Personality:
-Behaviour:
-Appearance: ["Descriptinve keyword list describing character for image generation"]
-Background story:
-""",
+Type: <short description for the person>
+Personality: <describe personality>
+Behaviour: <describe manners, attitudes, and emotions>
+Physical appearance and body: <Insert here descriptive and detailed keyword list describing character"]
+Background story: <detailed background story about the character and additional details>""",
                 tags=[Tag(kind=TagKind.ROLE, name=RoleTag.USER)],
                 mime_type=MimeTypes.TXT,
             ),

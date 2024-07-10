@@ -50,9 +50,9 @@ class ReACTOutputParser(OutputParser):
             #logging.warning(f"run_tool_input: {run_tool_input}")
         
         # Updated regex to match the new directive pattern
-        image_action = re.findall(r'<image>\[Keywords: (.*?)\]</image>',
+        image_action = re.findall(r'<image>\[(.*?)\]</image>',
               text,
-              flags=re.IGNORECASE)
+              flags=re.IGNORECASE | re.DOTALL)
         if image_action:
             function_call = True
             #logging.warning("image_action: " + str(image_action))
@@ -94,6 +94,7 @@ class ReACTOutputParser(OutputParser):
         text = text.split("#")[0]
         text = text.split("![Keywords:")[0]
         text = text.split("[Image:")[0]
+        text = text.split("[*think*:")[0]
         text = text.rstrip().lstrip()
 
         # Add check if no toolname is defined, but text contains regex keywords, run the tool anyway
