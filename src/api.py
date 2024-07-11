@@ -70,8 +70,7 @@ class MyAssistantConfig(Config):
         "none",
         description=
         "Send voice messages addition to text, values: ogg, mp3,coqui or none")
-    llm_model: Optional[str] = Field(MISTRAL,
-                                     description="llm model to use")
+    llm_model: Optional[str] = Field(MISTRAL, description="llm model to use")
     together_ai_api_key: Optional[str] = Field(
         "",
         description="Together.ai api key")
@@ -159,7 +158,8 @@ class MyAssistant(AgentService):
                                    max_tokens=256,
                                    moderate_output=False),
                     client=self.client,
-                    message_selector=TokenWindowMessageSelector(max_tokens=MAX_TOKENS)))
+                    message_selector=TokenWindowMessageSelector(
+                        max_tokens=MAX_TOKENS)))
 
         current_message_limit = MAX_TOKENS
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
@@ -324,7 +324,7 @@ class MyAssistant(AgentService):
         return "INDEX_RESET"
 
     @post("delete_messages")
-    def delete_messages(self, context_id = "",companionId=""):
+    def delete_messages(self, context_id="", companionId=""):
         """TODO: check why deleting messages causes error in chat history append"""
         #check history length, catch errors.
         try:
@@ -341,18 +341,16 @@ class MyAssistant(AgentService):
                     assistant_message_count += 1
 
             #Only delete messages after seed
-            if context.chat_history and assistant_message_count > 1 and user_message_count > 1:               
+            if context.chat_history and assistant_message_count > 1 and user_message_count > 1:
                 context.chat_history.delete_messages(selector)
                 return "MESSAGES_DELETED"
             else:
                 return "NO_MESSAGES_TO_DELETE"
-        
+
         except Exception as e:
             logging.warning(str(e))
             return "ERROR_DELETING_MESSAGES"
-        
-        
-    
+
     @post("append_history")
     def append_history(self,
                        prompt: Optional[str] = None,
@@ -422,7 +420,7 @@ class MyAssistant(AgentService):
                 "context_id": context_id,
                 "scenario": scenario or None
             }
-            
+
             last_agent_msg = context.chat_history.last_agent_message
             meta_name = context.metadata.get("instruction", {}).get("name")
             if not last_agent_msg:
@@ -433,7 +431,7 @@ class MyAssistant(AgentService):
                         f"{meta_seed}")
 
             context.chat_history.append_user_message(f"{prompt}")
-            
+
             #logging.warning("prompt inputs: " +
             #str(context.metadata["instruction"]))
             output_blocks = []

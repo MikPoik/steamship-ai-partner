@@ -29,11 +29,14 @@ class SelfieTool(ImageGeneratorTool):
     }
     url = "https://api.getimg.ai/v1/stable-diffusion/text-to-image"
 
-    def strip_duplicate_words(self, prompt_words: List[str], pre_prompt_words: List[str]) -> List[str]:
+    def strip_duplicate_words(self, prompt_words: List[str],
+                              pre_prompt_words: List[str]) -> List[str]:
         """Strip duplicate words in prompt_words that already exist in pre_prompt_words."""
-        stripped_prompt_words = [word for word in prompt_words if word not in pre_prompt_words]
+        stripped_prompt_words = [
+            word for word in prompt_words if word not in pre_prompt_words
+        ]
         return stripped_prompt_words
-        
+
     def run(self,
             tool_input: List[Block],
             context: AgentContext,
@@ -124,9 +127,11 @@ class SelfieTool(ImageGeneratorTool):
             else:
                 current_type = meta_type.split(".")[0]
         prompt_words = prompt.split(",")  # Split the prompt into words
-        pre_prompt_words = pre_prompt.split(",")  # Split the pre_prompt into words
-        stripped_prompt_words = self.strip_duplicate_words(prompt_words, pre_prompt_words)
-        
+        pre_prompt_words = pre_prompt.split(
+            ",")  # Split the pre_prompt into words
+        stripped_prompt_words = self.strip_duplicate_words(
+            prompt_words, pre_prompt_words)
+
         prompt_with_parentheses = ', '.join(
             [f'(({word.strip()}))' for word in stripped_prompt_words])
 
@@ -142,7 +147,7 @@ class SelfieTool(ImageGeneratorTool):
         meta_level = context.metadata.get("instruction", {}).get("level")
         if meta_level is not None and meta_level < 30:
             current_negative_prompt += negative_post
-            pre_prompt_with_brackets = "((((with clothes)))),"+pre_prompt_with_brackets
+            pre_prompt_with_brackets = "((((with clothes))))," + pre_prompt_with_brackets
             options["negative_prompt"] = current_negative_prompt
 
         prompt = f"{prompt_with_parentheses},{pre_prompt_with_brackets}"

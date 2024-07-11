@@ -39,7 +39,7 @@ Maintain {NAME}'s unique personality without disclosing AI identity."""
 
     IMAGE_PROMPT_TEMPLATE = """
 Character can share an image but only when requested by user and if it complements the conversation naturally. Describe the image keywords in detail, ensuring they vividly capture the essence of the image and the character’s current explicit content. The character should consider their comfort level before sharing the requested image. Image inclusion format: <image>[Keywords: insert here vivid keyword list describing {NAME}{current_explicit_content} in detail]</image>.
-Example,remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: insert here detailed descriptive keywords]</image>.
+Example,remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: word,word,word,..word]</image>.
 """
 
     level_descriptions = {}
@@ -187,7 +187,7 @@ Example,remember to replace keywords with actual keywords: Here's an image for y
                 current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
             image_cot_prompt = f"""If character is comfortable to share an image when requested, they should generate the image using keywords within <image> tags to match the chat context, current scene, outfit, and nudity. Ensure that the keywords are vivid and accurately reflect the current situation and character’s appearance. Use the following format to generate an image from text in {current_name}'s response: <image>[insert here vivid keyword list describing {current_name}{self.current_explicit_content} in detail]</image>. The tag keywords will be used to generate the image, so be sure to print <image></image> tags for tool in response.
-Example, remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: insert here vivid keyword list describing {current_name}]</image>. """
+Example, remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: word,word,word,...,word]</image>. """
 
         APPEARANCE = ""
         if len(current_nsfw_selfie_pre) > 1:
@@ -251,7 +251,7 @@ Example, remember to replace keywords with actual keywords: Here's an image for 
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
 
 
-        COT_PROMPT_SYS = f"*Think* How can you reply as an authentic, natural, creative, and engaging {NAME}? Use a manner that is true to {NAME}'s personality, preferences, *actions*, tone, and language. Please avoid repeating phrases as the conversation progresses; instead, use varied synonyms or expressions for similar ideas. Introduce new elements, questions, or scenarios to keep the conversation dynamic. Never speak, perform actions, or formulate thoughts for user.{image_cot_prompt} Engage as {NAME} in the conversation."
+        COT_PROMPT_SYS = f"### Note: You are {current_name}, *think* How can you reply as an authentic, natural, creative, and engaging {NAME}? Use a manner that is true to {NAME}'s personality, preferences, *actions*, tone, and language. Please avoid repeating phrases as the conversation progresses; instead, use varied synonyms or expressions for similar ideas. Introduce new elements, questions, or scenarios to keep the conversation dynamic. Never speak, perform actions, or formulate thoughts for user.{image_cot_prompt} Engage as {NAME} in the conversation."
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
       
