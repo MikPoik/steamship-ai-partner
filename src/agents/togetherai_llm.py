@@ -27,6 +27,11 @@ class TogetherAiLLM(LLM):
                  api_key: str = "",
                  model_name: str = "NousResearch/Nous-Hermes-Llama2-13b",
                  temperature: float = 0.4,
+                 top_p: float = 1,
+                 frequency_penalty: float = 0,
+                 presence_penalty: float = 0,
+                 repetition_penalty: float = 1.0,
+                 min_p:float = 0,
                  *args,
                  **kwargs):
         """Create a new instance.
@@ -39,18 +44,27 @@ class TogetherAiLLM(LLM):
         """
         client = client
         max_tokens = DEFAULT_MAX_TOKENS
+
+        
         if "max_tokens" in kwargs:
             max_tokens = kwargs["max_tokens"]
-
+            
+        config = {
+            "api_key": api_key,
+            "model": model_name,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "top_p": top_p,
+            "frequency_penalty": frequency_penalty,
+            "presence_penalty": presence_penalty,
+            "repetition_penalty": repetition_penalty,
+            "min_p": min_p,
+        }
+        
         generator = client.use_plugin(
             PLUGIN_HANDLE,
-            version="1.0.1",
-            config={
-                "api_key": api_key,
-                "model": model_name,
-                "temperature": temperature,
-                "max_tokens": max_tokens
-            },
+            version="1.0.2",
+            config=config,
         )
         super().__init__(client=client, generator=generator, *args, **kwargs)
 
@@ -67,7 +81,7 @@ class TogetherAiLLM(LLM):
         if stop:
             stop = stop.split(" ")[0]
             options["stop"] = [
-                "</s>", "\n\n", "<|", "\n###", "<|im_end|>", "<|im_start|>",
+                "</s>", "\n\n", "<|", "###", "<|im_end|>", "<|im_start|>",
                 f"\n\n{stop}"
             ]
         else:
@@ -123,13 +137,21 @@ class ChatTogetherAiLLM(ChatLLM, TogetherAiLLM):
             #print(functions)
 
         options["stop"] = [
-            "</s>", "\n\nUser:", "\n##", "\n\n\n","\n[Assistant:"
+            "</s>", "\n\nUser:", "\n##", "\n\n\n","<|eot_id|>"
         ]
 
         if "max_tokens" in kwargs:
             options["max_tokens"] = kwargs["max_tokens"]
         if "max_retries" in kwargs:
             options["max_retries"] = kwargs["max_retries"]
+        if "min_p" in kwargs:
+            options["min_p"] = kwargs["min_p"]
+        if "repetition_penalty" in kwargs:
+            options["repetition_penalty"] = kwargs["repetition_penalty"]
+        if "presence_penalty" in kwargs:
+            options["presence_penalty"] = kwargs["presence_penalty"]
+        if "temperature" in kwargs:
+            options["temperature"] = kwargs["temperature"]
 
         #logging.warning(json.dumps(
         #                   "\n".join([f"[{msg.chat_role}] {msg.as_llm_input()}" for msg in messages])))

@@ -25,6 +25,9 @@ class Zephyr(LLM):
                  api_key: str = "",
                  model_name: str = "zephyr-chat",
                  temperature: float = 0.9,
+                 top_p: float = 1,
+                 presence_penalty: float = 0,
+                 frequency_penalty: float = 0,
                  *args,
                  **kwargs):
         """Create a new instance.
@@ -47,7 +50,10 @@ class Zephyr(LLM):
                 "api_key": api_key,
                 "model": model_name,
                 "temperature": temperature,
-                "max_tokens": max_tokens
+                "max_tokens": max_tokens,
+                "presence_penalty": presence_penalty,
+                "frequency_penalty": frequency_penalty,
+                "top_p": top_p
             },
         )
         super().__init__(client=client, generator=generator, *args, **kwargs)

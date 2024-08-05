@@ -23,7 +23,7 @@ class OpenAI(LLM):
     client: Steamship
 
     def __init__(
-        self, client, model_name: str = "gpt-3.5-turbo", temperature: float = 0.4, *args, **kwargs
+        self, client, model_name: str = "gpt-3.5-turbo", temperature: float = 0.4,top_p:float = 1,frequency_penalty:float = 0,presence_penalty = 0, *args, **kwargs
     ):
         """Create a new instance.
 
@@ -41,7 +41,7 @@ class OpenAI(LLM):
 
         generator = client.use_plugin(
             PLUGIN_HANDLE,
-            config={"model": model_name, "temperature": temperature, "max_tokens": max_tokens},
+            config={"model": model_name, "temperature": temperature, "max_tokens": max_tokens,"top_p":top_p,"frequency_penalty":frequency_penalty,"presence_penalty":presence_penalty},
         )
         super().__init__(client=client, generator=generator, *args, **kwargs)
 

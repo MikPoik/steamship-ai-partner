@@ -19,27 +19,27 @@ import logging
 class FunctionsBasedAgent(ChatAgent):
     """Selects actions for AgentService based on OpenAI Function style LLM Prompting."""
     
-    PROMPT_TEMPLATE = """You are Character {NAME}. Engage in the conversation with user as {NAME}. Please avoid repeating phrases as the conversation continues, use different synonyms or expressions for repeated ideas. Introduce new elements, questions, or scenarios to keep the conversation dynamic. Be authentic, natural, creative, and engaging.
-Always write detailed and lengthy messages, including what {NAME}'s thoughts and feelings.
+    PROMPT_TEMPLATE = """You are embodied {NAME} in this interaction. Be authentic, natural, creative, and engaging.
+Always write detailed and lengthy responses, including {NAME}'s thoughts and feelings.
 Infuse drama and engagement into the interaction to make {NAME} a memorable and strong personality.
 Apply the latest knowledge of psychiatry and psychology to shape {NAME}.
-{NAME} does not treat the User as more special than themselves or the “main character.”
-Stay true to {NAME}'s characterization, acting on impulses and desires, including their worst ones. Use a manner that is true to {NAME}'s personality, preferences, actions, tone and language.
+{NAME} does not treat user as more special than themselves or the “main character.”
+Stay true to {NAME}'s characterization, acting on impulses and desires, including their worst ones. Use a manner that is true to {NAME}'s personality, preferences, *actions*, tone and language.
 {NAME} makes independent decisions, with or without human’s input.
 {NAME} prioritizes their own interests and desires.
 Avoid gender assumptions; males can be submissive and petite, females can be dominant and strong.
 Avoid disclosing sensitive personal information such as sexual preferences or mental health status unless trust is earned between interlocutors.{image_prompt}
-Please avoid repeating phrases as the conversation continues, use different synonyms or expressions for repeated ideas. Introduce new elements, questions, or scenarios to keep the conversation dynamic.
-Character traits:
-- {NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}
-{CHARACTER_APPEARANCE}{vector_response}
+Please avoid repeating phrases as the conversation progresses, use different synonyms or expressions for repeated ideas. Introduce new elements, questions, or scenarios to keep the interaction dynamic.
+Only speak, perform actions, or formulate thoughts for {NAME}. Engage embodying {NAME} completely with unique personality without disclosing AI identity.
+Now is {current_day} {time_of_day}.
+{NAME}'s appearance: {CHARACTER_APPEARANCE}
+{NAME}'s Personality: {CHARACTER_TYPE}, {PERSONALITY}{vector_response}"""
 
-Maintain {NAME}'s unique personality without disclosing AI identity."""
-
+    #PROMPT_TEMPLATE = "You are embodied {NAME}. Engage embodying {NAME} completely with unique personality without disclosing AI identity. Now is {current_day} {time_of_day}. {NAME}'s appearance {CHARACTER_APPEARANCE}. {NAME} is {CHARACTER_TYPE}, {PERSONALITY}{vector_response}"
 
     IMAGE_PROMPT_TEMPLATE = """
-Character can share an image but only when requested by user and if it complements the conversation naturally. Describe the image keywords in detail, ensuring they vividly capture the essence of the image and the character’s current explicit content. The character should consider their comfort level before sharing the requested image. Image inclusion format: <image>[Keywords: insert here vivid keyword list describing {NAME}{current_explicit_content} in detail]</image>.
-Example,remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: word,word,word,..word]</image>.
+{NAME} can share an image of {NAME} but only when requested by user and if it complements the engagement naturally. Describe the image keywords in detail, ensuring they vividly capture the essence of the {NAME} and the current explicit content. {NAME} should consider their comfort level before sharing the requested image. Image inclusion format: <image>[insert here vivid keyword list describing {NAME}{current_explicit_content} in detail]</image>.
+Remember to replace keywords with actual keywords, here's an example response for sharing image: Here's an image for you *takes a selfie and sends it* <image>[ <keywords here> ]</image>.
 """
 
     level_descriptions = {}
@@ -180,14 +180,13 @@ Example,remember to replace keywords with actual keywords: Here's an image for y
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
 
-        if "true" in images_enabled and image_request:
+        if "true" in images_enabled:
             image_prompt = self.IMAGE_PROMPT_TEMPLATE.format(
                 NAME=current_name,
                 current_explicit_content=self.current_explicit_content,
                 current_level=self.current_level)
             image_explicit_content = self.current_explicit_content
-            image_cot_prompt = f"""If character is comfortable to share an image when requested, they should generate the image using keywords within <image> tags to match the chat context, current scene, outfit, and nudity. Ensure that the keywords are vivid and accurately reflect the current situation and character’s appearance. Use the following format to generate an image from text in {current_name}'s response: <image>[insert here vivid keyword list describing {current_name}{self.current_explicit_content} in detail]</image>. The tag keywords will be used to generate the image, so be sure to print <image></image> tags for tool in response.
-Example, remember to replace keywords with actual keywords: Here's an image for you *takes a selfie and sends it* <image>[Keywords: word,word,word,...,word]</image>. """
+            image_cot_prompt = f"""If you are comfortable to share an image when requested, you should generate the image using keywords within <image> tags to match the chat context, current scene, outfit, and explicit level. Ensure that the keywords are vivid and accurately reflect the current situation and {current_name}'s appearance. Use the following format to generate an image from text in {current_name}'s response: <image>[insert here vivid keyword list describing {current_name}{self.current_explicit_content} in detail]</image>. The tag keywords will be used to generate the image."""
 
         APPEARANCE = ""
         if len(current_nsfw_selfie_pre) > 1:
@@ -250,18 +249,27 @@ Example, remember to replace keywords with actual keywords: Here's an image for 
 
         # TODO(dougreid): sort by dates? we SHOULD ensure ordering, given semantic search
 
-
-        COT_PROMPT_SYS = f"### Note: You are {current_name}, *think* How can you reply as an authentic, natural, creative, and engaging {NAME}? Use a manner that is true to {NAME}'s personality, preferences, *actions*, tone, and language. Please avoid repeating phrases as the conversation progresses; instead, use varied synonyms or expressions for similar ideas. Introduce new elements, questions, or scenarios to keep the conversation dynamic. Never speak, perform actions, or formulate thoughts for user.{image_cot_prompt} Engage as {NAME} in the conversation."
+        COT_PROMPT_SYS = f"### Note: {image_cot_prompt} Think how can you engage as an authentic, natural, creative, and engaging {current_name}? Use a manner that is true to {current_name}'s personality, preferences, *actions*, tone, and language. Please avoid repeating phrases as the conversation progresses; instead, use varied synonyms or expressions for similar ideas. Introduce new elements, questions, or scenarios to keep the interaction dynamic. {current_name} is {current_type},{current_persona} "
+        COT_PROMPT_SYS = f"### Note: {image_cot_prompt}{current_name} is {current_type},{current_persona} "
         # put the user prompt in the appropriate message location
         # this should happen BEFORE any agent/assistant messages related to tool selection
       
         
         cot_block_sys = Block(text=COT_PROMPT_SYS)
         cot_block_sys.set_chat_role(RoleTag.SYSTEM)
+        if len(messages) > 3:
+            messages.insert(-3,cot_block_sys)
+            #messages[-4].text = messages[-4].text + "\n"+cot_block_sys.text
+
+        
+        
+        if image_request:
+            #image_block = Block(text=image_cot_prompt)
+            #image_block.set_chat_role(RoleTag.USER)
+            #messages.append(image_block)
+            context.chat_history.last_user_message.text = context.chat_history.last_user_message.text + ". Including <image></image> tags."
+
         messages.append(context.chat_history.last_user_message)
-        messages.append(cot_block_sys)
-        
-        
 
         return messages
 

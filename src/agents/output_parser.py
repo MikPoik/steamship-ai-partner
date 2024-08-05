@@ -50,7 +50,7 @@ class ReACTOutputParser(OutputParser):
             #logging.warning(f"run_tool_input: {run_tool_input}")
         
         # Updated regex to match the new directive pattern
-        image_action = re.findall(r'<image>\[(.*?)\]</image>',
+        image_action = re.findall(r'<image>\s*\[(.+?)\]\s*</image>',
               text,
               flags=re.IGNORECASE | re.DOTALL)
         if image_action:
@@ -59,8 +59,9 @@ class ReACTOutputParser(OutputParser):
             run_tool = "selfie_tool"
             # Now correctly accessing the first group from the first match
             run_tool_input = [image_action[0]]  
-            text = re.sub(r'<image>\[Keywords: (.*?)\]</image>', '', text, flags=re.IGNORECASE).lstrip().rstrip()
-            text = re.sub(r'\[Keywords: (.*?)\]', '', text, flags=re.IGNORECASE).lstrip().rstrip()
+            #logging.warning(f"run_tool_input: {run_tool_input}")
+            text = re.sub(r'<image>\[(.+?)\]</image>', '', text, flags=re.IGNORECASE).lstrip().rstrip()
+            text = re.sub(r'\[(.+?)\]', '', text, flags=re.IGNORECASE).lstrip().rstrip()
         
 
         current_model = ""            
@@ -76,6 +77,7 @@ class ReACTOutputParser(OutputParser):
         text = text.replace('<|im_sep|>', "")
         text = text.replace('<|im_start|>', "")
         text = text.replace('</s>', "")
+        text = text.replace(f'As {current_name}, ', "")
 
         text = re.sub(r'\`', '', text, flags=re.DOTALL | re.IGNORECASE)        
         if len(text) > 600:

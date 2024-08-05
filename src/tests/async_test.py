@@ -3,7 +3,9 @@ import os
 from steamship import Steamship, Block, File
 import json
 
-url = "https://mpoikkilehto.steamship.run/b00d8164-6f2e-4c54-b454-a58cc6eaf9a9/b00d8164-6f2e-4c54-b454-a58cc6eaf9a9/async_prompt"
+#url = "https://mpoikkilehto.steamship.run/b00d8164-6f2e-4c54-b454-a58cc6eaf9a9/b00d8164-6f2e-4c54-b454-a58cc6eaf9a9/async_prompt"
+workspace="space-55d3f398fd3292253841b3e4a35b7225"
+url = "https://mpoikkilehto.steamship.run/space-55d3f398fd3292253841b3e4a35b7225/backend-test-bot-21d663b2737bc4b66b21a67e96eb3166/async_prompt"
 headers = {
     'Content-Type': 'application/json',
     'Authorization': f'Bearer {os.environ["STEAMSHIP_API_KEY"]}'
@@ -14,13 +16,14 @@ data = {
 response = requests.post(url, json=data, headers=headers)
 
 response_data = response.json()
+print(response_data)
 task_data = response_data.get("task", {})
 task_request_id = task_data.get("requestId")
 
 file_data = response_data.get("file", {})
 file_id = file_data.get('id')
 # Print the task_request_id and file_id
-#print(task_request_id, " : ", file_id, "\n\n\n")
+print(task_request_id, " : ", file_id, "\n\n\n")
 if task_data.get("state") == "failed":
     raise Exception(f"Exception from server: {json.dumps(response)}")
 chat_file_id = file_data.get("id")
@@ -30,7 +33,7 @@ request_id = task_data.get("requestId")
 def stream_chat(response,
                 access_token,
                 stream_timeout=30,
-                format="json-no-inner-stream"):
+                format="json-no-inner-stream",workspace=""):
     if "status" in response and response["status"]["state"] == "failed":
         raise Exception(f"Exception from server: {json.dumps(response)}")
 
@@ -45,7 +48,7 @@ def stream_chat(response,
     query_string = "&".join(
         [f"{key}={value}" for key, value in query_args.items()])
     url = f"https://api.steamship.com/api/v1/file/{chat_file_id}/stream?{query_string}"
-    #print("SSE URL:",url)
+    print("SSE URL:",url)
     sse_url = url  # SSE stream URL
 
     headers = {
@@ -53,7 +56,7 @@ def stream_chat(response,
         "Accept": "text/event-stream",
     }
     client = Steamship(api_key=access_token,
-                       workspace="b00d8164-6f2e-4c54-b454-a58cc6eaf9a9")
+                       workspace=workspace)
     with requests.get(sse_url, headers=headers, stream=True) as response:
         for event in response.iter_lines():
             if event is None:
@@ -103,4 +106,4 @@ def stream_chat(response,
                         )
 
 
-stream_chat(response_data, os.environ["STEAMSHIP_API_KEY"])
+stream_chat(response_data, os.environ["STEAMSHIP_API_KEY"],workspace=workspace)

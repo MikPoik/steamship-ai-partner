@@ -49,6 +49,8 @@ SFT_MIXTRAL = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-SFT"
 YI34B = "NousResearch/Nous-Hermes-2-Yi-34B"
 DOLPHIN = "cognitivecomputations/dolphin-2.5-mixtral-8x7b"
 CAPYBARA = "NousResearch/Nous-Capybara-7B-V1p9"
+LLAMA3_8B_TURBO = "meta-llama/Meta-Llama-3-8B-Instruct-Turbo"
+SNORKEL = "snorkelai/Snorkel-Mistral-PairRM-DPO"
 
 os.environ["GUARDRAILS_PROCESS_COUNT"] = "1"
 
@@ -154,7 +156,8 @@ class MyAssistant(AgentService):
                     tools,
                     llm=ChatOpenAI(self.client,
                                    model_name=self.config.llm_model,
-                                   temperature=0.8,
+                                   temperature=0.7,
+                                   #top_p=0.8,
                                    max_tokens=256,
                                    moderate_output=False),
                     client=self.client,
@@ -163,9 +166,12 @@ class MyAssistant(AgentService):
 
         current_message_limit = MAX_TOKENS
         if not "zephyr-chat" in self.config.llm_model and "gpt" not in self.config.llm_model:
-
+            temp = 0.75
+            top_p = 0.9               
+                
             if "mixtral" in self.config.llm_model:
                 current_message_limit = MAX_TOKENS_32K
+                
             self.set_default_agent(
                 FunctionsBasedAgent(
                     tools,
@@ -173,8 +179,12 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.together_ai_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.8,
-                        #top_p=0.6,
+                        temperature=temp,
+                        repetition_penalty=1.015, #1.01 #1.08
+                        top_p=top_p,
+                        #min_p=0.05,
+                        presence_penalty=0.1, #0.1 #dolphin 0.6
+                        frequency_penalty=0.01, #0.1 #dolphin 0.01
                         max_tokens=256,
                         max_retries=4),
                     client=self.client,
@@ -189,8 +199,8 @@ class MyAssistant(AgentService):
                         self.client,
                         api_key=self.config.zephyr_api_key,
                         model_name=self.config.llm_model,
-                        temperature=0.8,
-                        #top_p=0.7,
+                        temperature=0.7,
+                        #top_p=0.8,
                         max_tokens=256,
                         max_retries=4),
                     client=self.client,
@@ -355,7 +365,7 @@ class MyAssistant(AgentService):
     def append_history(self,
                        prompt: Optional[str] = None,
                        context_id: Optional[str] = None):
-        logging.warning(prompt)
+        #logging.warning(prompt)
         context = self.build_default_context(context_id)
 
         if prompt:
@@ -426,7 +436,6 @@ class MyAssistant(AgentService):
             if not last_agent_msg:
                 meta_seed = context.metadata.get("instruction", {}).get("seed")
                 if meta_seed is not None:
-                    context.chat_history.append_user_message("Begin!")
                     context.chat_history.append_assistant_message(
                         f"{meta_seed}")
 
